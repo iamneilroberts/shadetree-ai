@@ -10,3 +10,4 @@ cache/
 !tests/fixtures/**
 .claude/worktrees/
 .superpowers/
+*.egg-info/
