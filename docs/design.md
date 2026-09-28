@@ -1,6 +1,6 @@
 # OBD Diagnostic Assistant — Design (draft 1)
 
-_Status: draft, 2026-09-28. Working name `obd-reader` (rename TBD). No production code exists yet._
+_Status: draft, 2026-09-28. Project name `shadetree-ai` (provisional; import package `obd_reader`, repo dir `obd-reader`). No production code exists yet._
 
 ## 1. Purpose
 

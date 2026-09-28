@@ -1,4 +1,4 @@
-# obd-reader (working name)
+# shadetree-ai
 
 A **read-only** OBD-II diagnostic assistant for DIY mechanics. Plug in an adapter, scan the car into a snapshot, and troubleshoot with Claude using that snapshot plus cited reference material.
 

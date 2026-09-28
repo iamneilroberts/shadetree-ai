@@ -1,4 +1,6 @@
-# obd-reader
+# shadetree-ai
+
+Name chosen 2026-09-28 (provisional). PyPI dist/CLI: `shadetree-ai`; Python import package stays `obd_reader` for now; repo directory is still `obd-reader`.
 
 Read-only OBD-II diagnostic assistant. Design: `docs/design.md` (source of truth). Status: design phase — **no production code until the design is approved and Phase 1 starts.**
 

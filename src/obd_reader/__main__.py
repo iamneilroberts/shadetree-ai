@@ -8,7 +8,7 @@ from obd_reader.transport import Transport
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(prog="obd-reader")
+    ap = argparse.ArgumentParser(prog="shadetree-ai")
     sub = ap.add_subparsers(dest="cmd", required=True)
     rp = sub.add_parser("replay", help="build a snapshot from a recorded transcript (no adapter)")
     rp.add_argument("transcript", type=Path)
