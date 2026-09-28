@@ -30,7 +30,7 @@ _PATTERNS = tuple(
         r"ATZ", r"ATD", r"ATWS",
         r"ATE[01]", r"ATL[01]", r"ATS[01]", r"ATH[01]",
         r"ATDPN?", r"ATRV", r"ATI", r"AT@1",
-        r"ATCAF[01]", r"ATAT[012]",
+        r"ATCAF1", r"ATAT[012]",  # ATCAF0 is refused: see test_allowlist.py (CAF0 + 0104)
         r"ATSPA?[0-9A-C]", r"ATTPA?[0-9A-C]",
         rf"ATST{_H}{{2}}",
         rf"ATSH(?:{_H}{{3}}|{_H}{{6}}|{_H}{{8}})",

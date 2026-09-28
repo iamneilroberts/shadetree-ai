@@ -2,7 +2,7 @@
 import re
 
 ERROR_MARKERS = (
-    "NO DATA", "UNABLE TO CONNECT", "BUS INIT", "CAN ERROR", "BUS BUSY",
+    "NO DATA", "UNABLE TO CONNECT", "CAN ERROR", "BUS BUSY",
     "BUFFER FULL", "STOPPED", "ERROR", "?",
 )
 _HEX_LINE = re.compile(r"(?:[0-9A-F]{2} ?)+")
@@ -13,7 +13,9 @@ _FRAME_LINE = re.compile(r"[0-9A-F]+: ((?:[0-9A-F]{2} ?)+)")
 def parse_response(lines: list[str], sid: int) -> bytes | None:
     """Payload starting at the response SID, or None if unsupported/garbled."""
     lines = [ln.strip().upper() for ln in lines if ln.strip()]
-    lines = [ln for ln in lines if not ln.startswith("SEARCHING")]
+    # progress chatter, not errors: "SEARCHING...", K-line "BUS INIT: ...OK"
+    lines = [ln for ln in lines if not ln.startswith("SEARCHING")
+             and not (ln.startswith("BUS INIT") and ln.endswith("OK"))]
     if not lines or any(m in ln for ln in lines for m in ERROR_MARKERS):
         return None
 

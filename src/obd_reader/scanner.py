@@ -65,28 +65,38 @@ def scan(
     if pids01:
         supported["01"] = pids01
 
+    # DTC and VIN replies use a different layout on non-CAN buses (no count byte;
+    # multi-line VIN). Decoding them as CAN would give wrong codes, so skip until
+    # Phase 4 adds the non-CAN layouts.
+    is_can = "15765" in (proto.name or "")
     vin, vin_source = None, "none"
-    p9 = parse_response(transport.send("0900"), 0x49)
-    if p9 is not None and len(p9) >= 6:
-        pids09 = decode_supported(0x00, p9[2:6])
-        supported["09"] = pids09
-    else:
-        pids09 = []
-    if "02" in pids09:
-        pv = parse_response(transport.send("0902"), 0x49)
-        candidate = pv[3:20].decode("ascii", errors="replace") if pv else ""
-        if VIN_RE.fullmatch(candidate):
-            vin, vin_source = candidate, "obd"
+    dtcs = Dtcs()
+    if is_can:
+        p9 = parse_response(transport.send("0900"), 0x49)
+        if p9 is not None and len(p9) >= 6:
+            pids09 = decode_supported(0x00, p9[2:6])
+            supported["09"] = pids09
         else:
-            warnings.append(f"Mode 09 returned an invalid VIN: {candidate!r}")
-    else:
-        warnings.append("VIN unsupported via Mode 09")
+            pids09 = []
+        if "02" in pids09:
+            pv = parse_response(transport.send("0902"), 0x49)
+            candidate = pv[3:20].decode("ascii", errors="replace") if pv else ""
+            if VIN_RE.fullmatch(candidate):
+                vin, vin_source = candidate, "obd"
+            else:
+                warnings.append(f"Mode 09 returned an invalid VIN: {candidate!r}")
+        else:
+            warnings.append("VIN unsupported via Mode 09")
 
-    dtcs = Dtcs(
-        stored=_dtcs(transport, "03", 0x43),
-        pending=_dtcs(transport, "07", 0x47),
-        permanent=_dtcs(transport, "0A", 0x4A),
-    )
+        dtcs = Dtcs(
+            stored=_dtcs(transport, "03", 0x43),
+            pending=_dtcs(transport, "07", 0x47),
+            permanent=_dtcs(transport, "0A", 0x4A),
+        )
+    else:
+        warnings.append(
+            f"non-CAN or unknown protocol ({proto.name!r}): DTC and VIN decoding skipped (not supported yet)"
+        )
 
     mil = Mil()
     p1 = parse_response(transport.send("0101"), 0x41)

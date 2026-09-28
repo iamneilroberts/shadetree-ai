@@ -80,6 +80,24 @@ def test_no_dtc_data_replies_mean_empty_lists_not_a_crash():
     assert snap.dtcs.stored == [] and snap.dtcs.permanent == []
 
 
+def test_non_can_protocol_skips_dtc_and_vin_decoding_with_a_warning():
+    # Non-CAN Mode 03 has no count byte and the VIN reply is 5 lines; decoding
+    # them with the CAN layout would yield wrong codes (P0133 -> P3300).
+    records = _patch(load_transcript(FIXTURE), "ATDP", ["SAE J1850 PWM"])
+    records = _patch(records, "03", ["43 01 33 00 00 00 00"])
+    snap, port = run_scan(records)
+    assert snap.dtcs.stored == [] and snap.vehicle.vin is None
+    assert any("non-CAN" in w for w in snap.warnings)
+    assert not {"03", "07", "0A", "0902"} & set(port.written)
+
+
+def test_unknown_protocol_is_treated_as_non_can():
+    records = [r for r in load_transcript(FIXTURE) if r["tx"] != "ATDP"]
+    snap, port = run_scan(records)
+    assert snap.dtcs.stored == []
+    assert any("non-CAN" in w for w in snap.warnings)
+
+
 def test_cli_replay_prints_a_valid_snapshot():
     out = subprocess.run(
         [sys.executable, "-m", "obd_reader", "replay", str(FIXTURE), "--protocol", "6"],

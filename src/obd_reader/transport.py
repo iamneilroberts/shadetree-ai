@@ -4,7 +4,7 @@ import time
 from pathlib import Path
 from typing import Callable, Protocol
 
-from obd_reader.allowlist import check_command
+from obd_reader.allowlist import ForbiddenCommand, check_command
 
 
 class Port(Protocol):
@@ -61,6 +61,13 @@ class SerialPort:
         self._ser = serial.serial_for_url(url, baudrate=baudrate, timeout=0.1)
 
     def write(self, data: bytes) -> None:
+        # Second gate: SerialPort is public, so it refuses anything that is not
+        # exactly one canonical allowlisted command plus a single CR.
+        if not data.endswith(b"\r") or not data[:-1].isascii():
+            raise ForbiddenCommand(f"not one CR-terminated ASCII command: {data!r}")
+        body = data[:-1].decode("ascii")
+        if check_command(body) != body:
+            raise ForbiddenCommand(f"not a canonical command: {data!r}")
         self._ser.write(data)
 
     def read_until_prompt(self, timeout: float) -> str:

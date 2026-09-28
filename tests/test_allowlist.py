@@ -20,6 +20,9 @@ FORBIDDEN = [
     "10", "1901", "22F190", "2F", "3101",
     # ELM/STN commands that write, persist, or flood
     "ATPP", "ATPP0CSV01", "ATPPS", "ATMA", "ATCF", "ATCM", "STPX", "STPXH7DF", "STSAVE",
+    # CAN auto-formatting off makes the first hex byte the ISO-TP PCI byte, so
+    # "0104" would go out as a Mode 04 (clear DTCs) frame. Never allow it.
+    "ATCAF0", "ATCAF 0",
     # wrong argument length
     "010", "01000", "0200", "020C", "0300", "0A00",
     # injection / framing tricks (Review Focus 1)

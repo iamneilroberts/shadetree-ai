@@ -11,6 +11,16 @@ def test_searching_line_is_ignored():
     assert parse_response(["SEARCHING...", "41 0C 1A F8"], 0x41) == bytes.fromhex("410C1AF8")
 
 
+def test_kline_bus_init_ok_line_is_noise_not_an_error():
+    lines = ["BUS INIT: ...OK", "41 00 BE 3F B8 13"]
+    assert parse_response(lines, 0x41) == bytes.fromhex("4100BE3FB813")
+
+
+@pytest.mark.parametrize("lines", [["BUS INIT: ERROR"], ["BUS INIT: ...ERROR"], ["BUS INIT: ..."]])
+def test_kline_bus_init_failure_returns_none(lines):
+    assert parse_response(lines, 0x41) is None
+
+
 def test_multi_frame_vin():
     lines = ["014", "0: 49 02 01 31 48 47", "1: 43 4D 38 32 36 33 33", "2: 41 30 30 34 33 35 32"]
     payload = parse_response(lines, 0x49)
