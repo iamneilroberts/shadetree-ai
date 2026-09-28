@@ -1,0 +1,10 @@
+.env
+.venv/
+__pycache__/
+.pytest_cache/
+.hypothesis/
+.claude-sessions/
+snapshots/
+transcripts/
+cache/
+!tests/fixtures/**
