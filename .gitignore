@@ -8,3 +8,5 @@ snapshots/
 transcripts/
 cache/
 !tests/fixtures/**
+.claude/worktrees/
+.superpowers/
