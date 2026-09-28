@@ -217,7 +217,7 @@ Playbooks are YAML (steps, conditions, tool calls, expected readings, branches, 
 
 ## 12. Hardware notes (from research)
 
-- OBDLink EX: USB, STN2120 (per scantool.net chip page), lists J1850 PWM/VPW, ISO 9141, KWP, CAN, MS-CAN; no SW-CAN; Windows/Android (no iOS).
+- OBDLink EX: USB, STN2120 (per scantool.net chip page), lists J1850 PWM/VPW, ISO 9141, KWP, CAN; no SW-CAN; Windows/Android (no iOS). MS-CAN: the obdlink.com product page lists it, but the OBD Solutions "which adapter" article says it lacks it — sources conflict (irrelevant to generic scans). Linux is not an officially listed platform; verify USB-serial enumeration on arrival (180-day money-back guarantee).
 - OBDLink SX ($49.95) also lists PWM/VPW; older chip, no MS-CAN.
 - OBDLink CX: BLE only, **no J1850** — excluded. LX/MX+: Bluetooth Classic, `rfcomm`, the wireless upgrade path.
 - Cheap ELM327 clones often lack PWM and ISO 9141; many claim v1.5/v2.1 while running v1.4-era code.
@@ -229,8 +229,8 @@ Playbooks are YAML (steps, conditions, tool calls, expected readings, branches, 
 2. **UDS 0x19** over ISO-TP: enable in a later phase, needs its own gate rules.
 3. **`ATSH`/`ATCRA` allowed** for ECU targeting — constrain to hex values in valid ranges?
 4. **Austin's laptop OS** (Windows/Mac/Linux) and how he installs the MCP server.
-5. **DTC seed:** fabiovila vs hand-built vs audited Wal33D dataset (claims 9,415 generic entries — unaudited, likely inflated).
-6. **Playbook review workflow:** who signs off, and what `reviewed` requires (Austin's shop experience is the scarce input).
+5. **DTC seed:** fabiovila vs hand-built vs audited Wal33D dataset (claims 9,415 generic entries — unaudited, likely inflated). **Decided 2026-09-28:** `provenance_unknown` DTC data is allowed, always tagged as such.
+6. **Playbook review workflow:** who signs off, and what `reviewed` requires (Austin's shop experience is the scarce input). **Decided 2026-09-28:** Austin may read paid/credentialed sources himself and write original playbooks from that knowledge (read-then-rewrite). No copying or automated ingestion of vendor text; his playbooks are tagged `curated`, reviewer Austin.
 7. **Credentialed connectors** (voygent `/onboard` method: transport ladder, `legal-policy.mjs` ToS gate, `burn-ledger.mjs`): each user needs their own account; vendor ToS on automation must be an explicit recorded decision; no retention policy exists yet. Late phase, gitignored cache, `no-redistribute` tag.
 8. **Phone capture path:** no documented phone-to-laptop relay found; candidates: CSV import from existing phone apps, screenshot + vision, WiCAN Pro pilot (unproven).
 9. **Repo name** (see README/chat suggestions).

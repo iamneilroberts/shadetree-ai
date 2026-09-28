@@ -12,6 +12,7 @@ Read-only OBD-II diagnostic assistant. Design: `docs/design.md` (source of truth
 - Grounding rule: every diagnostic claim cites `[ref:<record_id>]` or `[general knowledge, unverified]`. Enforced in evals / `check_citations`, not at MCP runtime.
 - Reference records carry source, confidence, license. `model_drafted`/`unreviewed` playbooks are labeled as such until Austin reviews.
 - Adapter: genuine OBDLink EX (USB). CX has no J1850 — excluded. No cheap ELM327 clones.
+- `provenance_unknown` DTC data allowed if tagged (decided 2026-09-28). Austin may read paid sources and rewrite original playbooks (no copying, no automated vendor ingestion).
 - Credentialed commercial references (ALLDATA etc.) and Mode 22/OBDb: later phases, opt-in, gitignored cache, `no-redistribute` tag.
 
 ## Working rules
