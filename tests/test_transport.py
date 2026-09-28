@@ -49,6 +49,14 @@ def test_recorder_writes_jsonl(tmp_path):
     assert line == {"t": 0.5, "tx": "ATE0", "rx": ["OK"]}
 
 
+def test_recorder_refuses_to_overwrite_an_existing_capture(tmp_path):
+    path = tmp_path / "t.jsonl"
+    path.write_text("precious real capture\n")
+    with pytest.raises(FileExistsError):
+        TranscriptRecorder(path)
+    assert path.read_text() == "precious real capture\n"
+
+
 def test_forbidden_command_is_not_recorded(tmp_path):
     path = tmp_path / "t.jsonl"
     rec = TranscriptRecorder(path)

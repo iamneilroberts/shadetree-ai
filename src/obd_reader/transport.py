@@ -15,7 +15,7 @@ class Port(Protocol):
 
 class TranscriptRecorder:
     def __init__(self, path: Path):
-        self._fh = open(path, "w", encoding="utf-8")
+        self._fh = open(path, "x", encoding="utf-8")  # never overwrite a real capture
 
     def record(self, t: float, tx: str, rx: list[str]) -> None:
         self._fh.write(json.dumps({"t": round(t, 3), "tx": tx, "rx": rx}) + "\n")
