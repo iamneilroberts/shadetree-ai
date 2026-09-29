@@ -99,7 +99,7 @@ Two artifacts per scan:
   "captured_at": "2026-09-28T15:04:11Z",
   "source": {
     "kind": "live | replay | import",
-    "adapter": {"ati": "...", "sti": "...", "chip": "STN2120", "genuine_stn": true},
+    "adapter": {"ati": "...", "sti": "...", "chip": "STN2232", "genuine_stn": true},
     "tool_version": "0.1.0",
     "transcript": "transcripts/<id>.jsonl"
   },
@@ -219,7 +219,7 @@ Playbooks are YAML (steps, conditions, tool calls, expected readings, branches, 
 
 ## 12. Hardware notes (from research)
 
-- OBDLink EX: USB, STN2120 (per scantool.net chip page), lists J1850 PWM/VPW, ISO 9141, KWP, CAN; no SW-CAN; Windows/Android (no iOS). MS-CAN: the obdlink.com product page lists it, but the OBD Solutions "which adapter" article says it lacks it — sources conflict (irrelevant to generic scans). Linux is not an officially listed platform; verify USB-serial enumeration on arrival (180-day money-back guarantee).
+- OBDLink EX: USB, **STN2232 v5.12.4 (read from the unit via `STI`, 2026-09-29; the earlier STN2120 claim was from a web page and is wrong for this unit)**, reports `ELM327 v1.4b` to `ATI` and `OBDLink EX r2.7.1` to `STDI`; enumerates on Linux as FTDI `0403:6015` → `/dev/ttyUSB0`, works at 115200 baud first try. Lists J1850 PWM/VPW, ISO 9141, KWP, CAN; no SW-CAN; Windows/Android (no iOS). MS-CAN: the obdlink.com product page lists it, but the OBD Solutions "which adapter" article says it lacks it — sources conflict (irrelevant to generic scans). Linux is not an officially listed platform; verify USB-serial enumeration on arrival (180-day money-back guarantee).
 - OBDLink SX ($49.95) also lists PWM/VPW; older chip, no MS-CAN.
 - OBDLink CX: BLE only, **no J1850** — excluded. LX/MX+: Bluetooth Classic, `rfcomm`, the wireless upgrade path.
 - Cheap ELM327 clones often lack PWM and ISO 9141; many claim v1.5/v2.1 while running v1.4-era code.
