@@ -83,6 +83,29 @@ def test_serial_port_write_accepts_a_gated_command():
     port.close()
 
 
+def test_serial_port_write_discards_stale_input_first():
+    # A late reply from the previous command must not be read as this answer.
+    port = SerialPort("loop://")
+    port._ser.write(b"STALE\r>")
+    port.write(b"0100\r")
+    assert port._ser.read(64) == b"0100\r"
+    port.close()
+
+
+def test_transport_default_timeout_is_configurable():
+    seen = []
+
+    class TimeoutSpy(SpyPort):
+        def read_until_prompt(self, timeout):
+            seen.append(timeout)
+            return "OK\r"
+
+    t = Transport(TimeoutSpy(), default_timeout=12.0)
+    t.send("ATE0")
+    t.send("ATE0", timeout=1.5)
+    assert seen == [12.0, 1.5]
+
+
 def test_serial_port_reads_up_to_prompt_using_loopback():
     port = SerialPort("loop://")
     port._ser.write(b"NO DATA\r\r>")

@@ -31,16 +31,18 @@ class Transport:
         port: Port,
         recorder: TranscriptRecorder | None = None,
         clock: Callable[[], float] = time.monotonic,
+        default_timeout: float = 5.0,
     ):
         self._port = port
         self._recorder = recorder
         self._clock = clock
         self._t0 = clock()
+        self._default_timeout = default_timeout
 
-    def send(self, cmd: str, timeout: float = 5.0) -> list[str]:
+    def send(self, cmd: str, timeout: float | None = None) -> list[str]:
         canon = check_command(cmd)  # raises before anything touches the port
         self._port.write(canon.encode("ascii") + b"\r")
-        raw = self._port.read_until_prompt(timeout)
+        raw = self._port.read_until_prompt(self._default_timeout if timeout is None else timeout)
         lines = [ln.strip() for ln in raw.replace("\r", "\n").split("\n") if ln.strip()]
         if self._recorder is not None:
             self._recorder.record(self._clock() - self._t0, canon, lines)
@@ -68,6 +70,7 @@ class SerialPort:
         body = data[:-1].decode("ascii")
         if check_command(body) != body:
             raise ForbiddenCommand(f"not a canonical command: {data!r}")
+        self._ser.reset_input_buffer()  # drop any late reply to the previous command
         self._ser.write(data)
 
     def read_until_prompt(self, timeout: float) -> str:
