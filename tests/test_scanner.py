@@ -98,6 +98,18 @@ def test_unknown_protocol_is_treated_as_non_can():
     assert any("non-CAN" in w for w in snap.warnings)
 
 
+def test_auto_protocol_is_not_reported_as_pinned():
+    snap, _ = run_scan(load_transcript(FIXTURE) + [{"tx": "ATSP0", "rx": ["OK"]}], protocol="0")
+    assert snap.protocol.atsp == "0" and snap.protocol.pinned is False
+
+
+def test_no_mode_01_bitmap_gives_a_warning_not_silence():
+    records = _patch(load_transcript(FIXTURE), "0100", ["UNABLE TO CONNECT"])
+    snap, _ = run_scan(records)
+    assert snap.supported_pids.get("01") is None
+    assert any("Mode 01" in w and "no response" in w.lower() for w in snap.warnings)
+
+
 def test_cli_replay_prints_a_valid_snapshot():
     out = subprocess.run(
         [sys.executable, "-m", "obd_reader", "replay", str(FIXTURE), "--protocol", "6"],

@@ -47,7 +47,7 @@ def scan(
     proto = Protocol(
         name=dp.removeprefix("AUTO, ") if dp else None,
         atsp=protocol,
-        pinned=protocol is not None,
+        pinned=protocol not in (None, "0"),  # ATSP0 = automatic search, not a pin
     )
 
     supported: dict[str, list[str]] = {}
@@ -64,6 +64,8 @@ def scan(
         base += 0x20
     if pids01:
         supported["01"] = pids01
+    else:
+        warnings.append("Mode 01: no response to the supported-PID request (no data or unable to connect)")
 
     # DTC and VIN replies use a different layout on non-CAN buses (no count byte;
     # multi-line VIN). Decoding them as CAN would give wrong codes, so skip until
