@@ -7,7 +7,7 @@ name = "shadetree-ai"
 version = "0.1.0"
 requires-python = ">=3.11"
 license = { text = "MIT" }
-dependencies = ["pydantic>=2.6", "pyserial>=3.5"]
+dependencies = ["pydantic>=2.6", "pyserial>=3.5", "mcp>=2.2,<3"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "hypothesis>=6.100"]
@@ -17,3 +17,6 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[project.scripts]
+shadetree-ai-mcp = "obd_reader.mcp_server:main"
