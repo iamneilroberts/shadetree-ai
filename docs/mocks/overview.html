@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>shadetree-ai overview mock</title>
+<style>
+  :root {
+    --bg: #0e1113; --panel: #171b1f; --panel2: #1e2429; --line: #2c343b; --ink: #e8edf0; --muted: #93a0aa;
+    --cyan: #4fc3e8; --amber: #f2a93b; --ok: #7fcf94; --bad: #f07a5a;
+    --cond: Bahnschrift, "DIN Alternate", "Roboto Condensed", "Arial Narrow", "Helvetica Neue", sans-serif;
+    --mono: ui-monospace, "JetBrains Mono", "DejaVu Sans Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.45 var(--mono); }
+  .topbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 10px 16px; border-bottom: 1px solid var(--line); }
+  .brand { font: 700 17px var(--cond); letter-spacing: .04em; }
+  .tabs { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
+  .tab { border: 1px solid var(--line); background: var(--panel); color: var(--muted); padding: 6px 12px; border-radius: 4px;
+         font: 600 13px var(--cond); letter-spacing: .04em; }
+  .tab.on { background: var(--cyan); border-color: var(--cyan); color: #06222c; }
+  .strip { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; padding: 10px 16px; background: var(--panel);
+           border-bottom: 1px solid var(--line); font-size: 12.5px; }
+  .chip { border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px; color: var(--muted); white-space: nowrap; }
+  .chip b { color: var(--ink); font-weight: 600; }
+  .chip.ok b { color: var(--ok); }
+  .chip.live b::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--ok); margin-right: 6px; }
+  .strip .go { margin-left: auto; display: flex; gap: 8px; }
+  button.b { background: var(--panel2); color: var(--ink); border: 1px solid var(--line); border-radius: 4px; padding: 5px 11px;
+             font: 600 12.5px var(--cond); letter-spacing: .03em; cursor: pointer; }
+  button.b.primary { background: var(--cyan); color: #06222c; border-color: var(--cyan); }
+  main { max-width: 1180px; margin: 0 auto; padding: 16px; }
+  h2 { font: 700 12px var(--cond); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin: 18px 0 8px; }
+  h2:first-child { margin-top: 0; }
+  .tiles { display: grid; gap: 12px; grid-template-columns: repeat(5, 1fr); }
+  .tile { background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--ok); border-radius: 8px; padding: 10px 12px; position: relative; min-width: 0; }
+  .tile.watch { border-left-color: var(--amber); }
+  .tile.out { border-left-color: var(--bad); }
+  .tile h3 { font: 700 12px var(--cond); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin: 0 0 6px; padding-right: 26px; }
+  .big { font: 700 36px/1 var(--cond); font-variant-numeric: tabular-nums; }
+  .unit { font: 600 13px var(--cond); color: var(--muted); margin-left: 4px; }
+  .sub { color: var(--muted); font-size: 12px; margin-top: 4px; min-height: 18px; }
+  .sub.watch { color: var(--amber); } .sub.out { color: var(--bad); }
+  svg.spark { width: 100%; height: 34px; display: block; margin-top: 6px; }
+  svg.spark polyline { fill: none; stroke: var(--cyan); stroke-width: 1.6; }
+  .q { position: absolute; top: 8px; right: 8px; width: 22px; height: 22px; border-radius: 50%; border: 1px solid var(--line);
+       background: var(--panel2); color: var(--muted); font: 700 12px var(--cond); cursor: pointer; padding: 0; }
+  .q:hover, .q:focus-visible { color: var(--ink); border-color: var(--muted); }
+  .attn { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
+  .row { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-top: 1px solid var(--line); }
+  .row:first-child { border-top: 0; }
+  .row .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--amber); flex: none; }
+  .row .dot.out { background: var(--bad); }
+  .row .nm { font: 700 13px var(--cond); letter-spacing: .05em; text-transform: uppercase; min-width: 150px; }
+  .row .val { font: 700 15px var(--cond); min-width: 82px; font-variant-numeric: tabular-nums; }
+  .row .why { color: var(--muted); font-size: 12.5px; flex: 1; }
+  .row .q { position: static; flex: none; }
+  .more { display: block; margin-top: 14px; color: var(--cyan); font: 600 13px var(--cond); letter-spacing: .05em; text-decoration: none; }
+  #help { position: fixed; z-index: 50; width: min(360px, calc(100vw - 24px)); background: var(--panel2); border: 1px solid var(--muted);
+          border-radius: 8px; padding: 12px 14px; box-shadow: 0 10px 30px rgba(0,0,0,.55); display: none; }
+  #help.open { display: block; }
+  #help h4 { margin: 0 0 6px; font: 700 14px var(--cond); letter-spacing: .06em; text-transform: uppercase; }
+  #help h5 { margin: 10px 0 3px; font: 700 11px var(--cond); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  #help p, #help li { margin: 0; font-size: 12.5px; }
+  #help ul { margin: 0; padding-left: 18px; }
+  #help .live { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--line); font-size: 12.5px; }
+  #help .draft { margin-top: 8px; color: var(--muted); font-size: 11px; }
+  @media (max-width: 900px) { .tiles { grid-template-columns: repeat(2, 1fr); } .tile.wide { grid-column: span 2; } }
+  @media (max-width: 560px) { .row { flex-wrap: wrap; } .row .nm { min-width: 0; flex: 1; } .row .why { flex: 1 1 100%; order: 3; } .strip .go { margin-left: 0; width: 100%; } .tabs { margin-left: 0; } }
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">shadetree-ai</div>
+  <nav class="tabs"><span class="tab on">Overview</span><span class="tab">Guided test</span><span class="tab">Analyzer</span><span class="tab">Handheld</span><span class="tab">All readings</span></nav>
+</header>
+<div class="strip">
+  <span class="chip live"><b>LIVE</b></span>
+  <span class="chip">car <b>9SXSMUL1-T</b> &middot; seen 2 times</span>
+  <span class="chip">CAN 29/500</span>
+  <span class="chip ok">lamp <b>off</b></span>
+  <span class="chip">codes <b>none stored</b></span>
+  <span class="go"><button class="b">Save run</button><button class="b primary">Stop sampling</button></span>
+</div>
+<main>
+  <h2>Health</h2>
+  <div class="tiles">
+    <div class="tile watch wide" data-help="trims"><button class="q" aria-label="Help: fuel trims">?</button>
+      <h3>Fuel trims</h3><span class="big">+13.3</span><span class="unit">%</span>
+      <div class="sub watch">short-term, bank 2 &middot; other three within &plusmn;5</div>
+      <svg class="spark" viewBox="0 0 120 34" preserveAspectRatio="none"><polyline points="0,20 10,19 20,17 30,18 40,14 50,12 60,9 70,6 80,10 90,8 100,5 110,7 120,4"/></svg></div>
+    <div class="tile" data-help="coolant"><button class="q" aria-label="Help: coolant temperature">?</button>
+      <h3>Coolant</h3><span class="big">88</span><span class="unit">&deg;C</span>
+      <div class="sub">warm, steady</div>
+      <svg class="spark" viewBox="0 0 120 34" preserveAspectRatio="none"><polyline points="0,30 20,26 40,20 60,14 80,10 100,8 120,8"/></svg></div>
+    <div class="tile watch" data-help="volts"><button class="q" aria-label="Help: battery voltage">?</button>
+      <h3>Battery</h3><span class="big">12.1</span><span class="unit">V</span>
+      <div class="sub watch">low for a running engine</div>
+      <svg class="spark" viewBox="0 0 120 34" preserveAspectRatio="none"><polyline points="0,6 30,6 50,8 70,14 90,22 110,24 120,25"/></svg></div>
+    <div class="tile" data-help="load"><button class="q" aria-label="Help: engine load">?</button>
+      <h3>Engine load</h3><span class="big">28</span><span class="unit">%</span>
+      <div class="sub">last seen 2 s ago</div>
+      <svg class="spark" viewBox="0 0 120 34" preserveAspectRatio="none"><polyline points="0,24 20,22 40,12 60,18 80,10 100,20 120,16"/></svg></div>
+    <div class="tile" data-help="map"><button class="q" aria-label="Help: manifold pressure">?</button>
+      <h3>Manifold pressure</h3><span class="big">36</span><span class="unit">kPa</span>
+      <div class="sub">steady</div>
+      <svg class="spark" viewBox="0 0 120 34" preserveAspectRatio="none"><polyline points="0,22 20,21 40,10 60,20 80,14 100,21 120,20"/></svg></div>
+  </div>
+
+  <h2>Needs attention</h2>
+  <div class="attn">
+    <div class="row" data-help="trims"><span class="dot"></span><span class="nm">Short-term trim, bank 2</span><span class="val">+13.3 %</span>
+      <span class="why">The computer is adding fuel to correct a lean reading. Brief at high throttle is normal; steady at idle points to extra air or low fuel.</span><button class="q" aria-label="Help: fuel trims">?</button></div>
+    <div class="row" data-help="volts"><span class="dot"></span><span class="nm">Battery voltage</span><span class="val">12.1 V</span>
+      <span class="why">A running car should charge at about 13.5&ndash;14.8 V. This is what a battery alone reads.</span><button class="q" aria-label="Help: battery voltage">?</button></div>
+  </div>
+  <a class="more" href="#">All readings (16) and on-board tests (20) &rarr;</a>
+</main>
+<div id="help" role="dialog" aria-live="polite"></div>
+<script>
+(function () {
+  var H = {
+    trims: { t: 'Fuel trims', m: 'How much fuel the computer adds (+) or removes (-) to hold the air-fuel mix on target. Short-term reacts in seconds; long-term is the learned correction.',
+      u: ['Both banks near 0 means the mix is on target.', 'Positive on both banks at idle: look for a vacuum leak, weak fuel pressure or a dirty MAF/MAP.', 'Trims that differ by bank point at something on one side (injector, exhaust leak).'],
+      r: 'Typical: within ±10 %. Worry if: steady beyond ±10 %, or long-term beyond ±15 %.', live: 'now +13.3 % (bank 2, short-term): watch' },
+    coolant: { t: 'Coolant temperature', m: 'Engine coolant temperature at the thermostat housing.',
+      u: ['Should climb and then hold steady once warm.', 'Never reaching the thermostat range points to a stuck-open thermostat or a bad sensor.', 'A cold reading that makes trims rich is a common sensor fault.'],
+      r: 'Typical: 85–100 °C when warm. Worry if: above 110 °C, or stuck cold after 10 minutes.', live: 'now 88 °C: normal' },
+    volts: { t: 'Battery voltage', m: 'Voltage at the engine computer, as a proxy for battery and charging-system health.',
+      u: ['Engine off: about 12.4–12.7 V is a healthy battery.', 'Engine running: 13.5–14.8 V means the alternator is charging.', 'Running below 13 V points to the alternator, its belt or a wiring drop.'],
+      r: 'Typical: 13.5–14.8 V running. Worry if: below 13 V running, or above 15 V.', live: 'now 12.1 V: watch' },
+    load: { t: 'Engine load', m: 'How hard the engine is working, as a percentage of its maximum air per intake stroke.',
+      u: ['Idle is usually 15–30 %, and it rises with throttle.', 'High load at idle hints at a restriction, a dragging accessory or a leak.', 'Compare with throttle position: load should follow it.'],
+      r: 'Typical: 15–30 % at warm idle. Worry if: high and steady at idle.', live: 'now 28 %: normal' },
+    map: { t: 'Manifold pressure', m: 'Air pressure inside the intake manifold. Low means strong vacuum; near outside pressure means the throttle is wide open.',
+      u: ['Warm idle shows a steady, low value (about 25–40 kPa at sea level).', 'Unsteady or high at idle points to a vacuum leak or valve problem.', 'It should jump to near barometric pressure at full throttle.'],
+      r: 'Typical: 25–40 kPa at warm idle. Worry if: high, or hunting at idle.', live: 'now 36 kPa: normal' }
+  };
+  var box = document.getElementById('help'), openFor = null;
+  function el(tag, text, cls) { var e = document.createElement(tag); e.textContent = text; if (cls) e.className = cls; return e; }
+  function close() { box.className = ''; openFor = null; }
+  function open(btn, id) {
+    var h = H[id]; box.textContent = '';
+    box.appendChild(el('h4', h.t));
+    box.appendChild(el('h5', 'What it measures')); box.appendChild(el('p', h.m));
+    box.appendChild(el('h5', 'How to use it')); var ul = document.createElement('ul');
+    h.u.forEach(function (x) { ul.appendChild(el('li', x)); }); box.appendChild(ul);
+    box.appendChild(el('h5', 'Typical / worry if')); box.appendChild(el('p', h.r));
+    box.appendChild(el('div', h.live, 'live'));
+    box.appendChild(el('div', 'Wording drafted by the model, not yet reviewed.', 'draft'));
+    box.className = 'open';
+    var r = btn.getBoundingClientRect(), w = box.offsetWidth;
+    box.style.left = Math.max(12, Math.min(r.left, innerWidth - w - 12)) + 'px';
+    var below = r.bottom + 8, top = below + box.offsetHeight > innerHeight ? Math.max(12, r.top - box.offsetHeight - 8) : below;
+    box.style.top = top + 'px'; openFor = btn;
+  }
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest('.q');
+    if (b) { var id = b.closest('[data-help]').getAttribute('data-help'); openFor === b ? close() : open(b, id); e.stopPropagation(); return; }
+    if (!box.contains(e.target)) close();
+  });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); });
+})();
+</script>
+</body>
+</html>
