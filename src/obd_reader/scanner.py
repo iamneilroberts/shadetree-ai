@@ -2,13 +2,14 @@
 from datetime import datetime, timezone
 
 from obd_reader import __version__
-from obd_reader.elm import decode_dtc_list, decode_supported, parse_all, parse_headers
+from obd_reader.adapter import identify, init_adapter
+from obd_reader.elm import decode_dtc, decode_dtc_list, decode_supported, parse_all, parse_headers
+from obd_reader.pids import PIDS, decode_pid
+from obd_reader.readiness import parse_readiness
 from obd_reader.snapshot import (
-    VIN_RE, Adapter, Dtc, Dtcs, Ecu, Mil, Protocol, Snapshot, Source, Vehicle,
+    VIN_RE, Dtc, Dtcs, Ecu, FreezeFrame, Mil, PidValue, Protocol, Snapshot, Source, UserContext, Vehicle,
 )
 from obd_reader.transport import Transport
-
-INIT = ("ATZ", "ATE0", "ATL0", "ATH0")
 
 
 def _first(lines: list[str]) -> str | None:
@@ -42,6 +43,47 @@ def _supported(payloads: list[bytes], base: int) -> set[str]:
     return out
 
 
+def _walk_pages(transport: Transport, mode: int) -> set[str]:
+    """Supported-PID bitmaps for Mode 01 (`01xx`) or Mode 02 (`02xx00`), page by page."""
+    sid, off = 0x40 + mode, (2 if mode == 0x01 else 3)
+    found: set[str] = set()
+    base = 0x00
+    while base <= 0xE0:
+        cmd = f"{mode:02X}{base:02X}" + ("00" if mode == 0x02 else "")
+        pids: set[str] = set()
+        for p in parse_all(transport.send(cmd), sid):
+            if len(p) >= off + 4 and p[1] == base:
+                pids.update(decode_supported(base, p[off : off + 4]))
+        if not pids:
+            break
+        found |= pids
+        if f"{base + 0x20:02X}" not in pids:  # no ECU advertises another page
+            break
+        base += 0x20
+    return found
+
+
+def _freeze_frame(transport: Transport) -> FreezeFrame | None:
+    """Mode 02 frame 0: the DTC that triggered it, then every decodable supported PID."""
+    dtc_payloads = [p for p in parse_all(transport.send("020200"), 0x42) if len(p) >= 5]
+    if not dtc_payloads:
+        return None
+    hi, lo = dtc_payloads[0][3], dtc_payloads[0][4]
+    if hi == 0 and lo == 0:
+        return None
+    values: dict[str, PidValue] = {}
+    for pid in sorted(_walk_pages(transport, 0x02)):
+        if pid not in PIDS:
+            continue
+        for p in parse_all(transport.send(f"02{pid}00"), 0x42):
+            if len(p) >= 3 + PIDS[pid].nbytes and p[1] == int(pid, 16):
+                v = decode_pid(pid, p[3:])
+                if v is not None:
+                    values[pid] = v
+                break
+    return FreezeFrame(dtc=decode_dtc(hi, lo), pids=values)
+
+
 def scan(
     transport: Transport,
     *,
@@ -50,32 +92,13 @@ def scan(
     kind: str = "replay",
     protocol: str | None = None,
     transcript: str | None = None,
+    symptoms: str = "",
 ) -> Snapshot:
     warnings: list[str] = []
-    for cmd in INIT:
-        transport.send(cmd)
-    if protocol is not None:
-        transport.send(f"ATSP{protocol}")
-    ati = _first(transport.send("ATI"))
-    sti = _first(transport.send("STI"))
-    genuine_stn = bool(sti and sti.upper().startswith("STN"))
-    adapter = Adapter(
-        ati=ati,
-        sti=sti if genuine_stn else None,
-        chip=sti.split()[0] if genuine_stn else None,
-        genuine_stn=genuine_stn,
-    )
+    init_adapter(transport, protocol)
+    adapter = identify(transport)
     supported: dict[str, list[str]] = {}
-    pids01: set[str] = set()
-    base = 0x00
-    while base <= 0xE0:
-        pids = _supported(parse_all(transport.send(f"01{base:02X}"), 0x41), base)
-        if not pids:
-            break
-        pids01 |= pids
-        if f"{base + 0x20:02X}" not in pids:  # no ECU advertises another page
-            break
-        base += 0x20
+    pids01 = _walk_pages(transport, 0x01)
     if pids01:
         supported["01"] = sorted(pids01)
     else:
@@ -131,6 +154,8 @@ def scan(
     status = [p for p in parse_all(transport.send("0101"), 0x41) if len(p) >= 3 and p[1] == 0x01]
     if status:  # the lamp is on if any ECU commands it; each ECU counts its own codes
         mil = Mil(on=any(p[2] & 0x80 for p in status), dtc_count=sum(p[2] & 0x7F for p in status))
+    ignition, monitors = parse_readiness(status)
+    freeze_frame = _freeze_frame(transport) if dtcs.stored else None
 
     return Snapshot(
         snapshot_id=snapshot_id,
@@ -142,5 +167,9 @@ def scan(
         supported_pids=supported,
         dtcs=dtcs,
         mil=mil,
+        freeze_frame=freeze_frame,
+        readiness=monitors,
+        ignition_type=ignition,
+        user_context=UserContext(symptoms=symptoms),
         warnings=warnings,
     )
