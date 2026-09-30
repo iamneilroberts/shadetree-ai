@@ -3,12 +3,12 @@
 `check_command` returns the canonical (uppercase, spaceless, ASCII) command that
 the transport writes. Anything else raises ForbiddenCommand.
 
-Not enabled yet (see docs/design.md §13): Mode 06, UDS 0x19, STIX-style STN
-commands (unverified on hardware), ATPPS.
+Not enabled yet (see docs/design.md §13): UDS 0x19 / 0x22, STIX-style STN
+commands (unverified on hardware), ATPPS, ATCAF0.
 """
 import re
 
-ALLOWED_MODES = frozenset({0x01, 0x02, 0x03, 0x07, 0x09, 0x0A})
+ALLOWED_MODES = frozenset({0x01, 0x02, 0x03, 0x05, 0x06, 0x07, 0x09, 0x0A})
 
 
 class ForbiddenCommand(ValueError):
@@ -23,6 +23,8 @@ _PATTERNS = tuple(
         rf"01{_H}{{2}}",      # Mode 01 PID
         rf"02{_H}{{4}}",      # Mode 02 PID + frame number
         r"03",                # stored DTCs
+        rf"05{_H}{{4}}",      # Mode 05 O2 sensor test results: TID + sensor (non-CAN)
+        rf"06{_H}{{2}}",      # Mode 06 on-board test results: monitor id (MID)
         r"07",                # pending DTCs
         rf"09{_H}{{2}}",      # Mode 09 PID
         r"0A",                # permanent DTCs

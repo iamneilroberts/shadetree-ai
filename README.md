@@ -7,7 +7,7 @@ A **read-only** OBD-II diagnostic assistant for DIY mechanics. Plug in an adapte
 ## Read-only safety promise
 
 - This tool never clears codes, never writes to an ECU, never runs actuator tests, coding, or flashing.
-- Enforcement is in code, not in prompts: the transport layer allowlists OBD Modes 01, 02, 03, 07, 09, 0A (plus a short list of adapter identify/config commands) and refuses everything else before any byte reaches the port.
+- Enforcement is in code, not in prompts: the transport layer allowlists OBD Modes 01, 02, 03, 05, 06, 07, 09, 0A (plus a short list of adapter identify/config commands) and refuses everything else before any byte reaches the port.
 - No MCP tool accepts a raw command string.
 - Allowlist behavior is covered by table-driven and fuzz tests (see design doc §5).
 

@@ -4,19 +4,20 @@ from hypothesis import given, strategies as st
 from obd_reader.allowlist import ALLOWED_MODES, ForbiddenCommand, check_command
 
 # mode -> number of argument bytes the request takes
-ARG_BYTES = {0x01: 1, 0x02: 2, 0x03: 0, 0x07: 0, 0x09: 1, 0x0A: 0}
+ARG_BYTES = {0x01: 1, 0x02: 2, 0x03: 0, 0x05: 2, 0x06: 1, 0x07: 0, 0x09: 1, 0x0A: 0}
 
 ALLOWED = [
     "0100", "01 0C", "020C00", "03", "07", "0900", "0902", "0A",
     "ATZ", "ATD", "ATWS", "ATE0", "ATL0", "ATS0", "ATH1", "ATSP6", "ATSPA6",
     "ATTP6", "ATDP", "ATDPN", "ATRV", "ATI", "AT@1", "ATCAF1", "ATST64",
     "ATAT1", "ATSH7DF", "ATSH7E0", "ATCRA7E8", "ATCRA", "STI", "STDI",
+    "0600", "0601", "06 20", "050101", "05 02 01",
     "  at i ",
 ]
 
 FORBIDDEN = [
     # services outside the allowlist
-    "04", "0400", "05", "0500", "06", "0600", "08", "0800", "0B", "0C", "0E",
+    "04", "0400", "08", "0800", "0B", "0C", "0E",
     "10", "1901", "22F190", "2F", "3101",
     # ELM/STN commands that write, persist, or flood
     "ATPP", "ATPP0CSV01", "ATPPS", "ATMA", "ATCF", "ATCM", "STPX", "STPXH7DF", "STSAVE",
@@ -25,6 +26,7 @@ FORBIDDEN = [
     "ATCAF0", "ATCAF 0",
     # wrong argument length
     "010", "01000", "0200", "020C", "0300", "0A00",
+    "05", "0500", "05000000", "06", "060000",
     # injection / framing tricks (Review Focus 1)
     "0100\r04", "0100\n", "0100\r", "ATZ\rATPP0CSV01",
     # unicode look-alikes (Review Focus 2)

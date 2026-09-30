@@ -7,7 +7,7 @@ Read-only OBD-II diagnostic assistant. Design: `docs/design.md` (source of truth
 ## Decisions (do not relitigate without a real flaw)
 - Users: Austin (older cars, laptop on bench, own Claude subscription) and Neil (2024 Ridgeline, 2023 Highlander — CAN only). **Public repo, MIT** (github.com/iamneilroberts/shadetree-ai, made public 2026-09-29): never commit real snapshots/transcripts (VINs), secrets, or share-alike/NC/proprietary data.
 - Scope: 1996+ US OBD-II incl. J1850 PWM/VPW, ISO 9141, KWP2000, CAN. No OBD-I, Tesla, Mercedes, secure-gateway cars.
-- **Read-only, enforced in code.** Allowlist at the single write point (`transport.py`); only that module imports pyserial. Allowed: Modes 01, 02, 03, 07, 09, 0A (+ explicit AT/STN identify list). Never clear, write, actuate. No tool takes a raw command string.
+- **Read-only, enforced in code.** Allowlist at the single write point (`transport.py`); only that module imports pyserial. Allowed: Modes 01, 02, 03, 05, 06, 07, 09, 0A (+ explicit AT/STN identify list; 05/06 approved 2026-09-30). UDS 0x19 later, 0x22 not before OBDb. Never clear, write, actuate. No tool takes a raw command string.
 - v1 front end: MCP server only. Web UI/FastAPI deferred.
 - Own thin pyserial ELM/STN transport (not python-OBD: GPL-2.0+, legacy-bus issues). Python 3.11+, pydantic, SQLite, pytest + hypothesis.
 - Snapshot-first: every scan records a raw transcript + parsed snapshot JSON; replay drives all tests (no car needed).

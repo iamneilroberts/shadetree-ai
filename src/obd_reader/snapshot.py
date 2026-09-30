@@ -78,6 +78,41 @@ class Mil(_Model):
     dtc_count: int | None = None
 
 
+class PidValue(_Model):
+    name: str
+    value: float | int | str
+    unit: str | None = None
+    raw: str
+
+
+class Monitor(_Model):
+    supported: bool
+    complete: bool | None = None
+
+
+class FreezeFrame(_Model):
+    dtc: str | None = None
+    pids: dict[str, PidValue] = Field(default_factory=dict)
+
+
+class Series(_Model):
+    name: str
+    unit: str | None = None
+    samples: list[tuple[float, float]] = Field(default_factory=list)
+
+
+class LiveSample(_Model):
+    conditions: dict[str, str] = Field(default_factory=dict)
+    duration_s: float
+    rate_hz: float
+    series: dict[str, Series] = Field(default_factory=dict)
+
+
+class UserContext(_Model):
+    symptoms: str = ""
+    recent_work: str = ""
+
+
 class Snapshot(_Model):
     schema_version: Literal["0.1"] = "0.1"
     snapshot_id: str
@@ -89,4 +124,9 @@ class Snapshot(_Model):
     supported_pids: dict[str, list[str]] = Field(default_factory=dict)
     dtcs: Dtcs = Field(default_factory=Dtcs)
     mil: Mil = Field(default_factory=Mil)
+    freeze_frame: FreezeFrame | None = None
+    readiness: dict[str, Monitor] = Field(default_factory=dict)
+    ignition_type: Literal["spark", "compression"] | None = None
+    live_sample: LiveSample | None = None
+    user_context: UserContext = Field(default_factory=UserContext)
     warnings: list[str] = Field(default_factory=list)
