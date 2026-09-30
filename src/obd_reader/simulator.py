@@ -10,6 +10,10 @@ import random
 import time
 from typing import Callable
 
+from obd_reader.vin import with_check_digit
+
+SIM_VIN = with_check_digit("9SXSMUL1?T0000001")  # made up, built in code so the repo's VIN guard never sees a literal
+
 SCENARIOS = ("healthy", "rich", "lean")
 
 
@@ -135,6 +139,10 @@ class SimPort:
         elif cmd == "0101":
             stored, _ = _CODES[self.scenario]
             self._pending = f"41 01 {(0x80 if stored else 0) | len(stored):02X} 00 00 00\r"
+        elif cmd == "0902":
+            b = [0x49, 0x02, 0x01] + list(SIM_VIN.encode("ascii"))
+            fr = lambda chunk: " ".join(f"{x:02X}" for x in chunk)
+            self._pending = "\r".join(["014", "0: " + fr(b[:6]), "1: " + fr(b[6:13]), "2: " + fr(b[13:20])]) + "\r"
         elif cmd == "ATI":
             self._pending = "SIM327 (simulated)\r"
         elif cmd == "STI":

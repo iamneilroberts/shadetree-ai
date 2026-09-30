@@ -108,3 +108,13 @@ def test_support_bitmaps_chain_to_the_next_page_and_name_the_extra_readings():
 def test_mode06_answers_two_monitors():
     t = Transport(SimPort())
     assert t.send("0600")[0].startswith("46 00") and t.send("0621")[0].startswith("46 21")
+
+
+def test_sim_answers_the_vin_request_in_multi_frame_layout_and_it_parses():
+    from obd_reader.elm import parse_all
+    from obd_reader.simulator import SIM_VIN
+    from obd_reader.snapshot import VIN_RE
+    lines = Transport(SimPort()).send("0902")
+    assert lines[0] == "014" and lines[1].startswith("0: 49 02 01")
+    payload = parse_all(lines, 0x49)[0]
+    assert payload[3:20].decode("ascii") == SIM_VIN and VIN_RE.fullmatch(SIM_VIN)
