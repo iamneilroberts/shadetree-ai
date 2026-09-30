@@ -170,3 +170,18 @@ def test_security_headers_and_no_cors(srv):
     assert "default-src 'self'" in hdr["content-security-policy"]
     assert not any(k.startswith("access-control-") for k in hdr)
     c.close()
+
+
+def test_help_needs_the_token_and_is_get_only(srv):
+    server, _, _ = srv
+    assert call(server, "GET", "/api/help", token=None)[0] == 401
+    assert call(server, "GET", "/api/help", host="evil.example")[0] == 403
+    status, body = call(server, "GET", "/api/help")
+    assert status == 200 and "06" in body["pids"] and "evap" in body["mode06"]
+    assert call(server, "POST", "/api/help", {})[0] == 405
+
+
+def test_help_carries_no_vin_shaped_text(srv):
+    import re
+    text = json.dumps(call(srv[0], "GET", "/api/help")[1])
+    assert not re.search(r"\b[A-HJ-NPR-Z0-9]{17}\b", text)

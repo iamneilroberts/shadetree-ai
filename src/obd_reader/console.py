@@ -17,6 +17,7 @@ from obd_reader.hub import DEFAULT_PIDS, HubBusy, LiveHub
 from obd_reader.live import LiveLimitError
 from obd_reader.session import AdapterBusy, Config, NoAdapterError, Session
 from obd_reader.simulator import SimPort
+from obd_reader.stat_help import HELP, MODE06
 
 MAX_BODY = 4096
 _LOOPBACK = {"127.0.0.1", "localhost", "::1"}
@@ -164,7 +165,7 @@ class ConsoleServer:
             # ---- routes ----
             def do_GET(self):
                 path = urlparse(self.path).path
-                if path not in ("/", "/api/state"):
+                if path not in ("/", "/api/state", "/api/help"):
                     if path in _POST_ROUTES:
                         return self._json(405, {"error": "use POST"})
                     return self._json(404, {"error": "not found"})
@@ -174,6 +175,8 @@ class ConsoleServer:
                 if path == "/":
                     html, csp = outer._page()
                     return self._send(200, html, "text/html; charset=utf-8", csp)
+                if path == "/api/help":
+                    return self._json(200, {"pids": HELP, "mode06": MODE06})
                 try:
                     after = max(0, int((q.get("after") or ["0"])[0]))
                 except ValueError:
@@ -183,7 +186,7 @@ class ConsoleServer:
             def do_POST(self):
                 path = urlparse(self.path).path
                 if path not in _POST_ROUTES:
-                    if path in ("/", "/api/state"):
+                    if path in ("/", "/api/state", "/api/help"):
                         return self._json(405, {"error": "use GET"})
                     return self._json(404, {"error": "not found"})
                 ok, _ = self._guard(post=True)
