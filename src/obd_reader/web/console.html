@@ -80,6 +80,12 @@
   #v2 .strips .cap { display: flex; justify-content: space-between; font: 700 11.5px var(--cond); letter-spacing: .1em;
                      text-transform: uppercase; color: var(--muted); }
   #v2 .legend span { margin-left: 12px; letter-spacing: .03em; text-transform: none; }
+  /* chart key: a short line sample in the series colour and pattern, then the name */
+  .key { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 0 0 8px; font-size: 12.5px; color: var(--ink); }
+  .key i { display: inline-block; width: 26px; height: 0; border-top: 3px solid currentColor; vertical-align: middle; margin-right: 7px; }
+  .key i.dashed { border-top-style: dashed; }
+  .key .cyan i { color: var(--cyan); }
+  .key .amber i { color: var(--amber); }
   #v2 .cursor { position: absolute; top: 24px; bottom: 6px; width: 1px; background: var(--muted); pointer-events: none; display: none; }
   #v2 .tip { position: absolute; top: 28px; background: var(--panel2); border: 1px solid var(--line); border-radius: 4px;
              padding: 4px 8px; font-size: 12px; pointer-events: none; display: none; white-space: nowrap; z-index: 5; }
@@ -175,7 +181,14 @@
         <div class="card"><h3>Mass airflow</h3><span class="big" id="v1maf">0</span><span class="unit">g/s</span><canvas id="c1maf" height="60"></canvas></div>
         <div class="card"><h3>Control module voltage</h3><span class="big" id="v1volts">0</span><span class="unit">V</span><canvas id="c1volts" height="60"></canvas></div>
       </div>
-      <div class="card wide"><h3>Fuel trims, last minute</h3><canvas id="c1trims" height="150"></canvas></div>
+      <div class="card wide"><h3>Fuel trims, last minute</h3>
+        <div class="key" id="c1legend">
+          <span class="cyan"><i></i>STFT bank 1 (solid)</span>
+          <span class="cyan"><i class="dashed"></i>LTFT bank 1 (dashed)</span>
+          <span class="amber"><i></i>STFT bank 2 (solid)</span>
+          <span class="amber"><i class="dashed"></i>LTFT bank 2 (dashed)</span>
+        </div>
+        <canvas id="c1trims" height="150"></canvas></div>
     </div>
   </section>
 
