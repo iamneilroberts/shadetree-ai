@@ -236,5 +236,50 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
   bad.docHandlers.click({ target: findQ(bad.el('x_grid'), '04') });
   assert(/No bundled help/.test(flat(bad.el('helpPanel'))), 'a malformed help reply falls back to the generic popup, no crash');
 
+  // 6) Overview: tile state from the catalog's watch ranges on a 10 s median, honest empty states, attention list
+  const tw = { ok: [-10, 10], out: [-20, 20] };
+  const mk = (title, w, extra) => Object.assign({ title, measures: title + ' explained.', use: [], typical: '', status: [] }, w ? { watch: w } : {}, extra || {});
+  const OVF = { pids: { '06': mk('Short-term trim, bank 1', tw), '07': mk('Long-term trim, bank 1', tw), '08': mk('Short-term trim, bank 2', tw),
+                        '09': mk('Long-term trim, bank 2', tw), '05': mk('Coolant', { ok: [null, 105], out: [null, 112] }),
+                        '42': mk('Battery', { ok: [13.2, 14.8], out: [11.5, 15.5] }, { watch_engine_off: { ok: [12.2, 12.9], out: [11.5, 13.5] } }),
+                        '04': mk('Engine load'), '0B': mk('Manifold pressure') }, mode06: {} };
+  const base = () => ({ '0C': 700, '05': 90, '06': 2, '07': 1, '08': 2, '09': 1, '0B': 36, '42': 14.2, '04': 28 });
+  const ovEnv = async (fn, tweak) => {
+    const e = makeEnv(statesFor(30, fn).map(st => (tweak ? tweak(st) : st)), 'v0', OVF);
+    for (let k = 0; k < 32; k++) await e.tick();
+    return e;
+  };
+  const tile = (e, key) => { let r = null; walk(e.el('o_tiles'), n => { if (n.getAttribute('data-key') === key) r = n; }); return r; };
+  const part = (t, cls) => { let r = null; walk(t, n => { if (n.className === cls) r = n; }); return r.textContent; };
+  const rowsOf = e => e.el('o_attn').children.map(c => c.getAttribute('data-key'));
+
+  const okEnv = await ovEnv(base);
+  assert.deepStrictEqual(['trims', 'ect', 'volts', 'load', 'map'].map(k => tile(okEnv, k).className), ['tile', 'tile', 'tile', 'tile neutral', 'tile neutral'], 'healthy: normal tiles, no-threshold tiles neutral');
+  assert.strictEqual(okEnv.el('o_note').textContent, 'Nothing out of range');
+  assert.strictEqual(part(tile(okEnv, 'load'), 'sub'), 'live');
+  const wEnv = await ovEnv(() => Object.assign(base(), { '06': 13, '42': 12.1 }));
+  assert.strictEqual(tile(wEnv, 'trims').className, 'tile watch'); assert.strictEqual(part(tile(wEnv, 'trims'), 'big'), '13.0');
+  assert(/bank 1/.test(part(tile(wEnv, 'trims'), 'sub')), 'the subtitle names the worst trim');
+  assert.strictEqual(tile(wEnv, 'volts').className, 'tile watch');
+  assert.deepStrictEqual(rowsOf(wEnv), ['06', '42'], 'attention lists only out-of-range readings'); assert.strictEqual(wEnv.el('o_note').textContent, '');
+  const oEnv = await ovEnv(() => Object.assign(base(), { '09': 25, '42': 12.1 }));
+  assert.strictEqual(tile(oEnv, 'trims').className, 'tile out'); assert.deepStrictEqual(rowsOf(oEnv), ['09', '42'], 'out of range sorts before watch');
+  const offEnv = await ovEnv(() => Object.assign(base(), { '0C': 0, '42': 12.4 }));
+  assert.strictEqual(tile(offEnv, 'volts').className, 'tile', 'engine off: 12.4 V is normal');
+  assert.strictEqual(tile(wEnv, 'volts').className, 'tile watch', 'engine running: low voltage is flagged');
+  const noLoad = await ovEnv(() => { const b = base(); delete b['04']; return b; });
+  assert.strictEqual(tile(noLoad, 'load').className, 'tile idle'); assert.strictEqual(part(tile(noLoad, 'load'), 'sub'), 'not reported');
+  const stale = await ovEnv((s) => { const b = base(); if (s > 10) delete b['04']; return b; });
+  assert(/^last seen \d+ s ago$/.test(part(tile(stale, 'load'), 'sub')), 'a rotating extra shows its age: ' + part(tile(stale, 'load'), 'sub'));
+  const stoppedEnv = await ovEnv(base, st => Object.assign(st, { status: 'stopped' }));
+  assert.strictEqual(part(tile(stoppedEnv, 'ect'), 'sub'), 'not sampling'); assert.strictEqual(stoppedEnv.el('o_note').textContent, 'Not sampling');
+  assert.deepStrictEqual(rowsOf(stoppedEnv), []);
+  const chipsEnv = await ovEnv(base, st => Object.assign(st, { codes: { read: true, note: null, mil: true, stored: [{ code: 'P0300' }], pending: [], permanent: [] } }));
+  assert.strictEqual(chipsEnv.el('chipLamp').textContent, 'lamp on'); assert.strictEqual(chipsEnv.el('chipCodes').textContent, '1 stored');
+  const chipsNone = await ovEnv(base, st => Object.assign(st, { codes: { read: false, note: null } }));
+  assert.strictEqual(chipsNone.el('chipLamp').textContent, 'lamp ?'); assert.strictEqual(chipsNone.el('chipCodes').textContent, 'codes not read');
+  const qTrim = findQ(wEnv.el('o_attn'), '06'); assert(qTrim, 'attention rows have a ? button');
+  wEnv.docHandlers.click({ target: qTrim }); assert(/Short-term trim, bank 1/.test(flat(wEnv.el('helpPanel'))) && /now 13/.test(flat(wEnv.el('helpPanel'))), 'row help shows the catalog and the live value');
+
   console.log('page logic OK');
 })().catch(e => { console.error('FAIL', e.message); process.exit(1); });

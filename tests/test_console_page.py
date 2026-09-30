@@ -16,13 +16,13 @@ def test_page_is_self_contained_with_no_external_urls():
 
 def test_every_view_button_has_a_matching_section():
     views = set(re.findall(r'data-view="([a-z0-9]+)"', HTML))
-    assert {"v1", "v2", "v3", "v4", "v5"} <= views
+    assert {"v0", "v1", "v2", "v3", "v4", "v5", "v6"} <= views
     for view in views:
         assert f'id="{view}"' in HTML
 
 
 def test_required_controls_exist_and_no_simulator_is_baked_in():
-    for element_id in ("chipLive", "chipConn", "chipCar", "pause", "save", "msg", "simctl", "rpmGauge", "c1trims",
+    for element_id in ("chipLive", "chipConn", "chipCar", "chipLamp", "chipCodes", "o_tiles", "o_attn", "o_note", "helpPanel", "pause", "save", "msg", "simctl", "rpmGauge", "c1trims",
                        "s_trim", "results", "verdict", "go_idle", "go_rev"):
         assert f'id="{element_id}"' in HTML, element_id
     assert "function tick" not in HTML  # the mock's fake data generator is gone

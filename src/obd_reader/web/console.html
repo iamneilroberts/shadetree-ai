@@ -253,6 +253,31 @@
   #helpPanel p { margin: 0; } #helpPanel ul { margin: 0; padding-left: 18px; }
   #helpPanel .live { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--line); }
   #helpPanel .draft { margin-top: 8px; color: var(--muted); font-size: 11px; }
+  #v0 h3.sec { font: 700 12px var(--cond); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin: 18px 0 8px; }
+  #v0 h3.sec:first-child { margin-top: 0; }
+  #v0 .tiles { display: grid; gap: 12px; grid-template-columns: repeat(5, 1fr); }
+  #v0 .tile { background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--ok); border-radius: 8px; padding: 10px 12px; position: relative; min-width: 0; }
+  #v0 .tile.watch { border-left-color: var(--amber); } #v0 .tile.out { border-left-color: var(--bad); }
+  #v0 .tile.neutral { border-left-color: var(--line); } #v0 .tile.idle { border-left-color: var(--line); opacity: .65; }
+  #v0 .tile h3 { font: 700 12px var(--cond); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin: 0 0 6px; padding-right: 26px; }
+  #v0 .tile .q { position: absolute; top: 8px; right: 8px; }
+  #v0 .tile .sub { color: var(--muted); font-size: 12px; margin-top: 4px; min-height: 18px; }
+  #v0 .tile.watch .sub { color: var(--amber); } #v0 .tile.out .sub { color: var(--bad); }
+  #v0 svg.spark { width: 100%; height: 34px; display: block; margin-top: 6px; }
+  #v0 svg.spark polyline { fill: none; stroke: var(--cyan); stroke-width: 1.6; }
+  #v0 .attn { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
+  #v0 .attn:empty { display: none; }
+  #v0 .orow { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-top: 1px solid var(--line); }
+  #v0 .orow:first-child { border-top: 0; }
+  #v0 .orow .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--amber); flex: none; }
+  #v0 .orow .dot.out { background: var(--bad); }
+  #v0 .orow .nm { font: 700 13px var(--cond); letter-spacing: .05em; text-transform: uppercase; min-width: 170px; }
+  #v0 .orow .val { font: 700 15px var(--cond); min-width: 82px; font-variant-numeric: tabular-nums; }
+  #v0 .orow .why { color: var(--muted); font-size: 12.5px; flex: 1; }
+  #v0 .note { color: var(--muted); font-size: 12.5px; margin: 0 0 8px; }
+  #v0 .more { display: block; margin-top: 14px; color: var(--cyan); font: 600 13px var(--cond); letter-spacing: .05em; text-decoration: none; }
+  @media (max-width: 900px) { #v0 .tiles { grid-template-columns: repeat(2, 1fr); } #v0 .tile:first-child { grid-column: span 2; } }
+  @media (max-width: 560px) { #v0 .orow { flex-wrap: wrap; } #v0 .orow .nm { min-width: 0; flex: 1; } #v0 .orow .why { flex: 1 1 100%; order: 3; } }
 </style>
 </head>
 <body>
@@ -260,7 +285,8 @@
 <header class="topbar">
   <div class="brand">shadetree-ai console<small>local page, token-protected, read-only</small></div>
   <nav class="switcher" role="tablist" aria-label="Layouts">
-    <button class="vbtn is-active" data-view="v1" role="tab">A &middot; Cockpit</button>
+    <button class="vbtn is-active" data-view="v0" role="tab">Overview</button>
+    <button class="vbtn" data-view="v1" role="tab">A &middot; Cockpit</button>
     <button class="vbtn" data-view="v2" role="tab">B &middot; Scope</button>
     <button class="vbtn" data-view="v3" role="tab">C &middot; Guided test</button>
     <button class="vbtn" data-view="v4" role="tab">D &middot; Analyzer</button>
@@ -272,6 +298,8 @@
   <span class="chip ro"><b>READ-ONLY</b> &middot; this page cannot send commands</span>
   <span class="chip" id="chipConn"><b>no adapter</b></span>
   <span class="chip" id="chipCar">car ?</span>
+  <span class="chip" id="chipLamp">lamp ?</span>
+  <span class="chip" id="chipCodes">codes not read</span>
   <span class="chip idle" id="chipLive"><b>NOT SAMPLING</b></span>
   <span class="chip">rate <b id="rate">&mdash;</b></span>
   <span class="chip">last sample <b id="age">&mdash;</b></span>
@@ -293,8 +321,17 @@
 <div class="msgbar" id="msg" hidden></div>
 
 <main class="stage">
+  <section class="view is-active" id="v0" role="tabpanel">
+    <h3 class="sec">Health</h3>
+    <div class="tiles" id="o_tiles"></div>
+    <h3 class="sec">Needs attention</h3>
+    <div class="attn" id="o_attn"></div>
+    <p class="note" id="o_note"></p>
+    <a class="more" href="#v6" id="o_more">All readings and on-board tests &rarr;</a>
+  </section>
+
   <!-- A: COCKPIT -->
-  <section class="view is-active" id="v1" role="tabpanel">
+  <section class="view" id="v1" role="tabpanel">
     <div class="grid">
       <div class="card rpm">
         <h3>Engine speed</h3>
@@ -624,7 +661,7 @@
   }
 
   /* ---------- render ---------- */
-  function active() { var a = document.querySelector('.view.is-active'); return a ? a.id : 'v1'; }
+  function active() { var a = document.querySelector('.view.is-active'); return a ? a.id : 'v0'; }
   function showMsg(text) { var m = $('msg'); if (text) { m.textContent = text; m.hidden = false; } else { m.hidden = true; } }
   function chips() {
     var st = state || { status: 'disconnected' }, live = $('chipLive'), label = { running: 'LIVE', stopped: 'STOPPED', error: 'ERROR', idle: 'NOT SAMPLING', disconnected: 'DISCONNECTED' }[st.status] || 'UNKNOWN';
@@ -635,6 +672,10 @@
     $('chipConn').textContent = (ad.chip || ad.ati || 'no adapter') + (ad.protocol ? ' · ' + ad.protocol : '');
     var v = st.vehicle;
     $('chipCar').textContent = !v ? 'car ?' : v.key ? 'car ' + v.key + ' · ' + (v.known ? 'seen ' + v.runs + (v.runs === 1 ? ' time' : ' times') : 'new') : (v.note || 'car ?');
+    var cd = st.codes || {};
+    $('chipLamp').textContent = 'lamp ' + (cd.read ? (cd.mil ? 'on' : 'off') : '?');
+    $('chipCodes').textContent = !cd.read ? 'codes not read'
+      : (cd.stored && cd.stored.length ? cd.stored.length + ' stored' : 'none stored') + (cd.pending && cd.pending.length ? ' \u00b7 ' + cd.pending.length + ' pending' : '');
     $('rate').textContent = st.hz_measured ? st.hz_measured.toFixed(1) + ' Hz' : '—';
     var age = st.since_last_sample === null || st.since_last_sample === undefined ? null : st.since_last_sample + (st.status === 'running' ? (performance.now() - fetchedAt) / 1000 : 0);
     $('age').textContent = age === null ? '—' : age.toFixed(1) + ' s ago';
@@ -782,12 +823,91 @@
       box.appendChild(tb);
     });
   }
+  /* ---------- Overview ---------- */
+  var TILES = [
+    { key: 'trims', title: 'Fuel trims', pids: ['06', '07', '08', '09'], dp: 1 },
+    { key: 'ect', title: 'Coolant', pids: ['05'], dp: 0 },
+    { key: 'volts', title: 'Battery', pids: ['42'], dp: 1 },
+    { key: 'load', title: 'Engine load', pids: ['04'], dp: 0 },
+    { key: 'map', title: 'Manifold pressure', pids: ['0B'], dp: 0 }
+  ];
+  var TRIM_NAME = { '06': 'short-term, bank 1', '07': 'long-term, bank 1', '08': 'short-term, bank 2', '09': 'long-term, bank 2' };
+  var ROW_NAME = { '06': 'Short-term trim, bank 1', '07': 'Long-term trim, bank 1', '08': 'Short-term trim, bank 2', '09': 'Long-term trim, bank 2',
+                   '05': 'Coolant temperature', '42': 'Battery voltage' };
+  var ATTN = ['06', '07', '08', '09', '05', '42'];
+  var RANK = { none: 0, neutral: 1, ok: 2, watch: 3, out: 4 };
+  var WORD = { ok: 'normal', watch: 'watch', out: 'out of range', neutral: '', none: 'not reported' };
+  function sparkSvg(s) {
+    if (s.length < 2) return '';
+    var lo = Infinity, hi = -Infinity, t0 = tNow - SPAN;
+    s.forEach(function (p) { lo = Math.min(lo, p.v); hi = Math.max(hi, p.v); });
+    if (hi === lo) { hi += 1; lo -= 1; }
+    var pts = s.map(function (p) { return (Math.max(0, (p.t - t0) / SPAN) * 120).toFixed(1) + ',' + (32 - (p.v - lo) / (hi - lo) * 30).toFixed(1); }).join(' ');
+    return '<svg class="spark" viewBox="0 0 120 34" preserveAspectRatio="none"><polyline points="' + pts + '"/></svg>';
+  }
+  function tileModel(t, run) {
+    var main = null, mv = null, worst = 'none';
+    t.pids.forEach(function (p) {
+      var v = run ? winMedian(p) : latest(p);
+      if (v === null || v === undefined) return;
+      var s = run ? judge(v, watchFor(p)) : 'none';
+      if (RANK[s] > RANK[worst]) worst = s;
+      if (main === null || Math.abs(v) > Math.abs(mv)) { main = p; mv = v; }
+    });
+    var cls = !run || main === null ? 'idle' : worst === 'ok' ? '' : worst, sub;
+    if (!run) sub = 'not sampling';
+    else if (main === null) sub = 'not reported';
+    else if (t.key === 'load') { var s2 = series('04'), age = tNow - s2[s2.length - 1].t; sub = age < 2 ? 'live' : 'last seen ' + Math.round(age) + ' s ago'; }
+    else if (t.key === 'trims') sub = TRIM_NAME[main] + (worst !== 'ok' && WORD[worst] ? ' · ' + WORD[worst] : '');
+    else sub = WORD[worst];
+    return { key: t.key, title: t.title, cls: cls, help: main || t.pids[0], value: mv === null ? '—' : fmt(mv, t.dp), unit: unitOf(t.pids[0]),
+             sub: sub, spark: sparkSvg(series(main || t.pids[0])) };
+  }
+  function makeTile(it) {
+    var root = el('div', 'tile'), q = qbtn(it.help), h = el('h3', '', it.title), big = el('span', 'big'), unit = el('span', 'unit'),
+        sub = el('div', 'sub'), spark = el('div', 'spark'), line = el('div');
+    root.setAttribute('data-key', it.key);
+    line.appendChild(big); line.appendChild(unit);
+    [q, h, line, sub, spark].forEach(function (c) { root.appendChild(c); });
+    return { root: root, q: q, big: big, unit: unit, sub: sub, spark: spark };
+  }
+  function updTile(nd, it) {
+    nd.root.className = 'tile' + (it.cls ? ' ' + it.cls : '');
+    nd.q.setAttribute('data-help', it.help);
+    nd.big.textContent = it.value; nd.unit.textContent = it.unit; nd.sub.textContent = it.sub;
+    nd.spark.innerHTML = it.spark;   // numbers only
+  }
+  function makeRow(it) {
+    var root = el('div', 'orow'), dot = el('span', 'dot'), nm = el('span', 'nm', ROW_NAME[it.key]), val = el('span', 'val'), why = el('span', 'why');
+    root.setAttribute('data-key', it.key);
+    [dot, nm, val, why, qbtn(it.key)].forEach(function (c) { root.appendChild(c); });
+    return { root: root, dot: dot, val: val, why: why };
+  }
+  function updRow(nd, it) {
+    var e = HELP.pids[it.key];
+    nd.dot.className = 'dot ' + it.s;
+    nd.val.textContent = fmt(it.v, it.key === '05' ? 0 : 1) + ' ' + unitOf(it.key);
+    nd.why.textContent = e && typeof e === 'object' ? String(e.measures) : '';
+  }
+  function renderOverview() {
+    var run = !!state && state.status === 'running', models = TILES.map(function (t) { return tileModel(t, run); });
+    keyed($('o_tiles'), models, makeTile, updTile);
+    var rows = !run ? [] : ATTN.map(function (p) { var v = winMedian(p); return { key: p, v: v, s: judge(v, watchFor(p)) }; })
+      .filter(function (r) { return r.s === 'watch' || r.s === 'out'; })
+      .sort(function (a, b) { return RANK[b.s] - RANK[a.s] || ATTN.indexOf(a.key) - ATTN.indexOf(b.key); });
+    keyed($('o_attn'), rows, makeRow, updRow);
+    var have = models.some(function (m) { return m.cls !== 'idle'; });
+    $('o_note').textContent = rows.length ? '' : !run ? 'Not sampling' : have ? 'Nothing out of range' : 'Waiting for readings';
+  }
+  $('o_more').addEventListener('click', function (e) { if (e.preventDefault) e.preventDefault(); show('v6'); });
   function render() {
     chips();
     var view = active();
     CH.forEach(function (c) { var e = $('v1' + c.id); if (e) e.textContent = fmt(last[c.id], c.dp); });
     if (view === 'v6') renderReadings();
-    if (view === 'v1') {
+    if (view === 'v0') {
+      renderOverview();
+    } else if (view === 'v1') {
       rpmGauge(last.rpm);
       $('v1ectbar').style.width = Math.max(0, Math.min(100, ((last.ect || 20) - 20))) + '%';
       ['stft1', 'ltft1', 'stft2', 'ltft2'].forEach(function (k) { trimTag('t1' + k, last[k]); biBar('b1' + k, last[k]); });
