@@ -1,6 +1,40 @@
 import pytest
 
-from obd_reader.elm import decode_dtc, decode_dtc_list, decode_supported, parse_response
+from obd_reader.elm import decode_dtc, decode_dtc_list, decode_supported, parse_all, parse_response
+
+VIN_A = ["014", "0: 49 02 01 31 48 47", "1: 43 4D 38 32 36 33 33", "2: 41 30 30 34 33 35 32"]
+VIN_B = ["014", "0: 49 02 01 35 46 50", "1: 59 4B 33 46 35 31 52", "2: 42 30 30 30 30 30 31"]
+
+
+def test_parse_all_returns_one_payload_per_responding_ecu():
+    lines = ["SEARCHING...", "41 00 B7 BC A8 93", "41 00 98 18 80 03"]
+    assert parse_all(lines, 0x41) == [bytes.fromhex("4100B7BCA893"), bytes.fromhex("410098188003")]
+
+
+def test_parse_all_handles_short_replies_from_two_ecus():
+    assert parse_all(["43 00", "43 00"], 0x43) == [b"\x43\x00", b"\x43\x00"]
+
+
+def test_parse_all_handles_two_multi_frame_blocks_and_mixed_replies():
+    payloads = parse_all(VIN_A + ["49 00 40 00 00 00"] + VIN_B, 0x49)
+    assert len(payloads) == 3
+    assert payloads[0][3:].decode() == "1HGCM82633A004352"
+    assert payloads[1] == bytes.fromhex("490040000000")
+    assert payloads[2][3:].decode() == "5FPYK3F51RB000001"
+
+
+@pytest.mark.parametrize(
+    "lines",
+    [[], ["NO DATA"], ["UNABLE TO CONNECT"], ["7F 09 12"], ["ZZ"], ["014", "garbage"],
+     ["014", "0: 49 02 01 31 48 47"], ["000", "0: 49"], ["0FF"]],
+)
+def test_parse_all_returns_empty_for_errors_and_garbage_never_raises(lines):
+    assert parse_all(lines, 0x49) == []
+
+
+def test_parse_response_is_the_first_of_parse_all():
+    lines = ["41 00 B7 BC A8 93", "41 00 98 18 80 03"]
+    assert parse_response(lines, 0x41) == parse_all(lines, 0x41)[0]
 
 
 def test_single_frame():

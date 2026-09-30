@@ -10,38 +10,44 @@ _LEN_LINE = re.compile(r"[0-9A-F]{3}")
 _FRAME_LINE = re.compile(r"[0-9A-F]+: ((?:[0-9A-F]{2} ?)+)")
 
 
-def parse_response(lines: list[str], sid: int) -> bytes | None:
-    """Payload starting at the response SID, or None if unsupported/garbled."""
+def parse_all(lines: list[str], sid: int) -> list[bytes]:
+    """One payload (starting at the response SID) per responding ECU.
+
+    Handles single-frame lines and ISO-TP multi-frame blocks ("014", "0: ...").
+    Returns [] for errors, negative responses, and garbled or truncated data.
+    """
     lines = [ln.strip().upper() for ln in lines if ln.strip()]
     # progress chatter, not errors: "SEARCHING...", K-line "BUS INIT: ...OK"
     lines = [ln for ln in lines if not ln.startswith("SEARCHING")
              and not (ln.startswith("BUS INIT") and ln.endswith("OK"))]
     if not lines or any(m in ln for ln in lines for m in ERROR_MARKERS):
-        return None
+        return []
 
-    if _LEN_LINE.fullmatch(lines[0]) and len(lines) > 1:  # ISO-TP multi-frame
-        total = int(lines[0], 16)
-        data = b""
-        for ln in lines[1:]:
-            m = _FRAME_LINE.fullmatch(ln)
-            if not m:
-                return None
-            data += bytes.fromhex(m.group(1))
-        if len(data) < total:
-            return None
-        payload = data[:total]
-    else:  # single frame; take the first line that carries the expected SID
-        payload = None
-        for ln in lines:
-            if _HEX_LINE.fullmatch(ln):
-                candidate = bytes.fromhex(ln)
-                if candidate[:1] == bytes([sid]):
-                    payload = candidate
-                    break
-        if payload is None:
-            return None
+    out: list[bytes] = []
+    i = 0
+    while i < len(lines):
+        ln = lines[i]
+        if _LEN_LINE.fullmatch(ln):  # ISO-TP multi-frame block
+            total, data = int(ln, 16), b""
+            i += 1
+            while i < len(lines) and (m := _FRAME_LINE.fullmatch(lines[i])):
+                data += bytes.fromhex(m.group(1))
+                i += 1
+            if total > 0 and len(data) >= total and data[:1] == bytes([sid]):
+                out.append(data[:total])
+            continue
+        if _HEX_LINE.fullmatch(ln):  # single frame
+            candidate = bytes.fromhex(ln)
+            if candidate[:1] == bytes([sid]):
+                out.append(candidate)
+        i += 1
+    return out
 
-    return payload if payload[:1] == bytes([sid]) else None
+
+def parse_response(lines: list[str], sid: int) -> bytes | None:
+    """First responder's payload, or None if unsupported/garbled."""
+    payloads = parse_all(lines, sid)
+    return payloads[0] if payloads else None
 
 
 def decode_dtc(b1: int, b2: int) -> str:
