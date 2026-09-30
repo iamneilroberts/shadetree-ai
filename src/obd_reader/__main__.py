@@ -74,6 +74,19 @@ def console_main(args, block: bool = True):
     return svc
 
 
+def _export_run(args) -> int:
+    from obd_reader.export import ExportError, export_run
+
+    try:
+        dest = export_run(args.out_dir, args.dest, args.latest)
+    except ExportError as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 1
+    print(f"wrote {dest.resolve()} ({dest.stat().st_size} bytes)")
+    print("the transcripts inside can contain the VIN: move it privately and never commit it")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(prog="shadetree-ai")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -103,6 +116,11 @@ def build_parser() -> argparse.ArgumentParser:
     co.add_argument("--no-start", action="store_true", help="open the page without starting sampling")
     co.add_argument("--out-dir", type=Path, default=Path("."), help="runs/ and transcripts/ go here")
     co.set_defaults(func=lambda a: (console_main(a), 0)[1])
+    ex = sub.add_parser("export-run", help="bundle the newest saved run(s) and transcripts into one .tgz to move to another machine")
+    ex.add_argument("--out-dir", type=Path, default=Path("."), help="where runs/ and transcripts/ are")
+    ex.add_argument("--dest", type=Path, default=Path("shadetree-share.tgz"), help="bundle to write")
+    ex.add_argument("--latest", type=int, default=1, help="how many of the newest runs to include")
+    ex.set_defaults(func=_export_run)
     return ap
 
 

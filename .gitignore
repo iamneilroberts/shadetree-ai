@@ -12,3 +12,5 @@ cache/
 .claude/worktrees/
 .superpowers/
 *.egg-info/
+shadetree-share.tgz
+shadetree-share/

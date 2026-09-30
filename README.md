@@ -87,6 +87,8 @@ shadetree-ai console --port /dev/serial/by-id/<your-adapter>
 
 The console is read-only: it can only start and stop sampling and save a run to `runs/`. It binds to `127.0.0.1`, needs the token in the link, and refuses other `Host` and `Origin` values; the page's one script is pinned by hash in the Content-Security-Policy, and text from the adapter is only ever shown as text.
 
+**Moving a saved run to another machine:** press **Save run**, then `shadetree-ai export-run` (from the folder you started the console in) writes `shadetree-share.tgz` with the newest run, its transcript and a `SUMMARY.txt` (protocol, codes, lamp, Mode 06 MIDs, per-channel min/mean/max). Use `--latest 3` for more runs. The transcripts can contain the VIN, so copy it with `scp` and never commit it (the bundle name is gitignored).
+
 **On a phone or tablet on the same WiFi:** start it with `--host 0.0.0.0 --allow-lan`. It prints a second link (`console (other devices): http://<your-ip>:<port>/?t=<token>`) to open on the device. Anyone on your network who has that full link can watch live data, so use it only on a network you trust. If the device cannot connect, check the laptop's firewall and that the WiFi does not isolate clients.
 
 While the console samples, other live tools report the adapter as busy and point to `console_data`.
