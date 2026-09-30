@@ -244,7 +244,7 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
   const mk = (title, w, extra) => Object.assign({ title, measures: title + ' explained.', use: [], typical: '', status: [] }, w ? { watch: w } : {}, extra || {});
   const OVF = { pids: { '06': mk('Short-term trim, bank 1', tw), '07': mk('Long-term trim, bank 1', tw), '08': mk('Short-term trim, bank 2', tw),
                         '09': mk('Long-term trim, bank 2', tw), '05': mk('Coolant', { ok: [null, 105], out: [null, 112] }),
-                        '42': mk('Battery', { ok: [13.2, 14.8], out: [11.5, 15.5] }, { watch_engine_off: { ok: [12.2, 12.9], out: [11.5, 13.5] } }),
+                        '42': mk('Battery', { ok: [13.2, 14.8], out: [11.5, 15.5] }, { watch_engine_off: { ok: [12.2, null], out: [11.5, null] } }),
                         '04': mk('Engine load'), '0B': mk('Manifold pressure') }, mode06: {} };
   const base = () => ({ '0C': 700, '05': 90, '06': 2, '07': 1, '08': 2, '09': 1, '0B': 36, '42': 14.2, '04': 28 });
   const ovEnv = async (fn, tweak) => {
@@ -270,6 +270,10 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
   const offEnv = await ovEnv(() => Object.assign(base(), { '0C': 0, '42': 12.4 }));
   assert.strictEqual(tile(offEnv, 'volts').className, 'tile', 'engine off: 12.4 V is normal');
   assert.strictEqual(tile(wEnv, 'volts').className, 'tile watch', 'engine running: low voltage is flagged');
+  const hybridEnv = await ovEnv(() => Object.assign(base(), { '0C': 0, '42': 14.2 }));
+  assert.strictEqual(tile(hybridEnv, 'volts').className, 'tile', 'engine off but charging (hybrid, start-stop): 14.2 V is not flagged');
+  const lowOff = await ovEnv(() => Object.assign(base(), { '0C': 0, '42': 11.9 }));
+  assert.strictEqual(tile(lowOff, 'volts').className, 'tile watch', 'engine off: a weak battery is still flagged');
   const noLoad = await ovEnv(() => { const b = base(); delete b['04']; return b; });
   assert.strictEqual(tile(noLoad, 'load').className, 'tile idle'); assert.strictEqual(part(tile(noLoad, 'load'), 'sub'), 'not reported');
   const stale = await ovEnv((s) => { const b = base(); if (s > 10) delete b['04']; return b; });

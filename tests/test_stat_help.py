@@ -45,3 +45,9 @@ def test_watch_ranges_are_well_formed_and_nested():
     assert seen >= 7  # four trims, coolant, battery (running and engine off)
     assert "watch_engine_off" in HELP["42"] and all("watch" in HELP[p] for p in ("05", "06", "07", "08", "09", "42"))
     assert "watch" not in HELP["04"] and "watch" not in HELP["0B"]
+
+
+def test_engine_off_battery_band_is_open_above_so_charging_is_never_flagged():
+    # hybrids and start-stop pauses read rpm 0 while charging at 14 V; surface charge after shutdown reads 13+ V
+    w = HELP["42"]["watch_engine_off"]
+    assert w["ok"][1] is None and w["out"][1] is None and w["ok"][0] is not None and w["out"][0] is not None
