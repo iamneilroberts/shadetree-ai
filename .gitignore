@@ -7,6 +7,7 @@ __pycache__/
 snapshots/
 transcripts/
 runs/
+profiles/
 cache/
 !tests/fixtures/**
 .claude/worktrees/
