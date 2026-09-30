@@ -35,7 +35,7 @@ With an adapter (OBDLink EX tested; the car parked, ignition on, engine off):
 | Scan: VIN, protocol, supported PIDs, DTCs, MIL, readiness, freeze frame, multi-ECU union | done | 2024 Honda Ridgeline (CAN 29-bit): VIN, PIDs, DTC modes, readiness |
 | Record and replay (snapshot + raw transcript) | done | real Ridgeline transcript replays to the same snapshot |
 | 17 MCP tools (9 offline, 8 live) | done | not yet exercised against a car through Claude |
-| Live console: Cockpit, Scope, Guided test, Analyzer cabinet, Handheld (phone), Readings | done, demo tested in a browser (Readings tab: server data checked in demo, page not yet viewed) | sampling runs against the Ridgeline; Analyzer, Handheld and Readings not yet checked on real hardware or a phone |
+| Live console: Overview (health tiles and needs-attention list), Guided test, Analyzer cabinet, Handheld (phone), All readings | done, demo tested in a browser (Readings tab: server data checked in demo, page not yet viewed) | sampling runs against the Ridgeline; Analyzer, Handheld and Readings not yet checked on real hardware or a phone |
 | Extra readings on the console (car's supported PIDs, up to 16 per run, rotated) and unsupported PIDs dropped | done | 2024 Ridgeline: PID discovery (`0100` to `01A0`, two ECUs) and rotating extra readings sampled (`0104`, `0111`, `010D`, `010E`, `0143`, `0144`); MAF (`0110`) unanswered, MAP (`010B`) used |
 | Car identification and learned profile (partial VIN key, per-car list of PIDs that never answer), CAN cars only | done | 2024 Ridgeline: the VIN request (`0902`, one ECU, multi-frame) parsed, the partial key was derived and a profile file was written. A second run that loads the profile (car seen before) has **not** been checked |
 | Trouble codes on the console (Modes 03/07/0A + lamp), CAN cars only | done | 2024 Ridgeline (CAN 29/500, two ECUs): Modes 03, 07, 0A and the lamp bit read; the car had no codes and the lamp was off. A car that has codes has **not** been seen yet |
@@ -77,7 +77,7 @@ Live tools need the car parked with the ignition on. Only one tool can use the a
 
 ## Live console
 
-A local web page that shows live data as it is sampled, in five layouts: **A Cockpit** (gauges and trim bars), **B Scope** (stacked strip charts with a hover cursor), **C Guided test** (a fuel-trim check with timed captures; the playbook is a draft, unreviewed), **D Analyzer** (a 1970s shop-analyzer cabinet with LED numerals, trim bars, lamps, and the trouble codes up top) and **E Handheld** (the same readouts in a fixed-size phone frame with Codes, Live, Trims and Status modes; open it with `#v5`, e.g. from the laptop in the car and the phone in the mechanic's hand). Trouble codes (stored, pending, permanent, and the check-engine lamp) are read once when sampling starts and only on CAN cars; the plain-words meanings are model-drafted and unreviewed. The Clarity button fades the unlit segments for maximum contrast.
+A local web page that shows live data as it is sampled, in five tabs: **Overview** (five health tiles for fuel trims, coolant, battery, engine load and manifold pressure, plus a list of anything out of range), **Guided test** (a fuel-trim check with timed captures; the playbook is a draft, unreviewed), **Analyzer** (a 1970s shop-analyzer cabinet with LED numerals, trim bars, lamps, and the trouble codes up top) and **Handheld** (the same readouts in a fixed-size phone frame with Codes, Live, Trims and Status modes; open it with `#v5`, e.g. from the laptop in the car and the phone in the mechanic's hand). Trouble codes (stored, pending, permanent, and the check-engine lamp) are read once when sampling starts and only on CAN cars; the plain-words meanings are model-drafted and unreviewed. The Clarity button fades the unlit segments for maximum contrast.
 
 ```
 shadetree-ai console --demo
@@ -87,6 +87,8 @@ shadetree-ai console --port /dev/serial/by-id/<your-adapter>
 `--demo` uses a built-in simulated car (healthy, rich or lean) so you can try it without a vehicle. The command prints a link like `http://127.0.0.1:8765/?t=<token>`; open it in a browser (`--http-port N` picks another port if 8765 is taken). From Claude, the `open_console` tool starts the same page and `console_data` reads the same numbers.
 
 The console is read-only: it can only start and stop sampling and save a run to `runs/`. It binds to `127.0.0.1`, needs the token in the link, and refuses other `Host` and `Origin` values; the page's one script is pinned by hash in the Content-Security-Policy, and text from the adapter is only ever shown as text.
+
+**Help popups:** every reading, tile and Mode 06 line has a "?" that says what it measures, how to use it and typical values. The wording is ours and unreviewed (the popup says so); the colors on the Overview use general rules of thumb, not limits for your particular car.
 
 **Car memory:** on CAN cars the console reads the VIN once per run and keeps only a partial key (make, model, engine and year; never the serial) in the "car" chip. It remembers, per key, which readings the car never answers, in `profiles/` (local, gitignored), and stops asking for them sooner next time. A saved profile is a hint, not a fact: a PID that answers is always kept.
 

@@ -53,44 +53,6 @@
   .tag.ok { color: var(--ok); border-color: var(--ok); }
   canvas { width: 100%; display: block; }
 
-  /* v1 cockpit */
-  #v1 .grid { display: grid; gap: 12px; grid-template-columns: 1.15fr 1fr 1fr; }
-  #v1 .rpm { grid-row: span 2; display: flex; flex-direction: column; align-items: center; }
-  #v1 svg { width: 100%; max-width: 380px; }
-  #v1 .trims { grid-column: 2 / 4; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  #v1 .trim .big { font-size: 38px; }
-  #v1 .bar { position: relative; height: 12px; background: var(--panel2); border-radius: 6px; margin-top: 8px; overflow: hidden; }
-  #v1 .bar i { position: absolute; top: 0; bottom: 0; background: var(--cyan); }
-  #v1 .bar u { position: absolute; left: 50%; top: -2px; bottom: -2px; width: 2px; background: var(--muted); }
-  #v1 .ticks { display: flex; justify-content: space-between; color: var(--muted); font-size: 11px; margin-top: 3px; }
-  #v1 .vt { display: flex; gap: 12px; }
-  #v1 .vt .card { flex: 1; }
-  #v1 .wide { grid-column: 1 / 4; }
-  @media (max-width: 860px) { #v1 .grid { grid-template-columns: 1fr; } #v1 .trims, #v1 .wide, #v1 .rpm { grid-column: auto; grid-row: auto; } #v1 .trims { grid-template-columns: 1fr; } }
-
-  /* v2 scope */
-  #v2 .wrap { display: grid; grid-template-columns: 250px 1fr; gap: 12px; }
-  #v2 .rail .row { display: grid; grid-template-columns: 18px 1fr auto; gap: 8px; align-items: baseline; padding: 6px 0;
-                   border-bottom: 1px solid var(--line); font-size: 12.5px; }
-  #v2 .rail .row:last-child { border: 0; }
-  #v2 .rail .v { font: 700 16px var(--cond); font-variant-numeric: tabular-nums; }
-  #v2 .rail .mm { grid-column: 2 / 4; color: var(--muted); font-size: 11.5px; }
-  #v2 .strips .card { margin-bottom: 10px; padding: 8px 10px 4px; position: relative; }
-  #v2 .strips canvas { height: 150px; }
-  #v2 .strips .cap { display: flex; justify-content: space-between; font: 700 11.5px var(--cond); letter-spacing: .1em;
-                     text-transform: uppercase; color: var(--muted); }
-  #v2 .legend span { margin-left: 12px; letter-spacing: .03em; text-transform: none; }
-  /* chart key: a short line sample in the series colour and pattern, then the name */
-  .key { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 0 0 8px; font-size: 12.5px; color: var(--ink); }
-  .key i { display: inline-block; width: 26px; height: 0; border-top: 3px solid currentColor; vertical-align: middle; margin-right: 7px; }
-  .key i.dashed { border-top-style: dashed; }
-  .key .cyan i { color: var(--cyan); }
-  .key .amber i { color: var(--amber); }
-  #v2 .cursor { position: absolute; top: 24px; bottom: 6px; width: 1px; background: var(--muted); pointer-events: none; display: none; }
-  #v2 .tip { position: absolute; top: 28px; background: var(--panel2); border: 1px solid var(--line); border-radius: 4px;
-             padding: 4px 8px; font-size: 12px; pointer-events: none; display: none; white-space: nowrap; z-index: 5; }
-  @media (max-width: 860px) { #v2 .wrap { grid-template-columns: 1fr; } }
-
   /* v3 guided */
   #v3 .wrap { display: grid; grid-template-columns: 360px 1fr; gap: 12px; }
   #v3 .step { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; background: var(--panel); }
@@ -283,19 +245,16 @@
 <body>
 <div class="banner" id="demoBanner" hidden>Demo &mdash; simulated engine, no car connected</div>
 <header class="topbar">
-  <div class="brand">shadetree-ai console<small>local page, token-protected, read-only</small></div>
+  <div class="brand">shadetree-ai console</div>
   <nav class="switcher" role="tablist" aria-label="Layouts">
     <button class="vbtn is-active" data-view="v0" role="tab">Overview</button>
-    <button class="vbtn" data-view="v1" role="tab">A &middot; Cockpit</button>
-    <button class="vbtn" data-view="v2" role="tab">B &middot; Scope</button>
-    <button class="vbtn" data-view="v3" role="tab">C &middot; Guided test</button>
-    <button class="vbtn" data-view="v4" role="tab">D &middot; Analyzer</button>
-    <button class="vbtn" data-view="v5" role="tab">E &middot; Handheld</button>
-    <button class="vbtn" data-view="v6" role="tab">F &middot; Readings</button>
+    <button class="vbtn" data-view="v3" role="tab">Guided test</button>
+    <button class="vbtn" data-view="v4" role="tab">Analyzer</button>
+    <button class="vbtn" data-view="v5" role="tab">Handheld</button>
+    <button class="vbtn" data-view="v6" role="tab">All readings</button>
   </nav>
 </header>
 <div class="status">
-  <span class="chip ro"><b>READ-ONLY</b> &middot; this page cannot send commands</span>
   <span class="chip" id="chipConn"><b>no adapter</b></span>
   <span class="chip" id="chipCar">car ?</span>
   <span class="chip" id="chipLamp">lamp ?</span>
@@ -328,60 +287,6 @@
     <div class="attn" id="o_attn"></div>
     <p class="note" id="o_note"></p>
     <a class="more" href="#v6" id="o_more">All readings and on-board tests &rarr;</a>
-  </section>
-
-  <!-- A: COCKPIT -->
-  <section class="view" id="v1" role="tabpanel">
-    <div class="grid">
-      <div class="card rpm">
-        <h3>Engine speed</h3>
-        <svg viewBox="0 0 300 205" aria-label="Engine speed gauge"><g id="rpmGauge"></g></svg>
-        <div><span class="big" id="v1rpm">0</span><span class="unit">rpm</span></div>
-        <h3 style="margin-top:14px">Coolant temperature</h3>
-        <div style="width:100%"><span class="big" id="v1ect">0</span><span class="unit">&deg;C</span>
-          <div class="bar"><i id="v1ectbar" style="left:0"></i></div>
-          <div class="ticks"><span>20</span><span>70</span><span>120 &deg;C</span></div></div>
-      </div>
-      <div class="trims">
-        <div class="card trim"><h3>Short-term trim &middot; bank 1</h3><span class="big" id="v1stft1">0</span><span class="unit">%</span> <span class="tag" id="t1stft1"></span>
-          <div class="bar"><u></u><i id="b1stft1"></i></div><div class="ticks"><span>&minus;25</span><span>0</span><span>+25</span></div></div>
-        <div class="card trim"><h3>Long-term trim &middot; bank 1</h3><span class="big" id="v1ltft1">0</span><span class="unit">%</span> <span class="tag" id="t1ltft1"></span>
-          <div class="bar"><u></u><i id="b1ltft1"></i></div><div class="ticks"><span>&minus;25</span><span>0</span><span>+25</span></div></div>
-        <div class="card trim"><h3>Short-term trim &middot; bank 2</h3><span class="big" id="v1stft2">0</span><span class="unit">%</span> <span class="tag" id="t1stft2"></span>
-          <div class="bar"><u></u><i id="b1stft2"></i></div><div class="ticks"><span>&minus;25</span><span>0</span><span>+25</span></div></div>
-        <div class="card trim"><h3>Long-term trim &middot; bank 2</h3><span class="big" id="v1ltft2">0</span><span class="unit">%</span> <span class="tag" id="t1ltft2"></span>
-          <div class="bar"><u></u><i id="b1ltft2"></i></div><div class="ticks"><span>&minus;25</span><span>0</span><span>+25</span></div></div>
-      </div>
-      <div class="vt" style="grid-column:2 / 4">
-        <div class="card"><h3>Manifold pressure</h3><span class="big" id="v1map">0</span><span class="unit">kPa</span><canvas id="c1map" height="60"></canvas></div>
-        <div class="card"><h3>Control module voltage</h3><span class="big" id="v1volts">0</span><span class="unit">V</span><canvas id="c1volts" height="60"></canvas></div>
-      </div>
-      <div class="card wide"><h3>Fuel trims, last minute</h3>
-        <div class="key" id="c1legend">
-          <span class="cyan"><i></i>STFT bank 1 (solid)</span>
-          <span class="cyan"><i class="dashed"></i>LTFT bank 1 (dashed)</span>
-          <span class="amber"><i></i>STFT bank 2 (solid)</span>
-          <span class="amber"><i class="dashed"></i>LTFT bank 2 (dashed)</span>
-        </div>
-        <canvas id="c1trims" height="150"></canvas></div>
-    </div>
-  </section>
-
-  <!-- B: SCOPE -->
-  <section class="view" id="v2" role="tabpanel">
-    <div class="wrap">
-      <div class="card rail"><h3>Channels (8 of 8 PIDs)</h3><div id="rail"></div></div>
-      <div class="strips" id="strips">
-        <div class="card"><div class="cap"><span>Engine speed &middot; rpm</span></div><canvas id="s_rpm"></canvas><div class="cursor"></div><div class="tip"></div></div>
-        <div class="card"><div class="cap"><span>Fuel trims &middot; %</span>
-          <span class="legend"><span style="color:var(--cyan)">&mdash; STFT b1</span><span style="color:var(--cyan)">- - LTFT b1</span><span style="color:var(--amber)">&mdash; STFT b2</span><span style="color:var(--amber)">- - LTFT b2</span></span></div>
-          <canvas id="s_trim"></canvas><div class="cursor"></div><div class="tip"></div></div>
-        <div class="card"><div class="cap"><span>Manifold kPa &middot; coolant &deg;C</span>
-          <span class="legend"><span style="color:var(--cyan)">&mdash; MAP</span><span style="color:var(--amber)">- - coolant</span></span></div>
-          <canvas id="s_air"></canvas><div class="cursor"></div><div class="tip"></div></div>
-        <div class="card"><div class="cap"><span>Control module voltage &middot; V</span></div><canvas id="s_volt"></canvas><div class="cursor"></div><div class="tip"></div></div>
-      </div>
-    </div>
   </section>
 
   <!-- C: GUIDED TEST -->
@@ -423,8 +328,8 @@
 <div class="cab"><div class="face">
     <span class="screw" style="left:8px;top:8px"></span><span class="screw" style="right:8px;top:8px"></span>
     <span class="screw" style="left:8px;bottom:8px"></span><span class="screw" style="right:8px;bottom:8px"></span>
-    <div class="plate"><span>Shadetree Model 7-A &middot; Engine Analyzer</span><small>READ-ONLY &middot; NO OUTPUTS &middot; SER. 0709</small></div>
-    <div class="pan codes"><p class="lab">Trouble codes <span>plain-words meanings &middot; read-only</span></p>
+    <div class="plate"><span>Shadetree Model 7-A &middot; Engine Analyzer</span><small>SER. 0709</small></div>
+    <div class="pan codes"><p class="lab">Trouble codes <span>plain-words meanings</span></p>
       <div class="cwrap"><div class="cntbox"><div class="win led" id="a_cnt" style="--c:#ff3b2b"></div><small>codes found</small></div><div class="clist" id="a_codes"></div></div>
       <p class="cfoot">Meanings are plain-words drafts, unreviewed. The hint lines are general knowledge, unverified.</p></div>
     <div class="row">
@@ -453,7 +358,6 @@
       <div class="lampbox" id="a_lp_l2"><i class="lens red"></i><div><b>LTFT bank 2</b><em id="a_lp_l2t">within range</em></div></div>
       <div class="lampbox" id="a_lp_ect"><i class="lens amb"></i><div><b>Coolant</b><em id="a_lp_ectt">warm</em></div></div>
       <div class="lampbox lit"><i class="lens grn"></i><div><b>Sampling</b><em>2.5 Hz</em></div></div>
-      <div class="lampbox lit"><i class="lens grn"></i><div><b>Read-only</b><em>cannot send commands</em></div></div>
     </div>
     <div class="meters"><div class="pan meter" id="a_vm"><p class="lab">Battery / charging <span>VOLTS</span></p></div><div class="pan meter" id="a_tm"><p class="lab">Coolant <span>&deg;C</span></p></div></div>
     <div class="bench"><span class="lab" style="margin:0 6px 0 0">Display</span><button class="rocker" id="clarity" type="button">Clarity: standard</button><span class="lab" style="margin:0 0 0 8px">Sampling and simulator controls are in the bar above</span></div>
@@ -494,7 +398,7 @@
       <div id="m6"></div></div>
   </section>
 </main>
-<p class="foot">Values come from one shared sampler, so Claude and this page see the same numbers. Nothing on this page can send a command to the car. The &plusmn;10 % trim window used for the OUTSIDE tag is general knowledge, unverified. The guided test is a draft, unreviewed playbook.</p>
+<p class="foot">Values come from one shared sampler, so Claude and this page see the same numbers. The &plusmn;10 % trim window used for the OUTSIDE tag is general knowledge, unverified. The guided test is a draft, unreviewed playbook.</p>
 
 <div id="helpPanel" role="dialog" aria-live="polite"></div>
 <script>
@@ -592,32 +496,6 @@
     });
     g.fillStyle = PAL.mute; g.textAlign = 'right'; g.fillText('now', l + iw, c.h - 5); g.textAlign = 'left'; g.fillText('−60 s', l, c.h - 5);
   }
-  function arc(cx, cy, r, a0, a1) {
-    var p0 = [cx + r * Math.cos(a0), cy + r * Math.sin(a0)], p1 = [cx + r * Math.cos(a1), cy + r * Math.sin(a1)];
-    return 'M' + p0[0].toFixed(1) + ' ' + p0[1].toFixed(1) + ' A' + r + ' ' + r + ' 0 ' + ((a1 - a0) > Math.PI ? 1 : 0) + ' 1 ' + p1[0].toFixed(1) + ' ' + p1[1].toFixed(1);
-  }
-  function rpmGauge(v) {
-    var A0 = Math.PI * 0.85, A1 = Math.PI * 2.15, f = Math.max(0, Math.min(1, (v || 0) / 4000)), a = A0 + (A1 - A0) * f, s = '';
-    s += '<path d="' + arc(150, 135, 118, A0, A1) + '" fill="none" stroke="#2c343b" stroke-width="16" stroke-linecap="round"/>';
-    s += '<path d="' + arc(150, 135, 118, A0, Math.max(A0 + 0.001, a)) + '" fill="none" stroke="#4fc3e8" stroke-width="16" stroke-linecap="round"/>';
-    for (var k = 0; k <= 4; k++) {
-      var aa = A0 + (A1 - A0) * k / 4, x = 150 + 92 * Math.cos(aa), y = 135 + 92 * Math.sin(aa);
-      s += '<text x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" fill="#93a0aa" font-size="13" text-anchor="middle" dominant-baseline="middle">' + (k * 1000) + '</text>';
-    }
-    $('rpmGauge').innerHTML = s;
-  }
-  function trimTag(id, v) {
-    var el = $(id);
-    if (v === null || v === undefined) { el.textContent = 'no data'; el.className = 'tag'; return; }
-    var out = Math.abs(v) > 10;
-    el.textContent = out ? (v < 0 ? 'OUTSIDE ±10 % · less fuel' : 'OUTSIDE ±10 % · more fuel') : 'within ±10 %';
-    el.className = 'tag ' + (out ? 'warn' : 'ok');
-  }
-  function biBar(id, v) {
-    var el = $(id), p = Math.max(-25, Math.min(25, v || 0)) / 25 * 50;
-    el.style.left = (p >= 0 ? 50 : 50 + p) + '%'; el.style.width = Math.abs(p) + '%';
-  }
-
   /* ---------- guided test (layout C): captures are timed by the sample timestamps ---------- */
   function capRow(row) {
     if (!cap) return;
@@ -903,27 +781,9 @@
   function render() {
     chips();
     var view = active();
-    CH.forEach(function (c) { var e = $('v1' + c.id); if (e) e.textContent = fmt(last[c.id], c.dp); });
     if (view === 'v6') renderReadings();
     if (view === 'v0') {
       renderOverview();
-    } else if (view === 'v1') {
-      rpmGauge(last.rpm);
-      $('v1ectbar').style.width = Math.max(0, Math.min(100, ((last.ect || 20) - 20))) + '%';
-      ['stft1', 'ltft1', 'stft2', 'ltft2'].forEach(function (k) { trimTag('t1' + k, last[k]); biBar('b1' + k, last[k]); });
-      trend($('c1map'), [{ id: 'map', color: PAL.cyan }], [0, 110]);
-      trend($('c1volts'), [{ id: 'volts', color: PAL.amber }], [12, 15]);
-      trend($('c1trims'), [{ id: 'stft1', color: PAL.cyan }, { id: 'ltft1', color: PAL.cyan, dash: [6, 4] }, { id: 'stft2', color: PAL.amber }, { id: 'ltft2', color: PAL.amber, dash: [6, 4] }], [-25, 25]);
-    } else if (view === 'v2') {
-      $('rail').innerHTML = CH.map(function (c) {
-        var b = buf[c.id].map(function (p) { return p.v; }), mn = b.length ? Math.min.apply(null, b) : null, mx = b.length ? Math.max.apply(null, b) : null;
-        return '<div class="row"><span style="width:10px;height:10px;border-radius:2px;background:' + (c.id.slice(-1) === '2' ? PAL.amber : PAL.cyan) + ';align-self:center"></span><span>' + c.name +
-          '</span><span class="v">' + fmt(last[c.id], c.dp) + ' <span class="unit">' + c.unit + '</span></span><span class="mm">min ' + fmt(mn, c.dp) + ' · max ' + fmt(mx, c.dp) + '</span></div>';
-      }).join('');
-      trend($('s_rpm'), [{ id: 'rpm', color: PAL.cyan }], [0, 4000]);
-      trend($('s_trim'), [{ id: 'stft1', color: PAL.cyan }, { id: 'ltft1', color: PAL.cyan, dash: [6, 4] }, { id: 'stft2', color: PAL.amber }, { id: 'ltft2', color: PAL.amber, dash: [6, 4] }], [-25, 25]);
-      trend($('s_air'), [{ id: 'map', color: PAL.cyan }, { id: 'ect', color: PAL.amber, dash: [6, 4] }], [0, 110]);
-      trend($('s_volt'), [{ id: 'volts', color: PAL.cyan }], [12, 15]);
     } else if (view === 'v4') {
       renderCabinet();
     } else if (view === 'v5') {
@@ -1041,7 +901,7 @@
     $('h_status').innerHTML = ledLamp('', r.mil, 'red', 'Check engine (MIL)', r.mil ? 'ON' : (r.c.read ? 'off' : 'unknown')) +
       ledLamp('', l1, 'red', 'LTFT bank 1', l1 ? trimText(last.ltft1) : 'within range') + ledLamp('', l2, 'red', 'LTFT bank 2', l2 ? trimText(last.ltft2) : 'within range') +
       ledLamp('', last.ect !== null && last.ect < 60, 'amb', 'Coolant', last.ect !== null && last.ect < 60 ? 'reads cold' : 'warm') +
-      ledLamp('', st.status === 'running', 'grn', 'Sampling', st.status === 'running' ? (st.hz_measured ? st.hz_measured.toFixed(1) + ' Hz' : 'starting') : 'not sampling') + ledLamp('', true, 'grn', 'Read-only', 'cannot send commands');
+      ledLamp('', st.status === 'running', 'grn', 'Sampling', st.status === 'running' ? (st.hz_measured ? st.hz_measured.toFixed(1) + ' Hz' : 'starting') : 'not sampling');
   }
   function setMode(m) {
     Array.prototype.forEach.call(document.querySelectorAll('.hh-pane'), function (e) { e.hidden = e.dataset.mode !== m; });
@@ -1099,25 +959,6 @@
   }
   Array.prototype.forEach.call(btns, function (b) { b.addEventListener('click', function () { show(b.dataset.view); history.replaceState(null, '', location.search + '#' + b.dataset.view); }); });
   var init = (location.hash || '').replace('#', ''); if (init && $(init)) { show(init); window.addEventListener('load', function () { if (window.scrollTo) window.scrollTo(0, 0); }); }  // the #fragment would otherwise scroll the page to that section
-
-  Array.prototype.forEach.call(document.querySelectorAll('#strips .card'), function (card) {
-    var cv = card.querySelector('canvas'), cur = card.querySelector('.cursor'), tip = card.querySelector('.tip');
-    card.addEventListener('mousemove', function (e) {
-      var r = cv.getBoundingClientRect(), x = e.clientX - r.left, l = 40, iw = r.width - 48;
-      if (x < l || x > l + iw) { cur.style.display = tip.style.display = 'none'; return; }
-      var t = tNow - (1 - (x - l) / iw) * SPAN, id = cv.id;
-      var parts = id === 's_rpm' ? ['rpm'] : id === 's_trim' ? ['stft1', 'ltft1', 'stft2', 'ltft2'] : id === 's_air' ? ['map', 'ect'] : ['volts'];
-      var lines = parts.map(function (p) {
-        var c = CH.filter(function (q) { return q.id === p; })[0], b = buf[p], best = null;
-        b.forEach(function (s) { if (best === null || Math.abs(s.t - t) < Math.abs(best.t - t)) best = s; });
-        return best ? c.name + ' ' + fmt(best.v, c.dp) + ' ' + c.unit : null;
-      }).filter(Boolean);
-      if (!lines.length) { cur.style.display = tip.style.display = 'none'; return; }
-      cur.style.display = tip.style.display = 'block'; cur.style.left = (x + 10) + 'px'; tip.style.left = Math.min(x + 20, r.width - 150) + 'px';
-      tip.innerHTML = lines.join('<br>');
-    });
-    card.addEventListener('mouseleave', function () { cur.style.display = tip.style.display = 'none'; });
-  });
 
   renderResults(); render();
   window.addEventListener('resize', render);

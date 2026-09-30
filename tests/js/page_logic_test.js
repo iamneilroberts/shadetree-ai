@@ -21,7 +21,7 @@ function makeNode(id, handlers) {
   return n;
 }
 
-function makeEnv(states, viewId = 'v1', help = null) {
+function makeEnv(states, viewId = 'v0', help = null) {
   const els = {}, handlers = {}, docHandlers = {}, posts = [];
   function el(id) { return els[id] || (els[id] = makeNode(id, handlers)); }
   let timer = null, i = 0, now = 0;
@@ -110,9 +110,9 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
   assert.strictEqual(env3.el('simctl').hidden, true, 'sim controls hidden outside demo');
 
   // 4) a new run (seq restarts) resets the buffers instead of mixing runs
-  const env4 = makeEnv(statesFor(5, idle).concat(statesFor(2, rev, 0, 0)));
+  const env4 = makeEnv(statesFor(5, idle).concat(statesFor(2, rev, 0, 0)), 'v3');
   for (let k = 0; k < 7; k++) await env4.tick();
-  assert(/2500/.test(env4.el('v1rpm').textContent), 'shows the new run');
+  assert(/2500/.test(env4.el('v3rpm').textContent), 'shows the new run');
 
   // 5) adapter/ECU text is untrusted: it must reach the page as text, never as markup
   const evil = '<img src=x onerror=alert(1)//';
@@ -138,12 +138,15 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
   release(); await new Promise(r => setImmediate(r)); await new Promise(r => setImmediate(r));
 
   // 7) a new run id resets the buffers even when its sequence numbers overtake the old ones
-  const a = statesFor(3, idle, 0, 0);            // run 1: seq 1..3
-  const b = statesFor(1, rev, 9, 50);            // run 2 already at seq 10
+  const base0 = () => ({ '0C': 700, '05': 90, '06': 2, '07': 1, '08': 2, '09': 1, '0B': 36 });
+  const a = statesFor(3, () => Object.assign(base0(), { '42': 15.4 }), 0, 0);    // run 1: seq 1..3, battery 15.4 V
+  const b = statesFor(1, () => Object.assign(base0(), { '42': 12.1 }), 9, 1.2);  // run 2 already at seq 10, battery 12.1 V
   b[0].run = 2;
-  const env7 = makeEnv(a.concat(b), 'v2');       // the Scope view lists min/max over everything buffered
-  for (let k = 0; k < 4; k++) await env7.tick();
-  assert(/min 2500 · max 2500/.test(env7.el('rail').innerHTML), 'run 1 samples were dropped when run 2 began');
+  const env7 = makeEnv(a.concat(b), 'v0', { pids: { '42': { title: 'Battery', measures: 'x', use: [], typical: '', status: [], watch: { ok: [13.2, 14.8], out: [11.5, 15.5] } } }, mode06: {} });
+  for (let k = 0; k < 5; k++) await env7.tick();
+  let vt = null; walk(env7.el('o_tiles'), n => { if (n.getAttribute('data-key') === 'volts') vt = n; });
+  let vbig = null; walk(vt, n => { if (n.className === 'big') vbig = n; });
+  assert.strictEqual(vbig.textContent, '12.1', 'run 1 samples were dropped when run 2 began: battery reads 12.1, not the old 15.4');
 
   // 8) sampling stopping mid-capture cancels the capture instead of leaving it stuck
   const run = statesFor(12, idle);
@@ -182,7 +185,7 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
   assert.strictEqual(hh.el('h_n').textContent, '3 CODES');
   assert(/P0117/.test(hh.el('h_codes').innerHTML) && /Reads colder than real/.test(hh.el('h_codes').innerHTML) && !/<img/.test(hh.el('h_codes').innerHTML), 'handheld cards');
   assert.strictEqual(hh.el('h_live').textContent, 'LIVE');
-  assert(/Check engine \(MIL\)/.test(hh.el('h_status').innerHTML) && /Read-only/.test(hh.el('h_status').innerHTML), 'status pane');
+  assert(/Check engine \(MIL\)/.test(hh.el('h_status').innerHTML) && /Sampling/.test(hh.el('h_status').innerHTML), 'status pane');
   const hhWait = makeEnv(withCodes(3, { read: false, note: null }, 'idle'), 'v5');
   for (let k = 0; k < 3; k++) await hhWait.tick();
   assert.strictEqual(hhWait.el('h_n').textContent, '-- CODES'); assert.strictEqual(hhWait.el('h_live').textContent, 'IDLE');
