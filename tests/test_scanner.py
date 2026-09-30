@@ -110,6 +110,26 @@ def test_no_mode_01_bitmap_gives_a_warning_not_silence():
     assert any("Mode 01" in w and "no response" in w.lower() for w in snap.warnings)
 
 
+class AutoDetectPort(ReplayPort):
+    """Like the real adapter under ATSP0: ATDP says only 'AUTO' until a request succeeds."""
+
+    def write(self, data):
+        cmd = data.decode("ascii").rstrip("\r")
+        if cmd != "ATDP":
+            return super().write(data)
+        self.written.append(cmd)
+        found = "0100" in self.written
+        self._pending = ("AUTO, ISO 15765-4 (CAN 11/500)" if found else "AUTO") + "\r"
+
+
+def test_protocol_is_read_after_auto_detection_has_run():
+    port = AutoDetectPort(load_transcript(FIXTURE) + [{"tx": "ATSP0", "rx": ["OK"]}])
+    snap = scan(Transport(port), snapshot_id="t", captured_at=NOW, protocol="0")
+    assert snap.protocol.name == "ISO 15765-4 (CAN 11/500)"
+    assert snap.vehicle.vin == "1HGCM82633A004352"  # CAN layout decoded, not skipped
+    assert [d.code for d in snap.dtcs.stored] == ["P0171"]
+
+
 def test_cli_replay_prints_a_valid_snapshot():
     out = subprocess.run(
         [sys.executable, "-m", "obd_reader", "replay", str(FIXTURE), "--protocol", "6"],

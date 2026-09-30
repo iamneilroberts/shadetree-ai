@@ -43,13 +43,6 @@ def scan(
         chip=sti.split()[0] if genuine_stn else None,
         genuine_stn=genuine_stn,
     )
-    dp = _first(transport.send("ATDP"))
-    proto = Protocol(
-        name=dp.removeprefix("AUTO, ") if dp else None,
-        atsp=protocol,
-        pinned=protocol not in (None, "0"),  # ATSP0 = automatic search, not a pin
-    )
-
     supported: dict[str, list[str]] = {}
     pids01: list[str] = []
     base = 0x00
@@ -66,6 +59,15 @@ def scan(
         supported["01"] = pids01
     else:
         warnings.append("Mode 01: no response to the supported-PID request (no data or unable to connect)")
+
+    # Ask for the protocol only after a request has run: under ATSP0 (automatic
+    # search) ATDP answers just "AUTO" until the adapter has found the bus.
+    dp = _first(transport.send("ATDP"))
+    proto = Protocol(
+        name=dp.removeprefix("AUTO, ") if dp else None,
+        atsp=protocol,
+        pinned=protocol not in (None, "0"),  # ATSP0 = automatic search, not a pin
+    )
 
     # DTC and VIN replies use a different layout on non-CAN buses (no count byte;
     # multi-line VIN). Decoding them as CAN would give wrong codes, so skip until
