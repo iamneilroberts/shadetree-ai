@@ -35,7 +35,8 @@ With an adapter (OBDLink EX tested; the car parked, ignition on, engine off):
 | Scan: VIN, protocol, supported PIDs, DTCs, MIL, readiness, freeze frame, multi-ECU union | done | 2024 Honda Ridgeline (CAN 29-bit): VIN, PIDs, DTC modes, readiness |
 | Record and replay (snapshot + raw transcript) | done | real Ridgeline transcript replays to the same snapshot |
 | 17 MCP tools (9 offline, 8 live) | done | not yet exercised against a car through Claude |
-| Live console: Cockpit, Scope, Guided test | done, demo tested in a browser and on a phone | not yet run against a real adapter |
+| Live console: Cockpit, Scope, Guided test, Analyzer cabinet, Handheld (phone) | done, demo tested in a browser | not yet run against a real adapter; Analyzer and Handheld not yet tried on a real phone |
+| Trouble codes on the console (Modes 03/07/0A + lamp), CAN cars only | done in demo | not yet run against a real car |
 | Mode 06 test results | parser written | **not verified**: layout assumed from the standard |
 | 29-bit ECU header attribution | written | **not verified** on a real car |
 | Legacy protocols (J1850, ISO 9141, KWP) | scanner skips DTC/VIN decode on non-CAN | **not built yet** (needs Austin's older cars) |
@@ -74,7 +75,7 @@ Live tools need the car parked with the ignition on. Only one tool can use the a
 
 ## Live console
 
-A local web page that shows live data as it is sampled, in three layouts: **A Cockpit** (gauges and trim bars), **B Scope** (stacked strip charts with a hover cursor) and **C Guided test** (a fuel-trim check with timed captures; the playbook is a draft, unreviewed).
+A local web page that shows live data as it is sampled, in five layouts: **A Cockpit** (gauges and trim bars), **B Scope** (stacked strip charts with a hover cursor), **C Guided test** (a fuel-trim check with timed captures; the playbook is a draft, unreviewed), **D Analyzer** (a 1970s shop-analyzer cabinet with LED numerals, trim bars, lamps, and the trouble codes up top) and **E Handheld** (the same readouts in a fixed-size phone frame with Codes, Live, Trims and Status modes; open it with `#v5`, e.g. from the laptop in the car and the phone in the mechanic's hand). Trouble codes (stored, pending, permanent, and the check-engine lamp) are read once when sampling starts and only on CAN cars; the plain-words meanings are model-drafted and unreviewed. The Clarity button fades the unlit segments for maximum contrast.
 
 ```
 shadetree-ai console --demo

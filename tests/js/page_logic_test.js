@@ -139,5 +139,36 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
   assert.strictEqual(env8.el('go_idle').disabled, false, 'button usable again after sampling stopped');
   assert(/stopped/.test(env8.el('tx_idle').textContent), 'says why');
 
+  // 3) retro layouts D (cabinet) and E (handheld): trouble codes reach the page, escaped, with honest empty states
+  const withCodes = (n, codes, status = 'running') => statesFor(n, idle).map(st => Object.assign(st, { status, codes }));
+  const CODES = { read: true, note: null, mil: true,
+    stored: [{ code: 'P0117', desc: 'Engine coolant temperature circuit low input', hint: 'Reads colder than real', known: true },
+             { code: 'P0172', desc: '<img src=x onerror=alert(1)>', hint: '', known: false }],
+    pending: [{ code: 'P0175', desc: 'System too rich (bank 2)', hint: 'Seen once', known: true }], permanent: [] };
+  const cab = makeEnv(withCodes(3, CODES), 'v4');
+  for (let k = 0; k < 3; k++) await cab.tick();
+  const rows = cab.el('a_codes').innerHTML;
+  assert(/P0117/.test(rows) && /STORED/.test(rows) && /PENDING/.test(rows) && /P0175/.test(rows), 'cabinet lists stored and pending codes');
+  assert(!/<img/.test(rows) && /&lt;img/.test(rows), 'adapter/ECU-derived text is escaped, never markup');
+  assert.strictEqual(cab.el('a_lp_mil').className, 'lampbox lit', 'MIL lamp lit when the ECU commands it');
+  const cabNone = makeEnv(withCodes(3, { read: true, note: null, stored: [], pending: [], permanent: [], mil: false }), 'v4');
+  for (let k = 0; k < 3; k++) await cabNone.tick();
+  assert(/NO CODES STORED/.test(cabNone.el('a_codes').innerHTML) && cabNone.el('a_lp_mil').className === 'lampbox', 'healthy car: explicit none, lamp off');
+  const cabWait = makeEnv(withCodes(3, { read: false, note: null }, 'idle'), 'v4');
+  for (let k = 0; k < 3; k++) await cabWait.tick();
+  assert(/START SAMPLING TO READ CODES/.test(cabWait.el('a_codes').innerHTML) && !/NO CODES STORED/.test(cabWait.el('a_codes').innerHTML), 'unread codes never look like a clean bill');
+  const cabNote = makeEnv(withCodes(3, { read: false, note: 'trouble codes not supported yet on SAE J1850 PWM protocol' }), 'v4');
+  for (let k = 0; k < 3; k++) await cabNote.tick();
+  assert(/NOT SUPPORTED YET/.test(cabNote.el('a_codes').innerHTML), 'unsupported bus is stated');
+  const hh = makeEnv(withCodes(3, CODES), 'v5');
+  for (let k = 0; k < 3; k++) await hh.tick();
+  assert.strictEqual(hh.el('h_n').textContent, '3 CODES');
+  assert(/P0117/.test(hh.el('h_codes').innerHTML) && /Reads colder than real/.test(hh.el('h_codes').innerHTML) && !/<img/.test(hh.el('h_codes').innerHTML), 'handheld cards');
+  assert.strictEqual(hh.el('h_live').textContent, 'LIVE');
+  assert(/Check engine \(MIL\)/.test(hh.el('h_status').innerHTML) && /Read-only/.test(hh.el('h_status').innerHTML), 'status pane');
+  const hhWait = makeEnv(withCodes(3, { read: false, note: null }, 'idle'), 'v5');
+  for (let k = 0; k < 3; k++) await hhWait.tick();
+  assert.strictEqual(hhWait.el('h_n').textContent, '-- CODES'); assert.strictEqual(hhWait.el('h_live').textContent, 'IDLE');
+
   console.log('page logic OK');
 })().catch(e => { console.error('FAIL', e.message); process.exit(1); });

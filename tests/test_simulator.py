@@ -76,3 +76,22 @@ def test_unknown_scenario_is_rejected():
         SimPort("bogus")
     with pytest.raises(ValueError):
         SimPort().set_scenario("bogus")
+
+
+def _codes(scenario, cmd):
+    t = Transport(SimPort(scenario))
+    return t.send(cmd)
+
+
+def test_rich_car_reports_two_stored_and_one_pending_code_and_the_lamp_is_on():
+    assert _codes("rich", "03") == ["43 02 01 17 01 72"]
+    assert _codes("rich", "07") == ["47 01 01 75"]
+    assert _codes("rich", "0A") == ["4A 00"]
+    assert _codes("rich", "0101")[0].startswith("41 01 82")
+
+
+def test_lean_car_codes_and_healthy_car_has_none():
+    assert _codes("lean", "03") == ["43 02 01 71 01 74"]
+    assert _codes("lean", "07") == ["47 01 01 01"]
+    assert _codes("healthy", "03") == ["43 00"]
+    assert _codes("healthy", "0101")[0].startswith("41 01 00")

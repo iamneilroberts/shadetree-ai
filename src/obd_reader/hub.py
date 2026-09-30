@@ -12,8 +12,11 @@ from pathlib import Path
 from typing import Callable
 
 from obd_reader.adapter import identify
+from obd_reader.dtc_text import describe
+from obd_reader.elm import parse_all
 from obd_reader.live import MAX_HZ, MIN_HZ, LiveLimitError, read_pid_value, summarize, validate_pids
 from obd_reader.pids import PIDS
+from obd_reader.scanner import _dtcs
 from obd_reader.session import Session
 from obd_reader.simulator import SimPort
 from obd_reader.snapshot import LiveSample, Series
@@ -45,6 +48,7 @@ class LiveHub:
         self._sweep_t: deque = deque(maxlen=12)
         self._t0 = self._last_at = self._deadline = None
         self._adapter: dict = {"chip": None, "ati": None, "protocol": None}
+        self._codes: dict = {"read": False, "note": None}
 
     @property
     def running(self) -> bool:
@@ -95,6 +99,7 @@ class LiveHub:
                         if self._adapter["protocol"] is None:
                             dp = (t.send("ATDP") or [None])[0]
                             self._adapter["protocol"] = dp.removeprefix("AUTO, ") if dp else None
+                            self._read_codes(t)
                     else:
                         silent += 1
                         if silent >= _SILENT_SWEEPS:
@@ -106,6 +111,19 @@ class LiveHub:
         finally:
             if self.status != "error":
                 self.status = "stopped"
+
+    def _read_codes(self, t) -> None:
+        """Modes 03/07/0A and the lamp bit, once per run (CAN only: other layouts would decode wrongly)."""
+        proto = self._adapter["protocol"] or ""
+        if self._sim is None and "15765" not in proto:
+            with self._data_lock:
+                self._codes = {"read": False, "note": f"trouble codes not supported yet on {proto or 'this'} protocol"}
+            return
+        out = {k: [{"code": d.code, **describe(d.code)} for d in _dtcs(t, cmd, sid)]
+               for k, cmd, sid in (("stored", "03", 0x43), ("pending", "07", 0x47), ("permanent", "0A", 0x4A))}
+        status = [p for p in parse_all(t.send("0101"), 0x41) if len(p) >= 3 and p[1] == 0x01]
+        with self._data_lock:
+            self._codes = {"read": True, "note": None, **out, "mil": any(p[2] & 0x80 for p in status)}
 
     def _sweep(self, t, pids: list[str], now: float) -> bool:
         """Read every PID once, then publish the whole sweep at once (a viewer never sees half of one)."""
@@ -131,7 +149,7 @@ class LiveHub:
         with self._data_lock:
             seq, t0, deadline, last_at = self.seq, self._t0, self._deadline, self._last_at
             status, message, hz, run = self.status, self.message, self.hz, self._run_id
-            adapter, st = dict(self._adapter), list(self._sweep_t)
+            adapter, st, codes = dict(self._adapter), list(self._sweep_t), dict(self._codes)
             # only sweeps up to `seq`: anything newer is not complete yet
             channels = {
                 p: {"name": PIDS[p].name, "unit": PIDS[p].unit,
@@ -147,7 +165,7 @@ class LiveHub:
             "hz": hz, "hz_measured": None if measured is None else round(measured, 2),
             "seconds_left": (max(0.0, round(deadline - self._clock(), 1))
                              if status == "running" and deadline else None),
-            "adapter": adapter,
+            "adapter": adapter, "codes": codes,
             "channels": channels,
         }
 

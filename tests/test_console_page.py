@@ -16,7 +16,7 @@ def test_page_is_self_contained_with_no_external_urls():
 
 def test_every_view_button_has_a_matching_section():
     views = set(re.findall(r'data-view="([a-z0-9]+)"', HTML))
-    assert {"v1", "v2", "v3"} <= views
+    assert {"v1", "v2", "v3", "v4", "v5"} <= views
     for view in views:
         assert f'id="{view}"' in HTML
 
@@ -72,3 +72,16 @@ def test_inline_script_parses(tmp_path):
     f.write_text(js)
     r = subprocess.run(["node", "--check", str(f)], capture_output=True, text=True)
     assert r.returncode == 0, r.stderr
+
+
+def test_handheld_frame_has_a_fixed_size_so_switching_modes_never_resizes_it():
+    frame = re.search(r"\.retro \.hh \{([^}]*)\}", HTML).group(1)
+    assert "width: 390px" in frame and "height: 780px" in frame
+    body = re.search(r"\.retro \.hh-body \{([^}]*)\}", HTML).group(1)
+    assert "flex: 1" in body and "overflow-y: auto" in body  # long content scrolls inside the frame
+    assert re.findall(r'<div class="hh-pane" data-mode="(\w+)"', HTML) == ["codes", "live", "trims", "status"]
+
+
+def test_phone_width_hides_the_page_chrome_and_fills_the_screen_for_the_handheld_view():
+    media = HTML[HTML.index("@media (max-width: 430px)"):]
+    assert "#v5.is-active) .topbar" in media and "100dvh" in media

@@ -168,3 +168,47 @@ def test_set_sim_only_in_demo(tmp_path):
     real = LiveHub(Session(Config(port="x", home=tmp_path), port_factory=lambda: ScriptedPort({})))
     with pytest.raises(ValueError):
         real.set_sim(rev=True)
+
+
+def _codes_after_start(tmp_path, scenario):
+    hub, _, _ = make(tmp_path, sim=SimPort(scenario))
+    hub.start(DEFAULT_PIDS, hz=10, seconds=30)
+    assert wait_for(lambda: hub.state()["codes"]["read"])
+    st = hub.state()["codes"]
+    hub.stop()
+    return st
+
+
+def test_state_carries_the_trouble_codes_with_descriptions(tmp_path):
+    c = _codes_after_start(tmp_path, "rich")
+    assert [x["code"] for x in c["stored"]] == ["P0117", "P0172"]
+    assert [x["code"] for x in c["pending"]] == ["P0175"] and c["permanent"] == []
+    assert c["mil"] is True and c["stored"][0]["desc"] and c["stored"][0]["known"] is True
+
+
+def test_healthy_car_reads_no_codes_and_lamp_off(tmp_path):
+    c = _codes_after_start(tmp_path, "healthy")
+    assert c["stored"] == c["pending"] == c["permanent"] == [] and c["mil"] is False
+
+
+def test_codes_are_not_read_before_the_first_sample(tmp_path):
+    hub, _, _ = make(tmp_path)
+    assert hub.state()["codes"] == {"read": False, "note": None}
+
+
+def test_non_can_protocol_skips_code_decoding_and_says_why(tmp_path):
+    sim = SimPort("rich")
+    orig = sim.write
+
+    def write(data):
+        orig(data)
+        if data.decode().strip() == "ATDP":
+            sim._pending = "AUTO, SAE J1850 PWM\r"
+    sim.write = write
+    hub, _, _ = make(tmp_path, sim=None, port_factory=lambda: sim)
+    hub._sim = None  # behave like a real adapter: only a CAN protocol name enables code decoding
+    hub.start(DEFAULT_PIDS, hz=10, seconds=30)
+    assert wait_for(lambda: hub.state()["codes"]["note"])
+    st = hub.state()["codes"]
+    hub.stop()
+    assert st["read"] is False and "not supported" in st["note"]

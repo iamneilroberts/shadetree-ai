@@ -113,12 +113,105 @@
   #v3 .cite { color: var(--cyan); }
   #v3 .band { display: inline-block; padding: 1px 8px; border: 1px solid var(--line); border-radius: 3px; font-size: 12px; }
   @media (max-width: 860px) { #v3 .wrap { grid-template-columns: 1fr; } #v3 .readouts { grid-template-columns: 1fr 1fr; } }
+  /* ---- retro layouts D (analyzer cabinet) and E (handheld / phone): oxblood finish ---- */
+  .retro { --sil: "Helvetica Neue", Helvetica, Arial, "Liberation Sans", sans-serif; --ghost: .16; --glow: 3px;
+         --ink2: #4a4a4c; --mut: #a39b88; font: 14px/1.45 var(--sil); color: #ece6d6;
+         --rail: linear-gradient(90deg, #3a0f0e, #7d2724 22%, #a5423b 34%, #74221f 62%, #3f100f); --rail-rivet: radial-gradient(circle at 50% 28px, #e4e4e2 0 2.5px, #2b2b2c 3px 5px, transparent 5.5px) 0 0 / 100% 84px repeat-y; --rail-tex: repeating-linear-gradient(90deg, rgba(255,255,255,.05) 0 1px, rgba(0,0,0,.08) 1px 2px); --rail-edge: rgba(230,230,228,.35); --face: linear-gradient(#e9e9e6, #d6d6d3); --face-bd: #2b2b2c; --face-ink: #161617; --ink2: #4a4a4c; --pan: #b9babc; --pan-bd: #7a7b7e; --plate-bg: #141415; --plate-ink: #f4f4f1; --plate-ink2: #a9aaad; --bench: #a6a7aa; --scale: #232324; --meter-face: #f6f5ef; --win-bd: #2b2b2c; }
+  .retro.max { --ghost: .05; --glow: 1px; }
+  .retro .lab, .retro .lampbox, .retro .plate, .retro .rocker { margin-top: 0; }
+  .retro .cab { position: relative; padding: 0 30px; }
+  .retro .cab::before, .retro .cab::after { content: ""; position: absolute; top: 0; bottom: 0; width: 26px; border-radius: 5px; background: var(--rail-rivet), var(--rail-tex), var(--rail); box-shadow: inset 0 0 0 1px var(--rail-edge), inset 0 0 10px rgba(0,0,0,.5), 0 2px 6px rgba(0,0,0,.5); }
+  .retro .cab::before { left: 0; }
+  .retro .cab::after { right: 0; }
+  .retro .face { position: relative; background: var(--face); border: 3px solid var(--face-bd); border-radius: 6px; padding: 14px; color: var(--face-ink); box-shadow: inset 0 1px 0 rgba(255,255,255,.35), 0 8px 22px rgba(0,0,0,.55); }
+  .retro .plate { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 6px 12px; margin-bottom: 12px; background: var(--plate-bg); color: var(--plate-ink); border-radius: 3px; font: 700 14px var(--sil); letter-spacing: .22em; text-transform: uppercase; }
+  .retro .plate small { font: 700 11px var(--sil); letter-spacing: .14em; color: var(--plate-ink2); }
+  .retro .row { display: grid; gap: 12px; grid-template-columns: 1.1fr 1.4fr 1fr; }
+  .retro .pan { background: var(--pan); border: 1px solid var(--pan-bd); border-radius: 4px; padding: 10px 12px; box-shadow: inset 0 1px 3px rgba(0,0,0,.28); position: relative; }
+  .retro .lab { font: 700 11.5px var(--sil); letter-spacing: .16em; text-transform: uppercase; color: var(--face-ink); margin: 0 0 6px; display: flex; justify-content: space-between; }
+  .retro .lab span { color: var(--ink2); letter-spacing: .08em; }
+  .retro .win { background: #0d0a09; border: 3px solid var(--win-bd); border-radius: 4px; padding: 8px 10px; box-shadow: inset 0 0 12px #000; }
+  .retro .led svg { filter: drop-shadow(0 0 var(--glow) var(--c)); }
+  .retro svg.seg { display: block; }
+  .retro .leds { display: grid; grid-template-columns: repeat(21, 1fr); gap: 3px; background: #0d0a09; border: 3px solid var(--win-bd); border-radius: 4px; padding: 7px 8px; }
+  .retro .leds i { display: block; height: 20px; border-radius: 2px; background: rgba(255,255,255,.07); }
+  .retro .leds i.g { background: #3fe06a; box-shadow: 0 0 6px #3fe06a; }
+  .retro .leds i.y { background: #ffc233; box-shadow: 0 0 6px #ffc233; }
+  .retro .leds i.r { background: #ff4a3a; box-shadow: 0 0 6px #ff4a3a; }
+  .retro .leds i.z { border-bottom: 3px solid #d9d2bd; }
+  .retro .scale { display: flex; justify-content: space-between; font: 700 11px var(--sil); color: var(--scale); padding: 3px 2px 0; }
+  .retro .trims { display: grid; gap: 10px; }
+  .retro .meters { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 300px)); gap: 12px; margin-top: 12px; justify-content: center; }
+  .retro .meter svg { width: 100%; display: block; }
+  .retro .lamps { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-top: 12px; }
+  .retro .lampbox { display: flex; align-items: center; gap: 10px; background: var(--plate-bg); border-radius: 4px; padding: 8px 10px; color: var(--plate-ink2); font: 700 11.5px var(--sil); letter-spacing: .12em; text-transform: uppercase; }
+  .retro .lampbox.lit { color: #fff1cf; }
+  .retro .lens { width: 22px; height: 22px; border-radius: 50%; flex: none; border: 3px solid #6c6555; background: radial-gradient(circle at 35% 30%, #5a4a4a, #2a1c1c 70%); }
+  .retro .lens.grn { background: radial-gradient(circle at 35% 30%, #4a5a4a, #1c2a1c 70%); }
+  .retro .lens.amb { background: radial-gradient(circle at 35% 30%, #5a5040, #2a2216 70%); }
+  .retro .lampbox.lit .lens.red { background: radial-gradient(circle at 35% 30%, #ffd0c8, #ff4a3a 55%, #b3170b); box-shadow: 0 0 12px #ff4a3a; }
+  .retro .lampbox.lit .lens.amb { background: radial-gradient(circle at 35% 30%, #fff0c0, #ffc233 55%, #b37c05); box-shadow: 0 0 12px #ffc233; }
+  .retro .lampbox.lit .lens.grn { background: radial-gradient(circle at 35% 30%, #d6ffe0, #3fe06a 55%, #0e8a30); box-shadow: 0 0 12px #3fe06a; }
+  .retro .lampbox b { display: block; color: inherit; }
+  .retro .lampbox em { display: block; font-style: normal; font-weight: 400; letter-spacing: .04em; text-transform: none; font-size: 11px; opacity: .85; }
+  .retro .screw { position: absolute; width: 12px; height: 12px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #f1f1ee, #7d8288); box-shadow: 0 1px 2px rgba(0,0,0,.5); }
+  .retro .screw::after { content: ""; position: absolute; left: 2px; right: 2px; top: 5px; height: 2px; background: #454a4f; transform: rotate(35deg); }
+  .retro .bench { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px; padding: 8px 10px; background: var(--bench); border: 1px solid var(--pan-bd); border-radius: 4px; }
+  .retro .rocker { appearance: none; border: 2px solid #1b1c1e; background: linear-gradient(#5a5c60, #2b2c2f); color: #f1ead4; border-radius: 4px; padding: 6px 12px; font: 700 12px var(--sil); letter-spacing: .1em; text-transform: uppercase; cursor: pointer; box-shadow: 0 2px 0 #101112; }
+  .retro .rocker:active { transform: translateY(1px); box-shadow: 0 1px 0 #101112; }
+  .retro .mono { font-family: ui-monospace, "DejaVu Sans Mono", Menlo, Consolas, monospace; }
+  .retro .codes { margin-bottom: 12px; }
+  .retro .cwrap { display: grid; grid-template-columns: 150px 1fr; gap: 12px; }
+  .retro .cntbox { display: flex; flex-direction: column; justify-content: center; gap: 6px; }
+  .retro .cntbox small { font: 700 11px var(--sil); letter-spacing: .12em; text-transform: uppercase; color: var(--ink2); text-align: center; }
+  .retro .clist { background: #0d0a09; border: 3px solid var(--win-bd); border-radius: 4px; padding: 4px 12px; height: 176px; overflow: hidden; }
+  .retro .crow { display: grid; grid-template-columns: 104px 86px 1fr; gap: 12px; align-items: center; padding: 7px 0; border-bottom: 1px solid #2a2320; }
+  .retro .crow:last-child { border-bottom: 0; }
+  .retro .ccode { font-weight: 800; font-size: 28px; color: #ffb62e; text-shadow: 0 0 var(--glow) #ffb62e; letter-spacing: .04em; }
+  .retro .cst { font: 700 11px var(--sil); letter-spacing: .12em; padding: 3px 6px; border-radius: 2px; text-align: center; }
+  .retro .cst.stored { background: #ff4a3a; color: #1a0503; }
+  .retro .cst.pending { background: #ffc233; color: #241a06; }
+  .retro .cdesc { color: #f3ecd8; font: 600 16px var(--sil); }
+  .retro .chint { display: block; font: 400 12.5px var(--sil); color: #b9ae94; }
+  .retro .cnone { color: #3fe06a; font: 800 20px var(--sil); letter-spacing: .14em; padding: 60px 0; text-align: center; text-shadow: 0 0 var(--glow) #3fe06a; }
+  .retro .cfoot { font: 400 11.5px var(--sil); color: var(--ink2); margin: 6px 0 0; }
+  .retro .hhwrap { display: flex; flex-direction: column; align-items: center; gap: 12px; padding-top: 8px; }
+  .retro .hh { width: 390px; height: 780px; flex: none; padding: 14px 12px; border-radius: 28px; background: var(--rail-tex), var(--rail); box-shadow: inset 0 0 0 1px var(--rail-edge), inset 0 0 12px rgba(0,0,0,.5), 0 10px 26px rgba(0,0,0,.6); }
+  .retro .hh-in { height: 100%; display: flex; flex-direction: column; background: var(--face); border: 2px solid var(--face-bd); border-radius: 16px; color: var(--face-ink); overflow: hidden; }
+  .retro .hh-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex: none; height: 54px; padding: 0 12px; background: var(--plate-bg); color: var(--plate-ink); }
+  .retro .hh-top .mil { display: flex; align-items: center; gap: 8px; font: 700 12px var(--sil); letter-spacing: .12em; text-transform: uppercase; }
+  .retro .hh-top .n { font: 800 20px var(--sil); letter-spacing: .08em; color: #ffb62e; }
+  .retro .hh-top .n.zero { color: #3fe06a; }
+  .retro .hh-body { flex: 1; min-height: 0; padding: 10px; overflow-y: auto; }
+  .retro .hh-pane[hidden] { display: none; }
+  .retro .hh-nav { flex: none; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; padding: 8px; background: var(--pan); border-top: 1px solid var(--pan-bd); }
+  .retro .hh-nav button { appearance: none; border: 2px solid #1b1c1e; background: linear-gradient(#5a5c60, #2b2c2f); color: #f1ead4; border-radius: 6px; padding: 12px 0; font: 700 12px var(--sil); letter-spacing: .1em; text-transform: uppercase; cursor: pointer; min-height: 48px; }
+  .retro .hh-nav button.on { background: #e3b04b; color: #241a06; border-color: #a5782a; }
+  .retro .hcode { background: #0d0a09; border: 2px solid var(--win-bd); border-radius: 6px; padding: 8px 12px 10px; margin-bottom: 8px; }
+  .retro .hcode .r1 { display: flex; justify-content: space-between; align-items: center; }
+  .retro .hcode .ccode { font-size: 32px; }
+  .retro .hcode .cdesc { font-size: 17px; margin-top: 2px; }
+  .retro .hcode .chint { margin-top: 3px; }
+  .retro .hh .win { margin-bottom: 6px; }
+  .retro .hh .lab { margin-top: 8px; }
+  .retro .hh .lampbox { margin-bottom: 8px; }
+  .retro .hh-size { font: 12px var(--sil); color: var(--mut); }
+  .retro .hhwrap { padding-top: 0; }
+  @media (max-width: 900px) { .retro .row { grid-template-columns: 1fr; } .retro .cwrap { grid-template-columns: 1fr; } }
+  @media (max-width: 430px) {
+    body:has(#v5.is-active) .topbar, body:has(#v5.is-active) .status, body:has(#v5.is-active) .banner, body:has(#v5.is-active) .msgbar { display: none; }
+    body:has(#v5.is-active) .stage { padding: 0; }
+    #v5 .stage-pad { padding: 8px; } .retro .hh { width: 100%; height: calc(100dvh - 16px); border-radius: 18px; } .retro .hh-size { display: none; }
+  }
   .banner[hidden], [hidden] { display: none !important; }
   .msgbar { padding: 8px 16px; background: #2a2114; border-bottom: 1px solid var(--amber); color: var(--amber); font-size: 13px; }
   .chip.err b::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 6px; background: var(--bad); }
   .chip.idle b::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 6px; border: 1px solid var(--muted); }
   #chipConn { color: var(--ink); font-weight: 600; }
   .dash { color: var(--muted); }
+  .retro .cnone.wait { color: #a9aaad; text-shadow: none; }
+  .retro .hlive { font: 700 11px var(--sil); letter-spacing: .12em; color: #a9aaad; }
+  .retro .hlive.on { color: #3fe06a; } .retro .hlive.off { color: #ff8a7a; }
 </style>
 </head>
 <body>
@@ -129,6 +222,8 @@
     <button class="vbtn is-active" data-view="v1" role="tab">A &middot; Cockpit</button>
     <button class="vbtn" data-view="v2" role="tab">B &middot; Scope</button>
     <button class="vbtn" data-view="v3" role="tab">C &middot; Guided test</button>
+    <button class="vbtn" data-view="v4" role="tab">D &middot; Analyzer</button>
+    <button class="vbtn" data-view="v5" role="tab">E &middot; Handheld</button>
   </nav>
 </header>
 <div class="status">
@@ -243,6 +338,72 @@
       </div>
     </div>
   </section>
+  <!-- D: ANALYZER CABINET (oxblood) -->
+  <section class="view" id="v4" role="tabpanel"><div class="retro">
+<div class="cab"><div class="face">
+    <span class="screw" style="left:8px;top:8px"></span><span class="screw" style="right:8px;top:8px"></span>
+    <span class="screw" style="left:8px;bottom:8px"></span><span class="screw" style="right:8px;bottom:8px"></span>
+    <div class="plate"><span>Shadetree Model 7-A &middot; Engine Analyzer</span><small>READ-ONLY &middot; NO OUTPUTS &middot; SER. 0709</small></div>
+    <div class="pan codes"><p class="lab">Trouble codes <span>plain-words meanings &middot; read-only</span></p>
+      <div class="cwrap"><div class="cntbox"><div class="win led" id="a_cnt" style="--c:#ff3b2b"></div><small>codes found</small></div><div class="clist" id="a_codes"></div></div>
+      <p class="cfoot">Meanings are plain-words drafts, unreviewed. The hint lines are general knowledge, unverified.</p></div>
+    <div class="row">
+      <div class="pan"><p class="lab">Engine speed <span>RPM</span></p>
+        <div class="win led" id="a_rpm" style="--c:#ff3b2b"></div>
+        <div class="meter" id="a_tach" style="margin-top:10px"></div>
+      </div>
+      <div class="pan"><p class="lab">Fuel trim <span>% &middot; centre = 0</span></p>
+        <div class="trims">
+          <div><p class="lab" style="margin:0 0 3px">Short term &middot; bank 1 <span id="a_v_stft1"></span></p><div class="leds" id="a_l_stft1"></div></div>
+          <div><p class="lab" style="margin:0 0 3px">Long term &middot; bank 1 <span id="a_v_ltft1"></span></p><div class="leds" id="a_l_ltft1"></div></div>
+          <div><p class="lab" style="margin:0 0 3px">Short term &middot; bank 2 <span id="a_v_stft2"></span></p><div class="leds" id="a_l_stft2"></div></div>
+          <div><p class="lab" style="margin:0 0 3px">Long term &middot; bank 2 <span id="a_v_ltft2"></span></p><div class="leds" id="a_l_ltft2"></div></div>
+          <div class="scale"><span>&minus;25</span><span>&minus;10</span><span>0</span><span>+10</span><span>+25</span></div>
+        </div>
+      </div>
+      <div class="pan">
+        <p class="lab">Coolant <span>&deg;C</span></p><div class="win led" id="a_ect" style="--c:#ffb62e"></div>
+        <p class="lab" style="margin-top:10px">Control module <span>VOLTS</span></p><div class="win led" id="a_volts" style="--c:#3fe06a"></div>
+        <p class="lab" style="margin-top:10px">Air flow <span>G/S</span></p><div class="win led" id="a_maf" style="--c:#ffb62e"></div>
+      </div>
+    </div>
+    <div class="lamps">
+      <div class="lampbox" id="a_lp_mil"><i class="lens red"></i><div><b>Check engine (MIL)</b><em id="a_lp_milt">off</em></div></div>
+      <div class="lampbox" id="a_lp_l1"><i class="lens red"></i><div><b>LTFT bank 1</b><em id="a_lp_l1t">within range</em></div></div>
+      <div class="lampbox" id="a_lp_l2"><i class="lens red"></i><div><b>LTFT bank 2</b><em id="a_lp_l2t">within range</em></div></div>
+      <div class="lampbox" id="a_lp_ect"><i class="lens amb"></i><div><b>Coolant</b><em id="a_lp_ectt">warm</em></div></div>
+      <div class="lampbox lit"><i class="lens grn"></i><div><b>Sampling</b><em>2.5 Hz</em></div></div>
+      <div class="lampbox lit"><i class="lens grn"></i><div><b>Read-only</b><em>cannot send commands</em></div></div>
+    </div>
+    <div class="meters"><div class="pan meter" id="a_vm"><p class="lab">Battery / charging <span>VOLTS</span></p></div><div class="pan meter" id="a_tm"><p class="lab">Coolant <span>&deg;C</span></p></div></div>
+    <div class="bench"><span class="lab" style="margin:0 6px 0 0">Display</span><button class="rocker" id="clarity" type="button">Clarity: standard</button><span class="lab" style="margin:0 0 0 8px">Sampling and simulator controls are in the bar above</span></div>
+  </div></div>
+  </div></section>
+
+  <!-- E: HANDHELD / PHONE (oxblood) -->
+  <section class="view" id="v5" role="tabpanel"><div class="retro stage-pad">
+<div class="hhwrap"><div class="hh" id="hh"><div class="hh-in">
+    <div class="hh-top"><span class="mil"><i class="lens red" id="h_mil" style="width:18px;height:18px"></i><span id="h_miltxt">Check engine</span></span><span class="hlive" id="h_live">&mdash;</span><span class="n mono" id="h_n">0 CODES</span></div>
+    <div class="hh-body">
+      <div class="hh-pane" data-mode="codes" id="h_codes"></div>
+      <div class="hh-pane" data-mode="live" hidden>
+        <p class="lab">Engine speed <span>RPM</span></p><div class="win led" id="h_rpm" style="--c:#ff3b2b"></div>
+        <p class="lab">Coolant <span>&deg;C</span></p><div class="win led" id="h_ect" style="--c:#ffb62e"></div>
+        <p class="lab">Control module <span>VOLTS</span></p><div class="win led" id="h_volts" style="--c:#3fe06a"></div>
+        <p class="lab">Air flow <span>G/S</span></p><div class="win led" id="h_maf" style="--c:#ffb62e"></div>
+      </div>
+      <div class="hh-pane" data-mode="trims" hidden>
+        <p class="lab">Short term &middot; bank 1 <span id="h_v_stft1"></span></p><div class="leds" id="h_l_stft1"></div>
+        <p class="lab">Long term &middot; bank 1 <span id="h_v_ltft1"></span></p><div class="leds" id="h_l_ltft1"></div>
+        <p class="lab">Short term &middot; bank 2 <span id="h_v_stft2"></span></p><div class="leds" id="h_l_stft2"></div>
+        <p class="lab">Long term &middot; bank 2 <span id="h_v_ltft2"></span></p><div class="leds" id="h_l_ltft2"></div>
+        <div class="scale"><span>&minus;25</span><span>&minus;10</span><span>0</span><span>+10</span><span>+25</span></div>
+      </div>
+      <div class="hh-pane" data-mode="status" hidden id="h_status"></div>
+    </div>
+    <nav class="hh-nav"><button data-mode="codes" class="on">Codes</button><button data-mode="live">Live</button><button data-mode="trims">Trims</button><button data-mode="status">Status</button></nav>
+  </div></div><div class="hh-size" id="h_size"></div></div>
+  </div></section>
 </main>
 <p class="foot">Values come from one shared sampler, so Claude and this page see the same numbers. Nothing on this page can send a command to the car. The &plusmn;10 % trim window used for the OUTSIDE tag is general knowledge, unverified. The guided test is a draft, unreviewed playbook.</p>
 
@@ -438,6 +599,10 @@
       trend($('s_trim'), [{ id: 'stft1', color: PAL.cyan }, { id: 'ltft1', color: PAL.cyan, dash: [6, 4] }, { id: 'stft2', color: PAL.amber }, { id: 'ltft2', color: PAL.amber, dash: [6, 4] }], [-25, 25]);
       trend($('s_air'), [{ id: 'maf', color: PAL.cyan }, { id: 'ect', color: PAL.amber, dash: [6, 4] }], [0, 100]);
       trend($('s_volt'), [{ id: 'volts', color: PAL.cyan }], [12, 15]);
+    } else if (view === 'v4') {
+      renderCabinet();
+    } else if (view === 'v5') {
+      renderHandheld();
     } else {
       var inr = last.rpm !== null && last.rpm > 2300 && last.rpm < 2700;
       $('v3band').textContent = inr ? 'in range 2300–2700' : 'target 2300–2700';
@@ -447,6 +612,122 @@
       trend($('c3'), [{ id: 'rpm', color: PAL.mute, width: 1.5 }], [0, 4000], { band: [2300, 2700] });
     }
   }
+
+
+  /* ---------- retro layouts D and E ---------- */
+  var SEG = { a: '8,2 40,2 44,6 40,10 8,10 4,6', g: '8,38 40,38 44,42 40,46 8,46 4,42', d: '8,74 40,74 44,78 40,82 8,82 4,78',
+    b: '44,8 48,12 48,36 44,40 40,36 40,12', c: '44,44 48,48 48,72 44,76 40,72 40,48', f: '4,8 8,12 8,36 4,40 0,36 0,12', e: '4,44 8,48 8,72 4,76 0,72 0,48' };
+  var MAP = { '0': 'abcdef', '1': 'bc', '2': 'abged', '3': 'abgcd', '4': 'fgbc', '5': 'afgcd', '6': 'afgedc', '7': 'abc', '8': 'abcdefg', '9': 'abfgcd', '-': 'g', ' ': '' };
+  function layout(v, digits, dp) {
+    if (v === null || v === undefined || !isFinite(v)) return { s: new Array(digits + 1).join('-'), dot: -1 };
+    var neg = v < 0, plain = Math.abs(v).toFixed(dp).replace('.', ''), room = digits - (neg ? 1 : 0);
+    if (plain.length > room) plain = new Array(room + 1).join('9');
+    var s = (neg ? '-' : '') + plain; while (s.length < digits) s = ' ' + s;
+    return { s: s, dot: dp > 0 ? digits - dp - 1 : -1 };
+  }
+  function seven(el, v, digits, dp, color, h) {
+    var L = layout(v, digits, dp), w = digits * 60, out = '<svg class="seg" viewBox="0 0 ' + w + ' 92" style="width:100%;max-height:' + h + 'px" preserveAspectRatio="xMinYMid meet"><g transform="translate(6,4) skewX(-7)">';
+    for (var i = 0; i < digits; i++) {
+      var lit = MAP[L.s.charAt(i)] || '';
+      out += '<g transform="translate(' + i * 60 + ',0)">';
+      Object.keys(SEG).forEach(function (k) { out += '<polygon points="' + SEG[k] + '" style="fill:' + color + (lit.indexOf(k) >= 0 ? '' : ';fill-opacity:var(--ghost)') + '"/>'; });
+      out += '<circle cx="53" cy="79" r="3.4" style="fill:' + color + (i === L.dot ? '' : ';fill-opacity:var(--ghost)') + '"/></g>';
+    }
+    el.innerHTML = out + '</g></svg>';
+  }
+  function ledBar(v, n) {
+    var zero = (n - 1) / 2, step = 25 / zero, off = Math.max(-zero, Math.min(zero, Math.round(v / step))), h = '';
+    for (var i = 0; i < n; i++) {
+      var d = Math.abs(i - zero), lit = off >= 0 ? (i >= zero && i <= zero + off) : (i <= zero && i >= zero + off), col = d <= 2 ? 'g' : d <= 4 ? 'y' : 'r';
+      h += '<i class="' + (lit ? col : '') + (i === zero ? ' z' : '') + '"></i>';
+    }
+    return h;
+  }
+  function meter(el, v, lo, hi, majors, redFrom, label, div) {
+    div = div || 1;
+    var cx = 110, cy = 118, r = 92, a0 = -50, a1 = 50, s = '<svg viewBox="0 0 220 128" role="img" aria-label="' + label + '">';
+    var face = '#f6f5ef';
+    s += '<rect x="2" y="2" width="216" height="124" rx="6" fill="' + face + '" stroke="#7d765f" stroke-width="2"/>';
+    function P(val, rad) { var a = (a0 + (a1 - a0) * (val - lo) / (hi - lo)) * Math.PI / 180; return [cx + rad * Math.sin(a), cy - rad * Math.cos(a)]; }
+    if (redFrom !== null) { var p = P(redFrom, r), q = P(hi, r); s += '<path d="M' + p[0] + ' ' + p[1] + ' A' + r + ' ' + r + ' 0 0 1 ' + q[0] + ' ' + q[1] + '" stroke="#c9382a" stroke-width="6" fill="none"/>'; }
+    var p0 = P(lo, r), p1 = P(hi, r); s += '<path d="M' + p0[0] + ' ' + p0[1] + ' A' + r + ' ' + r + ' 0 0 1 ' + p1[0] + ' ' + p1[1] + '" stroke="#2a2723" stroke-width="2" fill="none"/>';
+    for (var i = 0; i <= majors; i++) {
+      var val = lo + (hi - lo) * i / majors, o = P(val, r + 2), inn = P(val, r - 12), tx = P(val, r - 24);
+      s += '<line x1="' + o[0] + '" y1="' + o[1] + '" x2="' + inn[0] + '" y2="' + inn[1] + '" stroke="#2a2723" stroke-width="2.4"/>';
+      s += '<text x="' + tx[0] + '" y="' + (tx[1] + 4) + '" font-size="13" font-weight="700" text-anchor="middle" fill="#2a2723" font-family="Helvetica,Arial,sans-serif">' + (Math.round(val / div * 10) / 10) + '</text>';
+      if (i < majors) for (var j = 1; j < 4; j++) { var mv = val + (hi - lo) / majors * j / 4, m1 = P(mv, r + 1), m2 = P(mv, r - 6); s += '<line x1="' + m1[0] + '" y1="' + m1[1] + '" x2="' + m2[0] + '" y2="' + m2[1] + '" stroke="#2a2723" stroke-width="1.2"/>'; }
+    }
+    if (div !== 1) s += '<text x="12" y="22" font-size="10" font-weight="700" text-anchor="start" fill="#5b5547" font-family="Helvetica,Arial,sans-serif" letter-spacing="1.5">x' + div + ' RPM</text>';
+    var nv = P(Math.max(lo, Math.min(hi, v === null ? lo : v)), r - 6);
+    s += '<line x1="' + cx + '" y1="' + cy + '" x2="' + nv[0] + '" y2="' + nv[1] + '" stroke="#b22a1c" stroke-width="3" stroke-linecap="round"/><circle cx="' + cx + '" cy="' + cy + '" r="7" fill="#2a2723"/></svg>';
+    var keep = el.querySelector('.lab'); el.innerHTML = (keep ? keep.outerHTML : '') + s;
+  }
+  function lamp(id, on, text, txt) { $(id).className = 'lampbox' + (on ? ' lit' : ''); if (txt) $(txt).textContent = text; }
+  function esc(x) { return String(x).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function codeRows(list, cls) {
+    return list.map(function (x) {
+      return { code: x.code, kind: x.kind, desc: x.desc, hint: x.hint };
+    }).map(function (x) {
+      return cls === 'hh'
+        ? '<div class="hcode"><div class="r1"><span class="ccode mono">' + esc(x.code) + '</span><span class="cst ' + x.kind + '" style="padding:4px 8px">' + x.kind.toUpperCase() + '</span></div><div class="cdesc">' + esc(x.desc) + '</div>' + (x.hint ? '<span class="chint">' + esc(x.hint) + '</span>' : '') + '</div>'
+        : '<div class="crow"><span class="ccode mono">' + esc(x.code) + '</span><span class="cst ' + x.kind + '">' + x.kind.toUpperCase() + '</span><span class="cdesc">' + esc(x.desc) + (x.hint ? '<span class="chint">' + esc(x.hint) + '</span>' : '') + '</span></div>';
+    }).join('');
+  }
+  function codeList(c) {
+    var out = [];
+    ['stored', 'pending', 'permanent'].forEach(function (k) { (c[k] || []).forEach(function (d) { out.push({ code: d.code, kind: k, desc: d.desc, hint: d.hint }); }); });
+    return out;
+  }
+  function codeEmpty(c, running) {
+    if (c && c.read) return 'NO CODES STORED';
+    if (c && c.note) return c.note.toUpperCase();
+    return running ? 'READING CODES...' : 'START SAMPLING TO READ CODES';
+  }
+  function retroCommon() {
+    var st = state || {}, c = st.codes || { read: false, note: null }, list = c.read ? codeList(c) : [], live = st.status === 'running';
+    var stored = c.read ? (c.stored || []).length : 0, mil = !!(c.read && c.mil);
+    return { c: c, list: list, live: live, mil: mil, stored: stored };
+  }
+  function ledLamp(id, on, cls, b, e) { return '<div class="lampbox' + (on ? ' lit' : '') + '"><i class="lens ' + cls + '"></i><div><b>' + b + '</b><em>' + e + '</em></div></div>'; }
+  function trimText(v) { return v > 10 ? 'LEAN: outside \u00b110 %' : 'RICH: outside \u00b110 %'; }
+  function renderCabinet() {
+    var r = retroCommon(), l1 = last.ltft1 !== null && Math.abs(last.ltft1) > 10, l2 = last.ltft2 !== null && Math.abs(last.ltft2) > 10;
+    seven($('a_cnt'), r.c.read ? r.list.length : null, 2, 0, r.list.length ? '#ff3b2b' : '#3fe06a', 64);
+    $('a_codes').innerHTML = r.list.length ? codeRows(r.list, 'cab') : '<div class="cnone' + (r.c.read ? '' : ' wait') + '">' + codeEmpty(r.c, r.live) + '</div>';
+    lamp('a_lp_mil', r.mil, r.mil ? 'ON' : (r.c.read ? 'off' : 'unknown'), 'a_lp_milt');
+    seven($('a_rpm'), last.rpm, 4, 0, '#ff3b2b', 96); seven($('a_ect'), last.ect, 3, 0, '#ffb62e', 64);
+    seven($('a_volts'), last.volts, 4, 2, '#3fe06a', 64); seven($('a_maf'), last.maf, 4, 1, '#ffb62e', 64);
+    ['stft1', 'ltft1', 'stft2', 'ltft2'].forEach(function (k) { $('a_l_' + k).innerHTML = ledBar(last[k], 21); $('a_v_' + k).textContent = last[k] === null ? '' : (last[k] > 0 ? '+' : '') + last[k].toFixed(1); });
+    lamp('a_lp_l1', l1, l1 ? trimText(last.ltft1) : 'within range', 'a_lp_l1t'); lamp('a_lp_l2', l2, l2 ? trimText(last.ltft2) : 'within range', 'a_lp_l2t');
+    lamp('a_lp_ect', last.ect !== null && last.ect < 60, last.ect !== null && last.ect < 60 ? 'reads cold' : 'warm', 'a_lp_ectt');
+    meter($('a_vm'), last.volts, 11, 16, 5, 15, 'volts'); meter($('a_tm'), last.ect, 20, 120, 5, 105, 'coolant'); meter($('a_tach'), last.rpm, 0, 4000, 4, 3500, 'tachometer', 1000);
+  }
+  function renderHandheld() {
+    var r = retroCommon(), l1 = last.ltft1 !== null && Math.abs(last.ltft1) > 10, l2 = last.ltft2 !== null && Math.abs(last.ltft2) > 10, st = state || {};
+    var mil = $('h_mil'); mil.className = 'lens red';
+    mil.style.cssText = 'width:18px;height:18px' + (r.mil ? ';background:radial-gradient(circle at 35% 30%,#ffd0c8,#ff4a3a 55%,#b3170b);box-shadow:0 0 12px #ff4a3a' : '');
+    $('h_miltxt').textContent = r.mil ? 'Check engine ON' : (r.c.read ? 'Check engine off' : 'Check engine ?');
+    $('h_n').textContent = r.c.read ? r.list.length + (r.list.length === 1 ? ' CODE' : ' CODES') : '-- CODES'; $('h_n').className = 'n mono' + (r.c.read && !r.list.length ? ' zero' : '');
+    var lv = $('h_live'); lv.textContent = { running: 'LIVE', stopped: 'STOPPED', error: 'ERROR', idle: 'IDLE', disconnected: 'NO LINK' }[st.status] || '--'; lv.className = 'hlive ' + (st.status === 'running' ? 'on' : 'off');
+    $('h_codes').innerHTML = r.list.length ? codeRows(r.list, 'hh') + '<p class="cfoot">Meanings are plain-words drafts, unreviewed. Hints: general knowledge, unverified.</p>' : '<div class="cnone' + (r.c.read ? '' : ' wait') + '" style="padding:150px 0">' + codeEmpty(r.c, r.live) + '</div>';
+    seven($('h_rpm'), last.rpm, 4, 0, '#ff3b2b', 84); seven($('h_ect'), last.ect, 3, 0, '#ffb62e', 64);
+    seven($('h_volts'), last.volts, 4, 2, '#3fe06a', 64); seven($('h_maf'), last.maf, 4, 1, '#ffb62e', 64);
+    ['stft1', 'ltft1', 'stft2', 'ltft2'].forEach(function (k) { $('h_l_' + k).innerHTML = ledBar(last[k], 21); $('h_v_' + k).textContent = last[k] === null ? '' : (last[k] > 0 ? '+' : '') + last[k].toFixed(1); });
+    $('h_status').innerHTML = ledLamp('', r.mil, 'red', 'Check engine (MIL)', r.mil ? 'ON' : (r.c.read ? 'off' : 'unknown')) +
+      ledLamp('', l1, 'red', 'LTFT bank 1', l1 ? trimText(last.ltft1) : 'within range') + ledLamp('', l2, 'red', 'LTFT bank 2', l2 ? trimText(last.ltft2) : 'within range') +
+      ledLamp('', last.ect !== null && last.ect < 60, 'amb', 'Coolant', last.ect !== null && last.ect < 60 ? 'reads cold' : 'warm') +
+      ledLamp('', st.status === 'running', 'grn', 'Sampling', st.status === 'running' ? (st.hz_measured ? st.hz_measured.toFixed(1) + ' Hz' : 'starting') : 'not sampling') + ledLamp('', true, 'grn', 'Read-only', 'cannot send commands');
+  }
+  function setMode(m) {
+    Array.prototype.forEach.call(document.querySelectorAll('.hh-pane'), function (e) { e.hidden = e.dataset.mode !== m; });
+    Array.prototype.forEach.call(document.querySelectorAll('.hh-nav button'), function (b) { b.classList.toggle('on', b.dataset.mode === m); });
+  }
+  Array.prototype.forEach.call(document.querySelectorAll('.hh-nav button'), function (b) { b.addEventListener('click', function () { setMode(b.dataset.mode); }); });
+  $('clarity').addEventListener('click', function () {
+    var on = false;
+    Array.prototype.forEach.call(document.querySelectorAll('.retro'), function (e) { e.classList.toggle('max'); on = e.classList.contains('max'); });
+    $('clarity').textContent = on ? 'Clarity: max' : 'Clarity: standard'; render();
+  });
 
   /* ---------- talking to the server ---------- */
   function post(path, body) {
@@ -492,7 +773,7 @@
     render();
   }
   Array.prototype.forEach.call(btns, function (b) { b.addEventListener('click', function () { show(b.dataset.view); history.replaceState(null, '', location.search + '#' + b.dataset.view); }); });
-  var init = (location.hash || '').replace('#', ''); if (init && $(init)) show(init);
+  var init = (location.hash || '').replace('#', ''); if (init && $(init)) { show(init); window.addEventListener('load', function () { if (window.scrollTo) window.scrollTo(0, 0); }); }  // the #fragment would otherwise scroll the page to that section
 
   Array.prototype.forEach.call(document.querySelectorAll('#strips .card'), function (card) {
     var cv = card.querySelector('canvas'), cur = card.querySelector('.cursor'), tip = card.querySelector('.tip');

@@ -36,6 +36,18 @@ ENCODERS: dict[str, Callable[[float], bytes]] = {
 _KEY = {"0C": "rpm", "05": "ect", "06": "s1", "07": "l1", "08": "s2", "09": "l2", "10": "maf", "42": "volts"}
 
 
+# (stored, pending) codes as 2-byte DTCs, and whether the lamp is on
+_CODES = {
+    "healthy": ([], []),
+    "rich": ([0x0117, 0x0172], [0x0175]),
+    "lean": ([0x0171, 0x0174], [0x0101]),
+}
+
+
+def _dtc_reply(sid: int, codes: list[int]) -> str:
+    return " ".join(f"{b:02X}" for b in [sid, len(codes)] + [x for c in codes for x in (c >> 8, c & 0xFF)])
+
+
 class SimPort:
     def __init__(self, scenario: str = "rich", clock: Callable[[], float] = time.monotonic, seed: int = 7):
         if scenario not in SCENARIOS:
@@ -86,13 +98,19 @@ class SimPort:
         cmd = data.decode("ascii").rstrip("\r")
         if cmd == "010C":
             self._advance()  # one model step per sweep
-        if cmd.startswith("01") and len(cmd) == 4:
+        if cmd.startswith("01") and len(cmd) == 4 and cmd != "0101":
             pid = cmd[2:]
             if pid in ENCODERS:
                 raw = ENCODERS[pid](self._values[_KEY[pid]])
                 self._pending = f"41 {pid} " + " ".join(f"{b:02X}" for b in raw) + "\r"
             else:
                 self._pending = "NO DATA\r"
+        elif cmd in ("03", "07", "0A"):
+            stored, pending = _CODES[self.scenario]
+            self._pending = _dtc_reply({"03": 0x43, "07": 0x47, "0A": 0x4A}[cmd], {"03": stored, "07": pending, "0A": []}[cmd]) + "\r"
+        elif cmd == "0101":
+            stored, _ = _CODES[self.scenario]
+            self._pending = f"41 01 {(0x80 if stored else 0) | len(stored):02X} 00 00 00\r"
         elif cmd == "ATI":
             self._pending = "SIM327 (simulated)\r"
         elif cmd == "STI":
