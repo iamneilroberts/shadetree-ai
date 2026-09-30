@@ -111,6 +111,7 @@
   .msgbar { padding: 8px 16px; background: #2a2114; border-bottom: 1px solid var(--amber); color: var(--amber); font-size: 13px; }
   .chip.err b::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 6px; background: var(--bad); }
   .chip.idle b::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 6px; border: 1px solid var(--muted); }
+  #chipConn { color: var(--ink); font-weight: 600; }
   .dash { color: var(--muted); }
 </style>
 </head>
@@ -250,7 +251,7 @@
   var PIDS = CH.map(function (c) { return c.pid; });
   var SPAN = 60;
   var PAL = { cyan: '#4fc3e8', amber: '#f2a93b', mute: '#93a0aa', line: '#2c343b' };
-  var buf = {}, last = {}, lastSeq = 0, tNow = 0, state = null, fetchedAt = 0, events = [], cap = null, results = {};
+  var buf = {}, last = {}, lastSeq = 0, runId = null, polling = false, tNow = 0, state = null, fetchedAt = 0, events = [], cap = null, results = {};
   CH.forEach(function (c) { buf[c.id] = []; last[c.id] = null; });
   function $(id) { return document.getElementById(id); }
   function fmt(v, dp) { return v === null || v === undefined ? '—' : (dp === 0 ? String(Math.round(v)) : v.toFixed(dp)); }
@@ -262,8 +263,10 @@
   /* ---------- data in ---------- */
   function resetBuffers() { CH.forEach(function (c) { buf[c.id] = []; last[c.id] = null; }); lastSeq = 0; events = []; }
   function ingest(st) {
-    if (st.seq < lastSeq) resetBuffers();          // a new run started: sequence numbers restart
+    // a new run (any viewer, or Claude, can start one) restarts the sequence numbers: start over
+    if (st.run !== runId || st.seq < lastSeq) { resetBuffers(); runId = st.run; }
     state = st; fetchedAt = performance.now(); tNow = st.now;
+    if (cap && st.status !== 'running') cancelCap('sampling stopped');
     var rows = {};
     CH.forEach(function (c) {
       var ch = st.channels[c.pid]; if (!ch) return;
@@ -343,7 +346,7 @@
   /* ---------- guided test (layout C): captures are timed by the sample timestamps ---------- */
   function capRow(row) {
     if (!cap) return;
-    if (cap.t0 === null) cap.t0 = row.t;
+    if (cap.t0 === null || row.t < cap.t0) cap.t0 = row.t;
     ['stft1', 'ltft1', 'stft2', 'ltft2', 'maf', 'rpm'].forEach(function (k) { if (row[k] !== undefined) { cap.sum[k] += row[k]; cap.cnt[k]++; } });
     var el = row.t - cap.t0;
     $('pg_' + cap.id).style.width = Math.min(100, el / cap.secs * 100) + '%';
@@ -352,6 +355,11 @@
       results[cap.id] = m; $('st_' + cap.id).className = 'step done'; $('tx_' + cap.id).textContent = 'captured';
       $('go_' + cap.id).disabled = false; cap = null; renderResults();
     }
+  }
+  function cancelCap(why) {
+    if (!cap) return;
+    $('st_' + cap.id).className = 'step'; $('tx_' + cap.id).textContent = 'cancelled: ' + why;
+    $('pg_' + cap.id).style.width = '0'; $('go_' + cap.id).disabled = false; cap = null;
   }
   function startCap(id) {
     if (cap) return;
@@ -381,11 +389,12 @@
   function active() { var a = document.querySelector('.view.is-active'); return a ? a.id : 'v1'; }
   function showMsg(text) { var m = $('msg'); if (text) { m.textContent = text; m.hidden = false; } else { m.hidden = true; } }
   function chips() {
-    var st = state || { status: 'disconnected' }, live = $('chipLive'), label = { running: 'LIVE', stopped: 'STOPPED', error: 'ERROR', idle: 'NOT SAMPLING', disconnected: 'DISCONNECTED' }[st.status] || st.status;
+    var st = state || { status: 'disconnected' }, live = $('chipLive'), label = { running: 'LIVE', stopped: 'STOPPED', error: 'ERROR', idle: 'NOT SAMPLING', disconnected: 'DISCONNECTED' }[st.status] || 'UNKNOWN';
     live.className = 'chip ' + (st.status === 'running' ? 'live' : st.status === 'error' || st.status === 'disconnected' ? 'err' : st.status === 'stopped' ? 'paused' : 'idle');
     live.innerHTML = '<b>' + label + '</b>';
     var ad = st.adapter || {};
-    $('chipConn').innerHTML = '<b>' + (ad.chip || ad.ati || 'no adapter') + '</b>' + (ad.protocol ? ' &middot; ' + ad.protocol : '');
+    // adapter and ECU text is untrusted: show it as text, never as markup
+    $('chipConn').textContent = (ad.chip || ad.ati || 'no adapter') + (ad.protocol ? ' · ' + ad.protocol : '');
     $('rate').textContent = st.hz_measured ? st.hz_measured.toFixed(1) + ' Hz' : '—';
     var age = st.since_last_sample === null || st.since_last_sample === undefined ? null : st.since_last_sample + (st.status === 'running' ? (performance.now() - fetchedAt) / 1000 : 0);
     $('age').textContent = age === null ? '—' : age.toFixed(1) + ' s ago';
@@ -432,10 +441,13 @@
       .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); });
   }
   function poll() {
+    if (polling) return;                      // never let two polls race: a slow reply must not be overtaken
+    polling = true;
     fetch(api('/api/state?after=' + lastSeq))
       .then(function (r) { if (!r.ok) throw new Error(String(r.status)); return r.json(); })
       .then(function (st) { ingest(st); render(); })
-      .catch(function () { state = { status: 'disconnected' }; chips(); });
+      .catch(function () { state = { status: 'disconnected' }; chips(); })
+      .then(function () { polling = false; });
   }
   $('pause').addEventListener('click', function () {
     var running = state && state.status === 'running';

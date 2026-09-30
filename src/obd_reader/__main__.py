@@ -55,6 +55,12 @@ def console_main(args, block: bool = True):
     if not args.no_start:
         svc.start_sampling(seconds=args.seconds)
     print(f"console: {server.url}", flush=True)
+    if args.host in ("0.0.0.0", "::"):
+        from obd_reader.console import guess_lan_ip
+
+        ip = guess_lan_ip()
+        if ip:  # from another device on the same network
+            print(f"console (other devices): http://{ip}:{server.port}/?t={server.token}", flush=True)
     if block:
         import time
 

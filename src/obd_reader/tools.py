@@ -226,6 +226,7 @@ def build_tools(session: Session) -> dict[str, Callable]:
     # ---- live console: one shared sampler, viewed by a web page and by Claude ---------------------
 
     consoles: dict[str, ConsoleService | None] = {"real": None, "demo": None}
+    recent_first: list[str] = []  # console kinds, most recently opened first
 
     def _service(demo: bool) -> ConsoleService:
         key = "demo" if demo else "real"
@@ -237,6 +238,10 @@ def build_tools(session: Session) -> dict[str, Callable]:
         """Start the live console web page (local, token-protected, read-only) and return its URL. demo=True uses a simulated car."""
         service = _service(bool(demo))
         server = service.ensure()
+        key = "demo" if demo else "real"
+        if key in recent_first:
+            recent_first.remove(key)
+        recent_first.insert(0, key)
         if start:
             service.start_sampling()
         return {"url": server.url, "status": service.hub.state()["status"], "demo": bool(demo)}
@@ -245,7 +250,7 @@ def build_tools(session: Session) -> dict[str, Callable]:
         """Latest values and exact statistics over the last N seconds from the console's sampler (what the page shows)."""
         if not (isinstance(seconds, (int, float)) and math.isfinite(seconds) and 0 < seconds <= 600):
             raise ValueError("seconds must be in (0, 600]")
-        service = next((c for c in (consoles["real"], consoles["demo"]) if c is not None and c.hub is not None), None)
+        service = next((consoles[k] for k in recent_first if consoles[k] is not None and consoles[k].hub is not None), None)
         if service is None:
             return {"status": "idle", "message": "the console is not open; call open_console first", "channels": {}}
         st = service.hub.state()

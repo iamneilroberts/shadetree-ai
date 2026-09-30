@@ -1,7 +1,12 @@
 """Local web console: one page plus a small token-protected JSON API over a LiveHub."""
+import base64
+import hashlib
 import hmac
+import ipaddress
 import json
+import re
 import secrets
+import socket
 import threading
 import weakref
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -16,8 +21,26 @@ from obd_reader.simulator import SimPort
 MAX_BODY = 4096
 _LOOPBACK = {"127.0.0.1", "localhost", "::1"}
 _POST_ROUTES = ("/api/start", "/api/stop", "/api/save", "/api/sim")
-_CSP = ("default-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; "
-        "connect-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'")
+_CSP_JSON = "default-src 'none'"
+
+
+def _page_csp(page: bytes) -> str:
+    """The page's one inline script is pinned by hash, so injected markup (an inline event
+    handler, a second script) cannot run even if untrusted text ever reached the DOM."""
+    script = re.search(rb"<script>(.*?)</script>", page, re.S)
+    digest = base64.b64encode(hashlib.sha256(script.group(1)).digest()).decode() if script else ""
+    return (f"default-src 'self'; script-src 'sha256-{digest}'; style-src 'unsafe-inline'; "
+            "connect-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none'")
+
+
+def guess_lan_ip() -> str | None:
+    """Best-effort address other devices can use (a UDP connect sends no packets)."""
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.connect(("10.255.255.255", 1))
+            return s.getsockname()[0]
+    except OSError:
+        return None
 
 
 class ConsoleServer:
@@ -31,7 +54,35 @@ class ConsoleServer:
         self.allowed_hosts = {f"127.0.0.1:{self.port}", f"localhost:{self.port}", f"[::1]:{self.port}"}
         if host not in _LOOPBACK:
             self.allowed_hosts.add(f"{host}:{self.port}")  # LAN: the user opens it by the address it is bound to
+        self._wildcard = host in ("0.0.0.0", "::")
+        self._page_bytes: bytes | None = None
+        self._page_csp = ""
         self._thread: threading.Thread | None = None
+
+    def _host_ok(self, hostport: str) -> bool:
+        """Loopback names, the bound address, or (wildcard bind only) any IP literal on our port.
+        An IP literal cannot be DNS-rebound, so it is safe to accept; a name is not."""
+        if hostport in self.allowed_hosts:
+            return True
+        if not self._wildcard:
+            return False
+        host, _, port = hostport.rpartition(":")
+        if not host or port != str(self.port):
+            return False
+        try:
+            ipaddress.ip_address(host.strip("[]"))
+        except ValueError:
+            return False
+        return True
+
+    def _origin_ok(self, origin: str) -> bool:
+        return origin.startswith("http://") and self._host_ok(origin[len("http://"):])
+
+    def _page(self) -> tuple[bytes, str]:
+        if self._page_bytes is None:
+            self._page_bytes = resources.files("obd_reader.web").joinpath("console.html").read_bytes()
+            self._page_csp = _page_csp(self._page_bytes)
+        return self._page_bytes, self._page_csp
 
     @property
     def url(self) -> str:
@@ -59,13 +110,13 @@ class ConsoleServer:
                 pass
 
             # ---- plumbing ----
-            def _send(self, status: int, body: bytes, ctype: str) -> None:
+            def _send(self, status: int, body: bytes, ctype: str, csp: str = _CSP_JSON) -> None:
                 self.send_response(status)
                 self.send_header("Content-Type", ctype)
                 self.send_header("Content-Length", str(len(body)))
                 self.send_header("Cache-Control", "no-store")
                 self.send_header("X-Content-Type-Options", "nosniff")
-                self.send_header("Content-Security-Policy", _CSP)
+                self.send_header("Content-Security-Policy", csp)
                 self.end_headers()
                 self.wfile.write(body)
 
@@ -73,12 +124,12 @@ class ConsoleServer:
                 self._send(status, json.dumps(obj).encode(), "application/json; charset=utf-8")
 
             def _guard(self, post: bool) -> tuple[bool, dict]:
-                if self.headers.get("Host", "") not in outer.allowed_hosts:
+                if not outer._host_ok(self.headers.get("Host", "")):
                     self._json(403, {"error": "forbidden"})
                     return False, {}
                 if post:
                     origin = self.headers.get("Origin")
-                    if origin is not None and origin not in {f"http://{h}" for h in outer.allowed_hosts}:
+                    if origin is not None and not outer._origin_ok(origin):
                         self._json(403, {"error": "forbidden"})
                         return False, {}
                 q = parse_qs(urlparse(self.path).query)
@@ -121,8 +172,8 @@ class ConsoleServer:
                 if not ok:
                     return
                 if path == "/":
-                    html = resources.files("obd_reader.web").joinpath("console.html").read_bytes()
-                    return self._send(200, html, "text/html; charset=utf-8")
+                    html, csp = outer._page()
+                    return self._send(200, html, "text/html; charset=utf-8", csp)
                 try:
                     after = max(0, int((q.get("after") or ["0"])[0]))
                 except ValueError:
