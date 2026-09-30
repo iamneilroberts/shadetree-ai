@@ -193,6 +193,16 @@
   .retro .hcode .cdesc { font-size: 17px; margin-top: 2px; }
   .retro .hcode .chint { margin-top: 3px; }
   .retro .hh .win { margin-bottom: 6px; }
+  /* the three data panes spread their contents over the whole frame, so nothing is left empty and the frame never resizes */
+  .retro .hh-pane[data-mode="live"], .retro .hh-pane[data-mode="trims"], .retro .hh-pane[data-mode="status"] { height: 100%; display: flex; flex-direction: column; }
+  .retro .hh-pane[hidden] { display: none; }
+  .retro .hh-pane[data-mode="live"] .win { flex: 1; min-height: 0; margin-bottom: 4px; display: flex; align-items: center; justify-content: center; padding: 4px 8px; }
+  .retro .hh-pane[data-mode="live"] .win svg.seg { max-height: none !important; height: 100%; width: 100%; }
+  .retro .hh-pane[data-mode="trims"] .leds { flex: 1; min-height: 0; margin-bottom: 4px; }
+  .retro .hh-pane[data-mode="trims"] .leds i { height: auto; }
+  .retro .hh-pane[data-mode="status"] .lampbox { flex: 1; min-height: 0; margin-bottom: 8px; }
+  .retro .hh-pane[data-mode="status"] .lampbox b { font-size: 14px; } .retro .hh-pane[data-mode="status"] .lampbox em { font-size: 13px; }
+  .retro .hh-nav { padding-bottom: calc(8px + env(safe-area-inset-bottom)); }
   .retro .hh .lab { margin-top: 8px; }
   .retro .hh .lampbox { margin-bottom: 8px; }
   .retro .hh-size { font: 12px var(--sil); color: var(--mut); }
@@ -201,7 +211,10 @@
   @media (max-width: 430px) {
     body:has(#v5.is-active) .topbar, body:has(#v5.is-active) .status, body:has(#v5.is-active) .banner, body:has(#v5.is-active) .msgbar { display: none; }
     body:has(#v5.is-active) .stage { padding: 0; }
-    #v5 .stage-pad { padding: 8px; } .retro .hh { width: 100%; height: calc(100dvh - 16px); border-radius: 18px; } .retro .hh-size { display: none; }
+    #v5 .stage-pad { padding: 0; }
+    .retro .hh { width: 100%; height: 100dvh; padding: 0; border-radius: 0; background: none; box-shadow: none; }
+    .retro .hh-in { border: 0; border-radius: 0; }
+    .retro .hh-top { height: 60px; } .retro .hh-body { padding: 8px; } .retro .hh-size { display: none; }
   }
   .banner[hidden], [hidden] { display: none !important; }
   .msgbar { padding: 8px 16px; background: #2a2114; border-bottom: 1px solid var(--amber); color: var(--amber); font-size: 13px; }
@@ -626,7 +639,7 @@
     return { s: s, dot: dp > 0 ? digits - dp - 1 : -1 };
   }
   function seven(el, v, digits, dp, color, h) {
-    var L = layout(v, digits, dp), w = digits * 60, out = '<svg class="seg" viewBox="0 0 ' + w + ' 92" style="width:100%;max-height:' + h + 'px" preserveAspectRatio="xMinYMid meet"><g transform="translate(6,4) skewX(-7)">';
+    var L = layout(v, digits, dp), w = digits * 60, out = '<svg class="seg" viewBox="0 0 ' + w + ' 92" style="width:100%;max-height:' + h + 'px" preserveAspectRatio="xMidYMid meet"><g transform="translate(6,4) skewX(-7)">';
     for (var i = 0; i < digits; i++) {
       var lit = MAP[L.s.charAt(i)] || '';
       out += '<g transform="translate(' + i * 60 + ',0)">';
