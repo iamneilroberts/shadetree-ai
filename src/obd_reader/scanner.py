@@ -2,7 +2,7 @@
 from datetime import datetime, timezone
 
 from obd_reader import __version__
-from obd_reader.elm import decode_dtc_list, decode_supported, parse_response
+from obd_reader.elm import decode_dtc_list, decode_supported, parse_all
 from obd_reader.snapshot import (
     VIN_RE, Adapter, Dtc, Dtcs, Mil, Protocol, Snapshot, Source, Vehicle,
 )
@@ -16,8 +16,20 @@ def _first(lines: list[str]) -> str | None:
 
 
 def _dtcs(transport: Transport, cmd: str, sid: int) -> list[Dtc]:
-    payload = parse_response(transport.send(cmd), sid)
-    return [Dtc(code=c) for c in decode_dtc_list(payload)] if payload else []
+    """Union of the codes every responding ECU reports, first-seen order."""
+    codes: list[str] = []
+    for payload in parse_all(transport.send(cmd), sid):
+        codes += [c for c in decode_dtc_list(payload) if c not in codes]
+    return [Dtc(code=c) for c in codes]
+
+
+def _supported(payloads: list[bytes], base: int) -> set[str]:
+    """PIDs advertised by any ECU whose reply is for this bitmap page."""
+    out: set[str] = set()
+    for p in payloads:
+        if len(p) >= 6 and p[1] == base:
+            out.update(decode_supported(base, p[2:6]))
+    return out
 
 
 def scan(
@@ -44,19 +56,18 @@ def scan(
         genuine_stn=genuine_stn,
     )
     supported: dict[str, list[str]] = {}
-    pids01: list[str] = []
+    pids01: set[str] = set()
     base = 0x00
     while base <= 0xE0:
-        p = parse_response(transport.send(f"01{base:02X}"), 0x41)
-        if p is None or len(p) < 6 or p[1] != base:
+        pids = _supported(parse_all(transport.send(f"01{base:02X}"), 0x41), base)
+        if not pids:
             break
-        pids = decode_supported(base, p[2:6])
-        pids01 += pids
-        if f"{base + 0x20:02X}" not in pids:
+        pids01 |= pids
+        if f"{base + 0x20:02X}" not in pids:  # no ECU advertises another page
             break
         base += 0x20
     if pids01:
-        supported["01"] = pids01
+        supported["01"] = sorted(pids01)
     else:
         warnings.append("Mode 01: no response to the supported-PID request (no data or unable to connect)")
 
@@ -76,19 +87,18 @@ def scan(
     vin, vin_source = None, "none"
     dtcs = Dtcs()
     if is_can:
-        p9 = parse_response(transport.send("0900"), 0x49)
-        if p9 is not None and len(p9) >= 6:
-            pids09 = decode_supported(0x00, p9[2:6])
-            supported["09"] = pids09
-        else:
-            pids09 = []
+        pids09 = _supported(parse_all(transport.send("0900"), 0x49), 0x00)
+        if pids09:
+            supported["09"] = sorted(pids09)
         if "02" in pids09:
-            pv = parse_response(transport.send("0902"), 0x49)
-            candidate = pv[3:20].decode("ascii", errors="replace") if pv else ""
-            if VIN_RE.fullmatch(candidate):
-                vin, vin_source = candidate, "obd"
+            candidates = [p[3:20].decode("ascii", errors="replace") for p in parse_all(transport.send("0902"), 0x49)]
+            valid = [c for c in dict.fromkeys(candidates) if VIN_RE.fullmatch(c)]
+            if valid:
+                vin, vin_source = valid[0], "obd"
+                if len(valid) > 1:
+                    warnings.append(f"ECUs disagree on the VIN: {valid}; using the first")
             else:
-                warnings.append(f"Mode 09 returned an invalid VIN: {candidate!r}")
+                warnings.append(f"Mode 09 returned an invalid VIN: {candidates[0] if candidates else ''!r}")
         else:
             warnings.append("VIN unsupported via Mode 09")
 
@@ -103,9 +113,9 @@ def scan(
         )
 
     mil = Mil()
-    p1 = parse_response(transport.send("0101"), 0x41)
-    if p1 is not None and len(p1) >= 3 and p1[1] == 0x01:
-        mil = Mil(on=bool(p1[2] & 0x80), dtc_count=p1[2] & 0x7F)
+    status = [p for p in parse_all(transport.send("0101"), 0x41) if len(p) >= 3 and p[1] == 0x01]
+    if status:  # the lamp is on if any ECU commands it; each ECU counts its own codes
+        mil = Mil(on=any(p[2] & 0x80 for p in status), dtc_count=sum(p[2] & 0x7F for p in status))
 
     return Snapshot(
         snapshot_id=snapshot_id,
