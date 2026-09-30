@@ -1,6 +1,6 @@
 # OBD Diagnostic Assistant — Design (draft 1)
 
-_Status: draft, 2026-09-28. Project name `shadetree-ai` (provisional; import package `obd_reader`, repo dir `obd-reader`). No production code exists yet._
+_Status: design of record, updated 2026-09-30. Project name `shadetree-ai` (provisional; import package `obd_reader`, repo dir `obd-reader`). Built so far: Phases 1 and 2, the tool layer and MCP server (Phase 3a), and the live console (§7b). Not built: the reference store and grounding checker (Phase 3b), legacy-protocol decode (Phase 4), playbooks and evals (Phase 5). See the README "What works today" table for hardware-verification status._
 
 ## 1. Purpose
 
@@ -14,7 +14,7 @@ Primary user: Austin (side-work mechanic, older cars, laptop on a bench near the
 |---|---|
 | Scope | 1996+ US OBD-II: J1850 PWM/VPW, ISO 9141-2, KWP2000, CAN. No OBD-I, no Tesla/Mercedes/secure-gateway cars |
 | Safety | Read-only, enforced in code at the transport layer, not in prompts |
-| Front end (v1) | MCP server only (Claude Desktop / Claude Code). Web UI + FastAPI deferred |
+| Front end | MCP server (Claude Desktop / Claude Code) plus the local live console (§7b, added 2026-09-30). A chat web UI + FastAPI stays deferred |
 | Distribution | Public repo, MIT (changed from private on 2026-09-29). Per-record license tags stay mandatory; share-alike/NC/proprietary reference data must not be committed |
 | Depth (v1) | Codes + freeze frame + general reasoning + 4–5 guided playbooks (P0171/P0174, misfire, P0420, charging, parasitic draw), Claude-drafted and Austin-reviewed. Long-term: live-data test procedures (voltage while cranking, etc.) |
 | Adapter | OBDLink EX (USB, ~$70) on a USB extension; wireless (LX/MX+) is a later config change |
@@ -31,7 +31,7 @@ Primary user: Austin (side-work mechanic, older cars, laptop on a bench near the
 **Non-goals (v1)**
 - Clearing codes, actuator tests, coding, flashing, any write. Ever.
 - Manufacturer-specific PIDs / Mode 22 (later, opt-in, OBDb).
-- Web UI, phone app, phone-to-laptop relay.
+- A chat web UI (the live console is a viewer only), a phone app, a phone-to-laptop relay. (The console can be opened on a phone or tablet on the same WiFi with `--allow-lan`.)
 - Credentialed commercial references (ALLDATA/Mitchell/Identifix/OEM) — hypothetical late phase; ToS risk unresolved.
 - Diagnosing while driving. The tool is for parked cars.
 
