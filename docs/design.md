@@ -146,8 +146,16 @@ All carry `readOnlyHint: true`. No tool accepts a command string.
 | `get_playbook` | `id` | structured playbook steps with cites |
 | `check_citations` | `answer_text` | valid/invalid `[ref:ID]` tags, uncited-claim report |
 | `import_snapshot` | `path` | validates + registers a recorded/imported snapshot |
+| `open_console` | `demo?`, `start?` | starts the live console web page (§7b) and returns its local URL |
+| `console_data` | `seconds?` | latest values and exact stats from the console's sampler (what the page shows) |
 
 Live mode = same snapshot format with a time series; the tool layer is the same for replay and live.
+
+## 7b. Live console
+
+A local web page for watching live data, built as three parts: a **LiveHub** (one background thread that owns the adapter through the Session lock and gated transport, sampling 8 Mode 01 PIDs into ring buffers), a **ConsoleServer** (stdlib HTTP server: one page plus `/api/state`, `/api/start`, `/api/stop`, `/api/save`, `/api/sim`), and a single-file page with three layouts (Cockpit, Scope, Guided test) that polls every 400 ms. Claude reads the same buffer through `console_data`, so the human and the model see identical numbers, and the refresh rate never multiplies traffic on the car's bus.
+
+Rules: read-only (start/stop sampling and save a run file only; no route accepts a command string); binds `127.0.0.1` unless `--allow-lan`; every request needs the random token plus an allowed `Host` header, POSTs also check `Origin`; no CORS; bodies capped at 4096 bytes; request lines are never logged; one run at most 1800 s (default 600 s), 0.1–10 Hz, at most 8 PIDs; a silent bus ends the run after 3 empty sweeps. `console --demo` runs a simulated car behind the same gated transport. The polling design is deliberately the same as MCP Apps' app-only-tool pattern, so the page can later be wrapped as an in-chat widget.
 
 ## 8. Reference store and grounding rule
 

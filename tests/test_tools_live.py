@@ -24,7 +24,7 @@ def live_session(tmp_path, factory, clk=None):
 def test_tool_names_are_exactly_the_reviewed_set(tmp_path):
     tools = build_tools(live_session(tmp_path, lambda: ScriptedPort({})))
     assert set(tools) == set(TOOL_NAMES) == set(OFFLINE_TOOLS | LIVE_TOOLS)
-    assert len(TOOL_NAMES) == 15
+    assert len(TOOL_NAMES) == 17
 
 
 def test_no_tool_accepts_a_command_string(tmp_path):

@@ -3,13 +3,15 @@ import hmac
 import json
 import secrets
 import threading
+import weakref
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib import resources
 from urllib.parse import parse_qs, urlparse
 
-from obd_reader.hub import HubBusy, LiveHub
+from obd_reader.hub import DEFAULT_PIDS, HubBusy, LiveHub
 from obd_reader.live import LiveLimitError
-from obd_reader.session import AdapterBusy, NoAdapterError
+from obd_reader.session import AdapterBusy, Config, NoAdapterError, Session
+from obd_reader.simulator import SimPort
 
 MAX_BODY = 4096
 _LOOPBACK = {"127.0.0.1", "localhost", "::1"}
@@ -161,3 +163,51 @@ class ConsoleServer:
             do_PUT = do_DELETE = do_PATCH = _not_allowed
 
         return Handler
+
+
+_services: "weakref.WeakSet[ConsoleService]" = weakref.WeakSet()
+
+
+class ConsoleService:
+    """Owns one hub and one server for a Session (or a private simulated one for --demo)."""
+
+    def __init__(self, session: Session, *, demo: bool = False, host: str = "127.0.0.1",
+                 http_port: int = 0, allow_lan: bool = False, scenario: str = "rich"):
+        self.demo, self._host, self._port, self._lan, self._scenario = demo, host, http_port, allow_lan, scenario
+        self._session = session
+        self.hub: LiveHub | None = None
+        self.server: ConsoleServer | None = None
+        _services.add(self)
+
+    def ensure(self) -> ConsoleServer:
+        if self.server is not None:
+            return self.server
+        if self.demo:
+            sim = SimPort(self._scenario)
+            session = Session(Config(port="sim", home=self._session.config.home, timeout=1.0),
+                              port_factory=lambda: sim)
+            self.hub = LiveHub(session, sim=sim)
+        else:
+            if not self._session.config.port:
+                raise NoAdapterError("SHADETREE_PORT is not set; use demo=True to try the console without a car")
+            self.hub = LiveHub(self._session)
+        self.server = ConsoleServer(self.hub, host=self._host, port=self._port, allow_lan=self._lan)
+        self.server.start()
+        return self.server
+
+    def start_sampling(self, pids: list[str] | None = None, hz: float = 2.5, seconds: float = 600.0) -> None:
+        self.ensure()
+        if not self.hub.running:
+            self.hub.start(pids or DEFAULT_PIDS, hz=hz, seconds=seconds)
+
+    def stop(self) -> None:
+        if self.hub is not None:
+            self.hub.stop()
+        if self.server is not None:
+            self.server.stop()
+        self.hub = self.server = None
+
+    @staticmethod
+    def shutdown_all() -> None:
+        for svc in list(_services):
+            svc.stop()

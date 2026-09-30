@@ -64,7 +64,7 @@ class FakeClock:
 REVIEWED_TOOLS = frozenset({
     "list_snapshots", "get_snapshot", "import_snapshot", "read_dtcs", "freeze_frame", "readiness",
     "vehicle_info", "list_supported_pids", "compare_snapshots", "adapter_info", "scan", "read_pid",
-    "live_data", "trim_summary", "mode06_tests",
+    "live_data", "trim_summary", "mode06_tests", "open_console", "console_data",
 })
 """The literal, human-reviewed tool list. Do not derive it from the code under test."""
 

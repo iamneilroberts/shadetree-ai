@@ -40,7 +40,35 @@ def _scan(args) -> int:
     return 0
 
 
-def main(argv: list[str] | None = None) -> int:
+def console_main(args, block: bool = True):
+    """Start the live console (page + sampler). Returns the ConsoleService; blocks until Ctrl-C if block."""
+    from obd_reader.console import ConsoleService
+    from obd_reader.session import Config, Session
+
+    session = Session(Config(port=args.port, home=args.out_dir))
+    svc = ConsoleService(session, demo=args.demo, host=args.host, http_port=args.http_port,
+                         allow_lan=args.allow_lan, scenario=args.scenario)
+    server = svc.ensure()
+    if args.host not in ("127.0.0.1", "localhost", "::1"):
+        print("warning: the console is reachable from your network; anyone with the link can watch live data",
+              file=sys.stderr)
+    if not args.no_start:
+        svc.start_sampling(seconds=args.seconds)
+    print(f"console: {server.url}", flush=True)
+    if block:
+        import time
+
+        try:
+            while True:
+                time.sleep(3600)
+        except KeyboardInterrupt:
+            pass
+        finally:
+            svc.stop()
+    return svc
+
+
+def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(prog="shadetree-ai")
     sub = ap.add_subparsers(dest="cmd", required=True)
 
@@ -58,7 +86,22 @@ def main(argv: list[str] | None = None) -> int:
     sc.add_argument("--out-dir", type=Path, default=Path("."), help="snapshots/ and transcripts/ go here")
     sc.set_defaults(func=_scan)
 
-    args = ap.parse_args(argv)
+    co = sub.add_parser("console", help="open the live console web page (read-only)")
+    co.add_argument("--port", default=None, help="adapter serial device (not needed with --demo)")
+    co.add_argument("--demo", action="store_true", help="use the built-in simulated car instead of an adapter")
+    co.add_argument("--scenario", default="rich", choices=["healthy", "rich", "lean"], help="demo scenario")
+    co.add_argument("--http-port", type=int, default=8765, help="local web port (0 = any free port)")
+    co.add_argument("--host", default="127.0.0.1", help="bind address (non-loopback needs --allow-lan)")
+    co.add_argument("--allow-lan", action="store_true", help="allow binding a non-loopback address")
+    co.add_argument("--seconds", type=float, default=600.0, help="auto-stop after this many seconds")
+    co.add_argument("--no-start", action="store_true", help="open the page without starting sampling")
+    co.add_argument("--out-dir", type=Path, default=Path("."), help="runs/ and transcripts/ go here")
+    co.set_defaults(func=lambda a: (console_main(a), 0)[1])
+    return ap
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = build_parser().parse_args(argv)
     try:
         return args.func(args)
     except (RuntimeError, ValueError, OSError) as e:  # e.g. adapter never returned its '>' prompt

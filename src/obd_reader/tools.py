@@ -1,11 +1,13 @@
 """Tool functions shared by every front end. Offline tools read saved snapshots;
 live tools are the only ones that open the adapter, always through a Session."""
+import math
 import re
 from pathlib import Path
 from typing import Callable
 
 from obd_reader.adapter import identify
 from obd_reader.capture import capture
+from obd_reader.console import ConsoleService
 from obd_reader.elm import parse_all
 from obd_reader.live import downsample, sample, summarize, validate_pids
 from obd_reader.mode06 import parse_results, supported_mids
@@ -17,7 +19,8 @@ OFFLINE_TOOLS = frozenset({
     "list_snapshots", "get_snapshot", "import_snapshot", "read_dtcs", "freeze_frame",
     "readiness", "vehicle_info", "list_supported_pids", "compare_snapshots",
 })
-LIVE_TOOLS = frozenset({"adapter_info", "scan", "read_pid", "live_data", "trim_summary", "mode06_tests"})
+LIVE_TOOLS = frozenset({"adapter_info", "scan", "read_pid", "live_data", "trim_summary", "mode06_tests",
+                        "open_console", "console_data"})
 TOOL_NAMES = OFFLINE_TOOLS | LIVE_TOOLS
 
 _MID_RE = re.compile(r"[0-9A-Fa-f]{2}")
@@ -220,8 +223,38 @@ def build_tools(session: Session) -> dict[str, Callable]:
         return {"supported_mids": sorted(mids), "results": results,
                 "note": "Mode 06 layout is unverified on real hardware; values are raw integers with no unit scaling."}
 
+    # ---- live console: one shared sampler, viewed by a web page and by Claude ---------------------
+
+    consoles: dict[str, ConsoleService | None] = {"real": None, "demo": None}
+
+    def _service(demo: bool) -> ConsoleService:
+        key = "demo" if demo else "real"
+        if consoles[key] is None:
+            consoles[key] = ConsoleService(session, demo=demo)
+        return consoles[key]
+
+    def open_console(demo: bool = False, start: bool = True) -> dict:
+        """Start the live console web page (local, token-protected, read-only) and return its URL. demo=True uses a simulated car."""
+        service = _service(bool(demo))
+        server = service.ensure()
+        if start:
+            service.start_sampling()
+        return {"url": server.url, "status": service.hub.state()["status"], "demo": bool(demo)}
+
+    def console_data(seconds: float = 30) -> dict:
+        """Latest values and exact statistics over the last N seconds from the console's sampler (what the page shows)."""
+        if not (isinstance(seconds, (int, float)) and math.isfinite(seconds) and 0 < seconds <= 600):
+            raise ValueError("seconds must be in (0, 600]")
+        service = next((c for c in (consoles["real"], consoles["demo"]) if c is not None and c.hub is not None), None)
+        if service is None:
+            return {"status": "idle", "message": "the console is not open; call open_console first", "channels": {}}
+        st = service.hub.state()
+        return {"status": st["status"], "message": st["message"], "seq": st["seq"],
+                "channels": service.hub.recent(seconds)}
+
     return {f.__name__: f for f in (
         list_snapshots, get_snapshot, import_snapshot, read_dtcs, freeze_frame,
         readiness, vehicle_info, list_supported_pids, compare_snapshots,
         adapter_info, scan, read_pid, live_data, trim_summary, mode06_tests,
+        open_console, console_data,
     )}
