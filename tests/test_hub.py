@@ -270,3 +270,82 @@ def test_seventeen_pids_are_refused_and_sixteen_are_accepted(tmp_path):
         hub.start(too_many, hz=5, seconds=5)
     hub.start(too_many[:16], hz=5, seconds=5)
     hub.stop()
+
+
+import json as _json
+
+from obd_reader.simulator import SIM_VIN
+from obd_reader.vehicle import vehicle_key
+
+CORE = ["0C", "05", "0F"]  # 0F is a PID the simulator does not answer
+
+
+def _run_once(tmp_path, pids=CORE, hz=10):
+    hub, s, sim = make(tmp_path)
+    hub.start(pids, hz=hz, seconds=30)
+    assert wait_for(lambda: hub.state()["vehicle"] is not None)
+    assert wait_for(lambda: hub.state()["seq"] >= 8)
+    hub.stop()
+    return hub
+
+
+def test_vehicle_is_identified_by_key_only_and_first_run_is_a_new_car(tmp_path):
+    hub = _run_once(tmp_path)
+    v = hub.state()["vehicle"]
+    assert v == {"key": vehicle_key(SIM_VIN), "known": False, "runs": 0, "note": None}
+    assert SIM_VIN not in _json.dumps(hub.state()) and SIM_VIN[-6:] not in _json.dumps(hub.state())
+
+
+def test_profile_is_saved_with_no_vin_in_it_and_second_run_knows_the_car(tmp_path):
+    _run_once(tmp_path)
+    f = tmp_path / "profiles" / f"{vehicle_key(SIM_VIN)}.json"
+    text = f.read_text()
+    assert SIM_VIN not in text and SIM_VIN[-6:] not in text
+    saved = _json.loads(text)
+    assert saved["runs"] == 1 and "0F" in saved["unsupported"] and "0C" in saved["supported_pids"]
+    hub2 = _run_once(tmp_path)
+    assert hub2.state()["vehicle"]["known"] is True and hub2.state()["vehicle"]["runs"] == 1
+    assert _json.loads(f.read_text())["runs"] == 2
+
+
+def test_known_unsupported_pid_is_dropped_after_one_miss_and_a_pid_that_answers_is_kept(tmp_path):
+    from obd_reader.profiles import ProfileStore
+    ProfileStore(tmp_path).save(vehicle_key(SIM_VIN), {"schema": 1, "key": vehicle_key(SIM_VIN), "updated": "", "runs": 4,
+                                                        "protocol": None, "supported_pids": [], "unsupported": ["0F", "0C"], "extras": []})
+    hub = _run_once(tmp_path)
+    st = hub.state()
+    assert "0F" in st["unsupported"] and "0C" not in st["unsupported"]  # 0C answers, so the old hint is overruled
+    assert _json.loads((tmp_path / "profiles" / f"{vehicle_key(SIM_VIN)}.json").read_text())["unsupported"] == ["0F"]
+
+
+def test_corrupt_profile_is_ignored_and_overwritten(tmp_path):
+    d = tmp_path / "profiles"
+    d.mkdir()
+    (d / f"{vehicle_key(SIM_VIN)}.json").write_text("{oops")
+    hub = _run_once(tmp_path)
+    assert hub.state()["vehicle"]["known"] is False
+    assert _json.loads((d / f"{vehicle_key(SIM_VIN)}.json").read_text())["runs"] == 1
+
+
+def test_unwritable_profile_dir_does_not_break_the_run(tmp_path):
+    (tmp_path / "profiles").write_text("a file where the folder should be")
+    hub = _run_once(tmp_path)
+    st = hub.state()
+    assert st["seq"] >= 8 and st["status"] == "stopped" and "could not save the car profile" in (st["message"] or "")
+
+
+def test_run_with_no_value_writes_no_profile(tmp_path):
+    hub, _, _ = make(tmp_path, port_factory=lambda: ScriptedPort({}), sim=SimPort())  # silent bus
+    hub.start(["0C"], hz=10, seconds=30)
+    assert wait_for(lambda: hub.state()["status"] != "running", 5)
+    assert hub.state()["vehicle"] is None and not (tmp_path / "profiles").exists()
+
+
+def test_car_that_reports_no_vin_gets_a_note_and_no_profile(tmp_path):
+    hub, _, _ = make(tmp_path, port_factory=lambda: ScriptedPort({"0C": "1AF8"}), sim=SimPort())
+    hub.start(["0C"], hz=10, seconds=30)
+    assert wait_for(lambda: hub.state()["vehicle"] is not None)
+    assert wait_for(lambda: hub.state()["seq"] >= 4)
+    hub.stop()
+    assert hub.state()["vehicle"] == {"key": None, "known": False, "runs": 0, "note": "the car did not report a VIN"}
+    assert not (tmp_path / "profiles").exists()

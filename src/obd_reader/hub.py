@@ -17,10 +17,12 @@ from obd_reader.elm import decode_supported, parse_all
 from obd_reader.live import MAX_HZ, MAX_PIDS, MIN_HZ, LiveLimitError, read_pid_value, summarize, validate_pids
 from obd_reader.mode06 import read_all as read_mode06
 from obd_reader.pids import PIDS
+from obd_reader.profiles import ProfileStore
 from obd_reader.scanner import _dtcs
 from obd_reader.session import Session
 from obd_reader.simulator import SimPort
-from obd_reader.snapshot import LiveSample, Series
+from obd_reader.snapshot import VIN_RE, LiveSample, Series
+from obd_reader.vehicle import vehicle_key
 
 MAX_RUN_S = 1800.0
 DEFAULT_PIDS = ["0C", "05", "06", "07", "08", "09", "0B", "42"]
@@ -44,6 +46,7 @@ class LiveHub:
                  clock: Callable[[], float] = time.monotonic):
         self._s, self._sim, self._max, self._clock = session, sim, max_buffer, clock
         self._lock = threading.Lock()       # serialises start()
+        self._profiles = ProfileStore(session.config.home)
         self._data_lock = threading.Lock()  # guards the buffers: the sampler writes, viewers read
         self._thread: threading.Thread | None = None
         self._stop = threading.Event()
@@ -61,6 +64,10 @@ class LiveHub:
         self._missed: set[str] = set()
         self._extras: list[str] = []
         self._m06: dict = {"read": False, "note": None, "mids": [], "results": []}
+        self._vehicle: dict | None = None
+        self._key: str | None = None
+        self._supported: set[str] = set()
+        self._prior: dict | None = None
 
     @property
     def running(self) -> bool:
@@ -123,6 +130,11 @@ class LiveHub:
                             self._adapter["protocol"] = dp.removeprefix("AUTO, ") if dp else None
                             self._read_codes(t)
                             if not self._stop.is_set():
+                                prior = self._read_identity(t)
+                                for p in (prior["unsupported"] if prior else []):
+                                    if p in misses:
+                                        misses[p] = _UNSUPPORTED_SWEEPS - 1
+                            if not self._stop.is_set():
                                 self._read_mode06(t)
                     else:
                         silent += 1
@@ -133,6 +145,7 @@ class LiveHub:
         except Exception as e:  # never let the thread die silently: report it and free the adapter
             self.status, self.message = "error", f"{type(e).__name__}: {e}"
         finally:
+            self._save_profile()
             if self.status != "error":
                 self.status = "stopped"
 
@@ -156,10 +169,44 @@ class LiveHub:
             base += 0x20
         extras = [p for p in EXTRA_PIDS if p in supported and p in PIDS and p not in core][:room]
         with self._data_lock:
-            self._extras = extras
+            self._extras, self._supported = extras, supported
             for p in extras:
                 self._ch[p] = deque(maxlen=self._max)
         return extras
+
+    def _read_identity(self, t) -> dict | None:
+        """Name the class of car from a partial VIN, once per run (CAN only), and load what past runs learned.
+        The VIN itself is never kept."""
+        proto = self._adapter["protocol"] or ""
+        if self._sim is None and "15765" not in proto:
+            with self._data_lock:
+                self._vehicle = {"key": None, "known": False, "runs": 0,
+                                 "note": f"vehicle id not supported yet on {proto or 'this'} protocol"}
+            return None
+        cands = [p[3:20].decode("ascii", errors="replace") for p in parse_all(t.send("0902"), 0x49)]
+        key = next((vehicle_key(c) for c in cands if VIN_RE.fullmatch(c)), None)
+        if key is None:
+            with self._data_lock:
+                self._vehicle = {"key": None, "known": False, "runs": 0, "note": "the car did not report a VIN"}
+            return None
+        prior = self._profiles.load(key)
+        with self._data_lock:
+            self._key, self._prior = key, prior
+            self._vehicle = {"key": key, "known": prior is not None, "runs": prior["runs"] if prior else 0, "note": None}
+        return prior
+
+    def _save_profile(self) -> None:
+        if not self._key or self.seq == 0:
+            return
+        prior = self._prior
+        profile = {"schema": 1, "key": self._key, "updated": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                   "runs": (prior["runs"] if prior else 0) + 1, "protocol": self._adapter["protocol"],
+                   "supported_pids": sorted(self._supported), "unsupported": sorted(set(self._unsupported)),
+                   "extras": list(self._extras)}
+        try:
+            self._profiles.save(self._key, profile)
+        except OSError as e:
+            self.message = self.message or f"could not save the car profile: {e}"
 
     def _read_mode06(self, t) -> None:
         """On-board test results, once per run (CAN only: the layout was verified on CAN)."""
@@ -218,6 +265,7 @@ class LiveHub:
             status, message, hz, run = self.status, self.message, self.hz, self._run_id
             adapter, st, codes = dict(self._adapter), list(self._sweep_t), dict(self._codes)
             unsupported, extras, m06 = list(self._unsupported), list(self._extras), dict(self._m06)
+            vehicle = None if self._vehicle is None else dict(self._vehicle)
             # only sweeps up to `seq`: anything newer is not complete yet
             channels = {
                 p: {"name": PIDS[p].name, "unit": PIDS[p].unit,
@@ -235,7 +283,7 @@ class LiveHub:
             "seconds_left": (max(0.0, round(deadline - self._clock(), 1))
                              if status == "running" and deadline else None),
             "adapter": adapter, "codes": codes, "unsupported": unsupported,
-            "extras": extras, "mode06": m06,
+            "extras": extras, "mode06": m06, "vehicle": vehicle,
             "channels": channels,
         }
 
