@@ -6,6 +6,7 @@ __pycache__/
 .claude-sessions/
 snapshots/
 transcripts/
+runs/
 cache/
 !tests/fixtures/**
 .claude/worktrees/

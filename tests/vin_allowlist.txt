@@ -1,0 +1,6 @@
+# VINs that may appear in tracked files. Only synthetic or publicly documented example VINs belong here.
+# One per line: VIN  # why it is safe. Adding a line is a deliberate, reviewable act: never allowlist a real car.
+1HGCM82633A004352  # synthetic sedan used in tests/fixtures/synthetic_sedan.jsonl and the tests (made up, not a real car)
+5FPYK3F51RB000001  # real Ridgeline capture with the individual serial replaced by 000001 (tests/fixtures/ridgeline_2024_can29.jsonl)
+WP0ZZZ99ZTS390000  # placeholder VIN shipped in the public ELM327-emulator 'car' scenario, cited in docs/research
+1M8GDM9AXKP042788  # the worked example VIN from the public Wikipedia article on VINs, used to test the check digit
