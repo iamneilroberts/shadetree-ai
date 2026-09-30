@@ -256,6 +256,7 @@
 <div class="status">
   <span class="chip ro"><b>READ-ONLY</b> &middot; this page cannot send commands</span>
   <span class="chip" id="chipConn"><b>no adapter</b></span>
+  <span class="chip" id="chipCar">car ?</span>
   <span class="chip idle" id="chipLive"><b>NOT SAMPLING</b></span>
   <span class="chip">rate <b id="rate">&mdash;</b></span>
   <span class="chip">last sample <b id="age">&mdash;</b></span>
@@ -614,6 +615,8 @@
     var ad = st.adapter || {};
     // adapter and ECU text is untrusted: show it as text, never as markup
     $('chipConn').textContent = (ad.chip || ad.ati || 'no adapter') + (ad.protocol ? ' · ' + ad.protocol : '');
+    var v = st.vehicle;
+    $('chipCar').textContent = !v ? 'car ?' : v.key ? 'car ' + v.key + ' · ' + (v.known ? 'seen ' + v.runs + (v.runs === 1 ? ' time' : ' times') : 'new') : (v.note || 'car ?');
     $('rate').textContent = st.hz_measured ? st.hz_measured.toFixed(1) + ' Hz' : '—';
     var age = st.since_last_sample === null || st.since_last_sample === undefined ? null : st.since_last_sample + (st.status === 'running' ? (performance.now() - fetchedAt) / 1000 : 0);
     $('age').textContent = age === null ? '—' : age.toFixed(1) + ' s ago';

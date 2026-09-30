@@ -170,5 +170,17 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
   for (let k = 0; k < 3; k++) await hhWait.tick();
   assert.strictEqual(hhWait.el('h_n').textContent, '-- CODES'); assert.strictEqual(hhWait.el('h_live').textContent, 'IDLE');
 
+  // 4) car chip: partial-VIN key, seen-before count, honest notes, never markup
+  const withCar = (vehicle) => makeEnv(statesFor(3, idle).map(st => Object.assign(st, { vehicle })));
+  const carText = async (vehicle) => { const e = withCar(vehicle); for (let k = 0; k < 3; k++) await e.tick(); return e.el('chipCar'); };
+  const seen = (await carText({ key: 'ABCDEFGH-P', known: true, runs: 3, note: null })).textContent;
+  assert(/ABCDEFGH-P/.test(seen) && /seen 3 times/.test(seen), 'known car shows key and run count');
+  assert(/seen 1 time$/.test((await carText({ key: 'ABCDEFGH-P', known: true, runs: 1, note: null })).textContent), 'singular');
+  assert(/new/.test((await carText({ key: 'ABCDEFGH-P', known: false, runs: 0, note: null })).textContent), 'first run says new');
+  assert(/did not report a VIN/.test((await carText({ key: null, known: false, runs: 0, note: 'the car did not report a VIN' })).textContent), 'note shown when no key');
+  assert.strictEqual((await carText(undefined)).textContent, 'car ?', 'no vehicle field');
+  const evilCar = await carText({ key: null, known: false, runs: 0, note: '<img src=x onerror=1>' });
+  assert.strictEqual(evilCar.innerHTML, '', 'chipCar is text only'); assert(evilCar.textContent.includes('<img src=x onerror=1>'), 'note shown literally');
+
   console.log('page logic OK');
 })().catch(e => { console.error('FAIL', e.message); process.exit(1); });
