@@ -36,8 +36,8 @@ With an adapter (OBDLink EX tested; the car parked, ignition on, engine off):
 | Record and replay (snapshot + raw transcript) | done | real Ridgeline transcript replays to the same snapshot |
 | 17 MCP tools (9 offline, 8 live) | done | not yet exercised against a car through Claude |
 | Live console: Cockpit, Scope, Guided test, Analyzer cabinet, Handheld (phone), Readings | done, demo tested in a browser (Readings tab: server data checked in demo, page not yet viewed) | sampling runs against the Ridgeline; Analyzer, Handheld and Readings not yet checked on real hardware or a phone |
-| Extra readings on the console (car's supported PIDs, up to 16 per run, rotated) and unsupported PIDs dropped | done | discovery and sampling not yet seen on a car |
-| Trouble codes on the console (Modes 03/07/0A + lamp), CAN cars only | done in demo | not yet run against a real car |
+| Extra readings on the console (car's supported PIDs, up to 16 per run, rotated) and unsupported PIDs dropped | done | 2024 Ridgeline: PID discovery (`0100` to `01A0`, two ECUs) and rotating extra readings sampled (`0104`, `0111`, `010D`, `010E`, `0143`, `0144`); MAF (`0110`) unanswered, MAP (`010B`) used |
+| Trouble codes on the console (Modes 03/07/0A + lamp), CAN cars only | done | 2024 Ridgeline (CAN 29/500, two ECUs): Modes 03, 07, 0A and the lamp bit read; the car had no codes and the lamp was off. A car that has codes has **not** been seen yet |
 | Mode 06 test results (MCP tool and console Readings tab) | done; reply layout is 9-byte groups `MID TID UASID value min max` | 2024 Ridgeline: 20 MIDs, 53 results, all within limits; values are raw (unit scaling not applied) |
 | 29-bit ECU header attribution | written | **not verified** on a real car |
 | Legacy protocols (J1850, ISO 9141, KWP) | scanner skips DTC/VIN decode on non-CAN | **not built yet** (needs Austin's older cars) |
