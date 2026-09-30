@@ -15,7 +15,7 @@ Primary user: Austin (side-work mechanic, older cars, laptop on a bench near the
 | Scope | 1996+ US OBD-II: J1850 PWM/VPW, ISO 9141-2, KWP2000, CAN. No OBD-I, no Tesla/Mercedes/secure-gateway cars |
 | Safety | Read-only, enforced in code at the transport layer, not in prompts |
 | Front end (v1) | MCP server only (Claude Desktop / Claude Code). Web UI + FastAPI deferred |
-| Distribution | Private repo (Neil + Austin). Per-record license tags kept anyway so a public release stays possible |
+| Distribution | Public repo, MIT (changed from private on 2026-09-29). Per-record license tags stay mandatory; share-alike/NC/proprietary reference data must not be committed |
 | Depth (v1) | Codes + freeze frame + general reasoning + 4–5 guided playbooks (P0171/P0174, misfire, P0420, charging, parasitic draw), Claude-drafted and Austin-reviewed. Long-term: live-data test procedures (voltage while cranking, etc.) |
 | Adapter | OBDLink EX (USB, ~$70) on a USB extension; wireless (LX/MX+) is a later config change |
 | Approach | Own thin pyserial ELM/STN transport; snapshot-first; MCP on top |

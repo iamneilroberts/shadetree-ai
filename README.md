@@ -15,6 +15,10 @@ A **read-only** OBD-II diagnostic assistant for DIY mechanics. Plug in an adapte
 
 1996+ US OBD-II cars: J1850 PWM/VPW, ISO 9141-2, KWP2000, CAN. Not OBD-I, Tesla, Mercedes, or secure-gateway vehicles. Use on parked cars only.
 
+## License
+
+MIT (see [LICENSE](LICENSE)). Reference data pulled in later keeps its own per-record license tag; share-alike or non-commercial data stays out of this repo.
+
 ## Grounding
 
 Every diagnostic claim cites a reference record ID or is labeled "general knowledge, unverified".
