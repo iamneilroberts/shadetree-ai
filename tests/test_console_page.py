@@ -2,6 +2,7 @@ import re
 import shutil
 import subprocess
 from importlib import resources
+from pathlib import Path
 
 import pytest
 
@@ -31,6 +32,15 @@ def test_required_controls_exist_and_no_simulator_is_baked_in():
 
 def test_page_states_it_is_read_only_and_marks_the_playbook_unreviewed():
     assert "READ-ONLY" in HTML and "unreviewed" in HTML
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node not installed")
+def test_page_logic_runs_against_a_fake_dom_and_scripted_server_states():
+    """Runs the page's real <script> under Node: timed captures, both verdicts, start request, run reset."""
+    page = str(resources.files("obd_reader.web").joinpath("console.html"))
+    script = str(Path(__file__).parent / "js" / "page_logic_test.js")
+    r = subprocess.run(["node", script, page], capture_output=True, text=True, timeout=60)
+    assert r.returncode == 0 and "page logic OK" in r.stdout, r.stdout + r.stderr
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="node not installed")
