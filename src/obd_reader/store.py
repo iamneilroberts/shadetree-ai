@@ -31,15 +31,24 @@ class SnapshotStore:
             fh.write(snap.model_dump_json(indent=2) + "\n")
         return path
 
+    def _inside(self, path: Path) -> bool:
+        """True only for a real file whose resolved location is inside the snapshots dir (no symlink escapes)."""
+        return path.is_file() and path.resolve().is_relative_to(self.dir.resolve())
+
     def load(self, snapshot_id: str) -> Snapshot:
         path = self.path(snapshot_id)
-        if not path.is_file():
+        if not self._inside(path):
             raise FileNotFoundError(f"no snapshot named {snapshot_id!r}")
-        return Snapshot.model_validate_json(path.read_text(encoding="utf-8"))
+        try:
+            return Snapshot.model_validate_json(path.read_text(encoding="utf-8"))
+        except (ValidationError, ValueError):
+            raise ValueError(f"snapshot {snapshot_id!r} is not a valid snapshot file") from None  # never echo content
 
     def list(self) -> list[dict]:
         rows = []
         for path in sorted(self.dir.glob("*.json")) if self.dir.is_dir() else []:
+            if not self._inside(path):
+                continue
             try:
                 s = Snapshot.model_validate_json(path.read_text(encoding="utf-8"))
             except (ValidationError, ValueError):

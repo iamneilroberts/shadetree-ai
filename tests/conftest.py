@@ -59,3 +59,28 @@ class FakeClock:
 
     def sleep(self, s: float) -> None:
         self.t += s
+
+
+REVIEWED_TOOLS = frozenset({
+    "list_snapshots", "get_snapshot", "import_snapshot", "read_dtcs", "freeze_frame", "readiness",
+    "vehicle_info", "list_supported_pids", "compare_snapshots", "adapter_info", "scan", "read_pid",
+    "live_data", "trim_summary", "mode06_tests",
+})
+"""The literal, human-reviewed tool list. Do not derive it from the code under test."""
+
+
+class RampPort(ScriptedPort):
+    """Engine RPM rises by 10 on every read, so exact stats differ from any subsample's stats."""
+
+    def __init__(self):
+        super().__init__({})
+        self.n = 0
+
+    def write(self, data: bytes) -> None:
+        cmd = data.decode("ascii").rstrip("\r")
+        if cmd == "010C":
+            self.n += 1
+            self.writes.append(cmd)
+            self._pending = f"41 0C {self.n * 40:04X}\r"
+        else:
+            super().write(data)

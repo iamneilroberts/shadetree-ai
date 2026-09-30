@@ -11,7 +11,9 @@ from obd_reader.transport import Transport
 MAX_PIDS = 8
 MAX_SECONDS = 120.0
 MAX_HZ = 10.0
+MIN_HZ = 0.1  # at most a 10 s pause between sweeps, so the adapter lock is never held for hours
 MAX_POINTS = 120
+_SILENT_SWEEPS = 2  # give up after this many sweeps in which no PID answered at all
 _PID_RE = re.compile(r"[0-9A-Fa-f]{2}")
 
 
@@ -47,10 +49,10 @@ def sample(
     pids = validate_pids(pids)
     if not 0 < seconds <= MAX_SECONDS:
         raise LiveLimitError(f"seconds must be in (0, {MAX_SECONDS:g}]")
-    if not 0 < hz <= MAX_HZ:
-        raise LiveLimitError(f"hz must be in (0, {MAX_HZ:g}]")
+    if not MIN_HZ <= hz <= MAX_HZ:
+        raise LiveLimitError(f"hz must be between {MIN_HZ:g} and {MAX_HZ:g}")
     series = {p: Series(name=PIDS[p].name, unit=PIDS[p].unit) for p in pids}
-    period, t0 = 1.0 / hz, clock()
+    period, t0, silent = 1.0 / hz, clock(), 0
     while True:
         t = clock() - t0
         if t > seconds:
@@ -61,6 +63,14 @@ def sample(
                 if len(payload) >= 2 + d.nbytes and payload[1] == int(p, 16):
                     series[p].samples.append((round(t, 3), d.decode(payload[2 : 2 + d.nbytes])))
                     break
+        if any(s.samples for s in series.values()):
+            silent = 0
+        else:
+            silent += 1
+            if silent >= _SILENT_SWEEPS:  # car off or not answering: do not hold the adapter for the whole run
+                break
+        if t + period > seconds:  # the next sweep would start after the deadline
+            break
         sleep(max(0.0, period - (clock() - t0 - t)))
     return LiveSample(duration_s=seconds, rate_hz=hz, series=series)
 

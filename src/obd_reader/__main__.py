@@ -59,7 +59,11 @@ def main(argv: list[str] | None = None) -> int:
     sc.set_defaults(func=_scan)
 
     args = ap.parse_args(argv)
-    return args.func(args)
+    try:
+        return args.func(args)
+    except (RuntimeError, ValueError, OSError) as e:  # e.g. adapter never returned its '>' prompt
+        print(f"error: {e}", file=sys.stderr)
+        return 1
 
 
 if __name__ == "__main__":

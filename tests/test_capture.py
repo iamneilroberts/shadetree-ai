@@ -52,16 +52,15 @@ def test_existing_capture_is_never_overwritten_and_port_untouched(tmp_path):
     assert second.written == []
 
 
-def test_cli_scan_end_to_end_on_a_silent_loopback_port(tmp_path):
-    # loop:// echoes our own commands back and never answers: no car, no adapter.
+def test_cli_scan_stops_cleanly_when_the_adapter_never_returns_a_prompt(tmp_path):
+    # loop:// echoes our own commands back and never sends '>': an adapter that may still be busy.
+    # The scan must stop instead of writing into it, keep the transcript, and say why.
     proc = subprocess.run(
         [sys.executable, "-m", "obd_reader", "scan", "--port", "loop://", "--label", "smoke",
          "--timeout", "0.2", "--out-dir", str(tmp_path)],
-        capture_output=True, text=True, check=True,
+        capture_output=True, text=True,
     )
-    snaps = list((tmp_path / "snapshots").glob("*-smoke.json"))
-    assert len(snaps) == 1 and len(list((tmp_path / "transcripts").glob("*-smoke.jsonl"))) == 1
-    snap = Snapshot.model_validate_json(snaps[0].read_text())
-    assert snap.source.kind == "live"
-    assert any("Mode 01" in w for w in snap.warnings)
-    assert "snapshot:" in proc.stdout and "transcript:" in proc.stdout
+    assert proc.returncode == 1
+    assert "error:" in proc.stderr and "prompt" in proc.stderr and "Traceback" not in proc.stderr
+    assert len(list((tmp_path / "transcripts").glob("*-smoke.jsonl"))) == 1  # what was sent is kept
+    assert list((tmp_path / "snapshots").glob("*-smoke.json")) == []          # no half-made snapshot

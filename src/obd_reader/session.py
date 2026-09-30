@@ -1,5 +1,6 @@
 """Live-adapter session: config from the environment, one connection at a time,
 every command recorded to a transcript."""
+import math
 import os
 import threading
 import time
@@ -32,10 +33,13 @@ class Config:
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> "Config":
         env = os.environ if env is None else env
+        timeout = float(env.get("SHADETREE_TIMEOUT", 10))
+        if not math.isfinite(timeout) or timeout <= 0:  # nan would make every read return at once
+            raise ValueError("SHADETREE_TIMEOUT must be a positive, finite number of seconds")
         return cls(
             port=env.get("SHADETREE_PORT") or None,
             baud=int(env.get("SHADETREE_BAUD", 115200)),
-            timeout=float(env.get("SHADETREE_TIMEOUT", 10)),
+            timeout=timeout,
             home=Path(env.get("SHADETREE_HOME", ".")),
         )
 

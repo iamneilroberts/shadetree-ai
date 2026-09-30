@@ -65,22 +65,25 @@ def _walk_pages(transport: Transport, mode: int) -> set[str]:
 
 def _freeze_frame(transport: Transport) -> FreezeFrame | None:
     """Mode 02 frame 0: the DTC that triggered it, then every decodable supported PID."""
-    dtc_payloads = [p for p in parse_all(transport.send("020200"), 0x42) if len(p) >= 5]
-    if not dtc_payloads:
+    dtc_payloads = [p for p in parse_all(transport.send("020200"), 0x42)
+                    if len(p) >= 5 and p[1] == 0x02 and p[2] == 0x00]
+    # The ECU that has a frame is the one reporting a non-zero DTC (another ECU may answer first with 0000).
+    idx = next((i for i, p in enumerate(dtc_payloads) if p[3] or p[4]), None)
+    if idx is None:
         return None
-    hi, lo = dtc_payloads[0][3], dtc_payloads[0][4]
-    if hi == 0 and lo == 0:
-        return None
+    hi, lo = dtc_payloads[idx][3], dtc_payloads[idx][4]
     values: dict[str, PidValue] = {}
     for pid in sorted(_walk_pages(transport, 0x02)):
         if pid not in PIDS:
             continue
-        for p in parse_all(transport.send(f"02{pid}00"), 0x42):
-            if len(p) >= 3 + PIDS[pid].nbytes and p[1] == int(pid, 16):
-                v = decode_pid(pid, p[3:])
-                if v is not None:
-                    values[pid] = v
-                break
+        got = [p for p in parse_all(transport.send(f"02{pid}00"), 0x42)
+               if len(p) >= 3 + PIDS[pid].nbytes and p[1] == int(pid, 16) and p[2] == 0x00]
+        # Headers are off, so an ECU is known only by its position in the reply list. Use the same
+        # position as the DTC's ECU, and only when every ECU answered; otherwise skip rather than mix ECUs.
+        if len(got) == len(dtc_payloads):
+            v = decode_pid(pid, got[idx][3:])
+            if v is not None:
+                values[pid] = v
     return FreezeFrame(dtc=decode_dtc(hi, lo), pids=values)
 
 

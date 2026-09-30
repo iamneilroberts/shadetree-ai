@@ -42,7 +42,7 @@ def test_bad_pid_lists_are_refused_before_any_traffic(pids):
     assert port.writes == []
 
 
-@pytest.mark.parametrize("seconds,hz", [(0, 2), (-1, 2), (121, 2), (10, 0), (10, 11), (10, -1)])
+@pytest.mark.parametrize("seconds,hz", [(0, 2), (-1, 2), (121, 2), (10, 0), (10, 11), (10, -1), (10, 0.05), (1, 1e-6)])
 def test_bad_duration_or_rate_is_refused_before_any_traffic(seconds, hz):
     port = ScriptedPort({"0C": "1AF8"})
     with pytest.raises(LiveLimitError):

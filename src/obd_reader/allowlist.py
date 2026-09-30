@@ -33,7 +33,7 @@ _PATTERNS = tuple(
         r"ATE[01]", r"ATL[01]", r"ATS[01]", r"ATH[01]",
         r"ATDPN?", r"ATRV", r"ATI", r"AT@1",
         r"ATCAF1", r"ATAT[012]",  # ATCAF0 is refused: see test_allowlist.py (CAF0 + 0104)
-        r"ATSPA?[0-9A-C]", r"ATTPA?[0-9A-C]",
+        r"ATSPA?[0-9]", r"ATTPA?[0-9]",  # protocols A-C (J1939, user CAN) are refused
         rf"ATST{_H}{{2}}",
         rf"ATSH(?:{_H}{{3}}|{_H}{{6}}|{_H}{{8}})",
         rf"ATCRA(?:{_H}{{3}}|{_H}{{8}})?",

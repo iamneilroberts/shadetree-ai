@@ -22,7 +22,7 @@ TOOL_NAMES = OFFLINE_TOOLS | LIVE_TOOLS
 
 _MID_RE = re.compile(r"[0-9A-Fa-f]{2}")
 _LABEL_RE = re.compile(r"[a-z0-9-]{1,40}")
-_PROTO_RE = re.compile(r"[0-9A-Ca-c]")
+_PROTO_RE = re.compile(r"[0-9]")  # 0 = automatic, 1-9 = a fixed protocol; A-C (J1939, user CAN) are refused
 MAX_MODE06_MIDS = 40
 
 
@@ -149,14 +149,14 @@ def build_tools(session: Session) -> dict[str, Callable]:
                 "device": device, "supply_voltage": volts}
 
     def scan(label: str = "scan", protocol: str = "0", symptoms: str = "") -> dict:
-        """Run a full read-only scan of the car and save a snapshot. protocol is 0 (auto) or an ATSP digit 1-C."""
+        """Run a full read-only scan of the car and save a snapshot. protocol is 0 (auto) or an ATSP digit 1-9."""
         if not _LABEL_RE.fullmatch(label):
             raise ValueError("label must be 1-40 chars of [a-z0-9-]")
         if not _PROTO_RE.fullmatch(protocol):
-            raise ValueError("protocol must be one character 0-9 or A-C")
+            raise ValueError("protocol must be one digit 0-9")
         with session.raw_port() as port:  # same lock as every live tool; capture records its own transcript
             snap, _s_path, _t_path = capture(
-                port, session.config.home, label=label, protocol=protocol.upper(),
+                port, session.config.home, label=label, protocol=protocol,
                 timeout=session.config.timeout, symptoms=symptoms,
             )
         return {"snapshot_id": snap.snapshot_id, "vin": snap.vehicle.vin, "protocol": snap.protocol.name,
@@ -181,8 +181,11 @@ def build_tools(session: Session) -> dict[str, Callable]:
         validate_pids(pids)
         with session.connection("live") as t:
             ls = sample(t, pids, seconds, hz=hz, clock=session.clock, sleep=session.sleep)
-        return {"duration_s": ls.duration_s, "hz": ls.rate_hz, "conditions": conditions,
-                "series": _series_out(ls)}
+        out = {"duration_s": ls.duration_s, "hz": ls.rate_hz, "conditions": conditions,
+               "series": _series_out(ls)}
+        if not any(s.samples for s in ls.series.values()):
+            out["note"] = "no data: the ECU did not answer any of these PIDs (car off or not connected?)"
+        return out
 
     def trim_summary(seconds: float = 15, hz: float = 2) -> dict:
         """Fuel-trim statistics (short and long term, both banks) over a short sample."""

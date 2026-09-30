@@ -63,7 +63,7 @@ replay/     fake ELM over pty/in-process, driven by transcripts ──> same tra
 | Layer | Allowed | Grammar |
 |---|---|---|
 | OBD services | Modes 01, 02, 03, 05, 06, 07, 09, 0A | `01 PP`, `02 PP FF`, `03`, `05 TID SENSOR`, `06 MID`, `07`, `09 PP`, `0A` — hex, exact arg lengths per mode |
-| ELM AT | `ATZ ATD ATE0 ATL0 ATS0 ATH0/1 ATSP<0-C> ATTP<0-C> ATDP ATDPN ATRV ATI AT@1 ATCAF1 ATST<hh> ATAT0/1/2 ATSH<hex> ATCRA<hex> ATWS` | explicit list |
+| ELM AT | `ATZ ATD ATE0 ATL0 ATS0 ATH0/1 ATSP<0-9> ATTP<0-9> (A-C = J1939 or user CAN: refused) ATDP ATDPN ATRV ATI AT@1 ATCAF1 ATST<hh> ATAT0/1/2 ATSH<hex> ATCRA<hex> ATWS` | explicit list |
 | STN read-only | `STI STDI STIX`-style identify commands only | explicit list |
 | Later, gated | UDS `19 xx` read-DTC over ISO-TP (own phase, after a real-car test); UDS `22` waits for OBDb | not enabled |
 

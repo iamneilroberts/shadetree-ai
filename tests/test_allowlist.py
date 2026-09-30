@@ -27,6 +27,8 @@ FORBIDDEN = [
     # wrong argument length
     "010", "01000", "0200", "020C", "0300", "0A00",
     "05", "0500", "05000000", "06", "060000",
+    # J1939 / user-defined CAN protocol selection is not needed and not allowed
+    "ATSPA", "ATSPB", "ATSPC", "ATSPAA", "ATSPAB", "ATTPB", "ATTPC", "ATTPAA",
     # injection / framing tricks (Review Focus 1)
     "0100\r04", "0100\n", "0100\r", "ATZ\rATPP0CSV01",
     # unicode look-alikes (Review Focus 2)

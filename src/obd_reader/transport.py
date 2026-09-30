@@ -7,6 +7,10 @@ from typing import Callable, Protocol
 from obd_reader.allowlist import ForbiddenCommand, check_command
 
 
+class AdapterNotReady(RuntimeError):
+    """The adapter never returned its '>' prompt, so it may still be busy; nothing more is sent."""
+
+
 class Port(Protocol):
     def write(self, data: bytes) -> None: ...
     def read_until_prompt(self, timeout: float) -> str: ...
@@ -61,6 +65,18 @@ class SerialPort:
         import serial
 
         self._ser = serial.serial_for_url(url, baudrate=baudrate, timeout=0.1)
+        self._prompt_seen = True  # nothing outstanding yet
+        self.recovery_s = 2.0     # how long to wait for a missing prompt before refusing to write
+
+    def _wait_for_prompt(self) -> None:
+        """The last reply timed out without '>': the ELM may still be busy, and a new byte
+        would interrupt it. Wait briefly for the prompt; never write into a busy adapter."""
+        deadline = time.monotonic() + self.recovery_s
+        while time.monotonic() < deadline:
+            if b">" in self._ser.read(64):
+                self._prompt_seen = True
+                return
+        raise AdapterNotReady("the adapter has not finished the previous command (no '>' prompt); nothing was sent")
 
     def write(self, data: bytes) -> None:
         # Second gate: SerialPort is public, so it refuses anything that is not
@@ -70,6 +86,8 @@ class SerialPort:
         body = data[:-1].decode("ascii")
         if check_command(body) != body:
             raise ForbiddenCommand(f"not a canonical command: {data!r}")
+        if not self._prompt_seen:
+            self._wait_for_prompt()
         self._ser.reset_input_buffer()  # drop any late reply to the previous command
         self._ser.write(data)
 
@@ -82,6 +100,7 @@ class SerialPort:
                 buf += chunk
                 if b">" in buf:
                     break
+        self._prompt_seen = b">" in buf
         return buf.decode("ascii", errors="replace").split(">", 1)[0]
 
     def close(self) -> None:
