@@ -1,6 +1,8 @@
 import pytest
 
-from obd_reader.elm import decode_dtc, decode_dtc_list, decode_supported, parse_all, parse_response
+from obd_reader.elm import (
+    decode_dtc, decode_dtc_list, decode_supported, parse_all, parse_headers, parse_response,
+)
 
 VIN_A = ["014", "0: 49 02 01 31 48 47", "1: 43 4D 38 32 36 33 33", "2: 41 30 30 34 33 35 32"]
 VIN_B = ["014", "0: 49 02 01 35 46 50", "1: 59 4B 33 46 35 31 52", "2: 42 30 30 30 30 30 31"]
@@ -30,6 +32,21 @@ def test_parse_all_handles_two_multi_frame_blocks_and_mixed_replies():
 )
 def test_parse_all_returns_empty_for_errors_and_garbage_never_raises(lines):
     assert parse_all(lines, 0x49) == []
+
+
+@pytest.mark.parametrize(
+    "lines,expected",
+    [
+        (["7E8 06 41 00 BE 3F A8 13", "7E9 06 41 00 98 18 80 03"], ["7E8", "7E9"]),
+        (["18 DA F1 10 06 41 00 B7 BC A8 93", "18 DA F1 18 06 41 00 98 18 80 03"], ["18DAF110", "18DAF118"]),
+        (["SEARCHING...", "7E8 06 41 00 BE 3F A8 13", "7E8 06 41 00 BE 3F A8 13"], ["7E8"]),
+        (["41 00 BE 3F A8 13"], []),          # headers off: nothing to attribute
+        (["41 00 98 41 00"], []),             # "41 00" inside data is not a header
+        (["NO DATA"], []), ([], []), (["ZZ ZZ 41"], []),
+    ],
+)
+def test_parse_headers(lines, expected):
+    assert parse_headers(lines) == expected
 
 
 def test_parse_response_is_the_first_of_parse_all():

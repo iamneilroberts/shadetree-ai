@@ -50,6 +50,28 @@ def parse_response(lines: list[str], sid: int) -> bytes | None:
     return payloads[0] if payloads else None
 
 
+_HEADER_RE = re.compile(r"[0-9A-F]{3}|[0-9A-F]{8}")  # CAN 11-bit id, or 29-bit id as 4 bytes
+
+
+def parse_headers(lines: list[str]) -> list[str]:
+    """ECU CAN ids from a headers-on (ATH1) reply to "0100", first-seen order.
+
+    A CAN line looks like "<id bytes> <PCI length> 41 00 ..."; everything before
+    the PCI byte is the id. Header format is unverified on real hardware for
+    29-bit ids; anything that does not fit yields no header instead of a guess.
+    """
+    out: list[str] = []
+    for ln in lines:
+        toks = ln.strip().upper().split()
+        for p in range(2, len(toks) - 1):
+            if toks[p] == "41" and toks[p + 1] == "00":
+                head = "".join(toks[: p - 1])
+                if _HEADER_RE.fullmatch(head) and head not in out:
+                    out.append(head)
+                break
+    return out
+
+
 def decode_dtc(b1: int, b2: int) -> str:
     letter = "PCBU"[b1 >> 6]
     return f"{letter}{(b1 >> 4) & 0x3}{b1 & 0xF:X}{b2:02X}"

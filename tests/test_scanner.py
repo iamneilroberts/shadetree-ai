@@ -31,6 +31,7 @@ def test_scan_synthetic_sedan():
     assert "02" in snap.supported_pids["09"]
     assert snap.source.adapter.ati == "ELM327 v1.5"
     assert snap.source.adapter.genuine_stn is False
+    assert [e.header for e in snap.ecus] == ["7E8"]
     assert snap.warnings == []
 
 

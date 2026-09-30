@@ -2,9 +2,9 @@
 from datetime import datetime, timezone
 
 from obd_reader import __version__
-from obd_reader.elm import decode_dtc_list, decode_supported, parse_all
+from obd_reader.elm import decode_dtc_list, decode_supported, parse_all, parse_headers
 from obd_reader.snapshot import (
-    VIN_RE, Adapter, Dtc, Dtcs, Mil, Protocol, Snapshot, Source, Vehicle,
+    VIN_RE, Adapter, Dtc, Dtcs, Ecu, Mil, Protocol, Snapshot, Source, Vehicle,
 )
 from obd_reader.transport import Transport
 
@@ -21,6 +21,16 @@ def _dtcs(transport: Transport, cmd: str, sid: int) -> list[Dtc]:
     for payload in parse_all(transport.send(cmd), sid):
         codes += [c for c in decode_dtc_list(payload) if c not in codes]
     return [Dtc(code=c) for c in codes]
+
+
+def _discover_ecus(transport: Transport) -> list[Ecu]:
+    """One headers-on Mode 01 request to learn which CAN ids answer, then headers off again."""
+    transport.send("ATH1")
+    try:
+        lines = transport.send("0100")
+    finally:
+        transport.send("ATH0")  # every later parse assumes headers off
+    return [Ecu(header=h, modes_seen=["01"]) for h in parse_headers(lines)]
 
 
 def _supported(payloads: list[bytes], base: int) -> set[str]:
@@ -84,6 +94,11 @@ def scan(
     # multi-line VIN). Decoding them as CAN would give wrong codes, so skip until
     # Phase 4 adds the non-CAN layouts.
     is_can = "15765" in (proto.name or "")
+    ecus: list[Ecu] = []
+    if is_can:
+        ecus = _discover_ecus(transport)
+        if not ecus:
+            warnings.append("ECU attribution unavailable (no CAN ids in the headers-on reply)")
     vin, vin_source = None, "none"
     dtcs = Dtcs()
     if is_can:
@@ -123,6 +138,7 @@ def scan(
         source=Source(kind=kind, adapter=adapter, tool_version=__version__, transcript=transcript),
         vehicle=Vehicle(vin=vin, vin_source=vin_source),
         protocol=proto,
+        ecus=ecus,
         supported_pids=supported,
         dtcs=dtcs,
         mil=mil,
