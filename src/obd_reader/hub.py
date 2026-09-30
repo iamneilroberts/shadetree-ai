@@ -43,8 +43,10 @@ class HubBusy(RuntimeError):
 
 class LiveHub:
     def __init__(self, session: Session, *, sim: SimPort | None = None, max_buffer: int = 600,
-                 clock: Callable[[], float] = time.monotonic):
+                 clock: Callable[[], float] = time.monotonic, autosave: bool | None = None):
         self._s, self._sim, self._max, self._clock = session, sim, max_buffer, clock
+        self._autosave = sim is None if autosave is None else autosave  # a demo run is not worth a file
+        self._unsaved = False               # the last run ended with samples that could not be saved
         self._lock = threading.Lock()       # serialises start()
         self._profiles = ProfileStore(session.config.home)
         self._data_lock = threading.Lock()  # guards the buffers: the sampler writes, viewers read
@@ -68,6 +70,7 @@ class LiveHub:
         self._key: str | None = None
         self._supported: set[str] = set()
         self._prior: dict | None = None
+        self._saved: tuple[Path, int] | None = None  # (file, seq) of the last save of this run
 
     @property
     def running(self) -> bool:
@@ -82,6 +85,10 @@ class LiveHub:
         with self._lock:
             if self.running:
                 raise HubBusy("the console is already sampling; stop it first")
+            if self._unsaved:  # starting clears the last run: say so once, then let the person decide
+                self._unsaved = False
+                raise HubBusy("the last run could not be saved and starting clears it: press Save run, "
+                              "or press Start again to discard it")
             with self._data_lock:
                 self._reset()
                 self._run_id += 1
@@ -146,6 +153,7 @@ class LiveHub:
             self.status, self.message = "error", f"{type(e).__name__}: {e}"
         finally:
             self._save_profile()
+            self._autosave_run()
             if self.status != "error":
                 self.status = "stopped"
 
@@ -308,8 +316,17 @@ class LiveHub:
         with self._data_lock:
             if self.seq == 0:
                 raise ValueError("nothing sampled yet")
+            if self._saved is not None and self._saved[1] == self.seq:  # already on disk (autosaved): no duplicate
+                return self._saved[0]
+        path = self._write_run(label)
+        self._unsaved = False
+        return path
+
+    def _write_run(self, label: str) -> Path:
+        with self._data_lock:
+            seq = self.seq
             series = {p: Series(name=PIDS[p].name, unit=PIDS[p].unit,
-                                samples=[(tt, v) for s, tt, v in d if s <= self.seq])
+                                samples=[(tt, v) for s, tt, v in d if s <= seq])
                       for p, d in self._ch.items()}
         ls = LiveSample(duration_s=self.state()["now"], rate_hz=self.hz or 0.0, series=series)
         rdir = Path(self._s.config.home) / "runs"
@@ -318,7 +335,21 @@ class LiveHub:
         with open(path, "x", encoding="utf-8") as fh:
             json.dump({"kind": "live_run", "demo": self._sim is not None, "adapter": self._adapter,
                        "live_sample": ls.model_dump(mode="json")}, fh, indent=2)
+        with self._data_lock:
+            self._saved = (path, seq)
         return path
+
+    def _autosave_run(self) -> None:
+        """Every run that took samples is written when it ends, so a later Start cannot lose it."""
+        if not self._autosave or self.seq == 0:
+            return
+        try:
+            path = self._write_run("auto")
+        except Exception as e:
+            self._unsaved = True
+            self.message = (self.message + " \u00b7 " if self.message else "") + f"could not save the run automatically ({e}): press Save run"
+            return
+        self.message = (self.message + " \u00b7 " if self.message else "") + f"run saved as {path.name}"
 
     def set_sim(self, scenario: str | None = None, rev: bool | None = None) -> None:
         if self._sim is None:

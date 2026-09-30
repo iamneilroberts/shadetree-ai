@@ -349,3 +349,43 @@ def test_car_that_reports_no_vin_gets_a_note_and_no_profile(tmp_path):
     hub.stop()
     assert hub.state()["vehicle"] == {"key": None, "known": False, "runs": 0, "note": "the car did not report a VIN"}
     assert not (tmp_path / "profiles").exists()
+
+
+def test_a_finished_run_is_saved_automatically_and_a_new_start_cannot_lose_it(tmp_path):
+    sim = SimPort("rich")
+    s = Session(Config(port="sim", home=tmp_path, timeout=0.5), port_factory=lambda: sim)
+    hub = LiveHub(s, sim=sim, autosave=True)
+    hub.start(DEFAULT_PIDS, hz=10, seconds=30)
+    assert wait_for(lambda: hub.state()["seq"] >= 5)
+    hub.stop()
+    files = list((tmp_path / "runs").glob("*-auto.json"))
+    assert len(files) == 1 and "run saved as" in hub.state()["message"]
+    assert json.loads(files[0].read_text())["live_sample"]["series"]["0C"]["samples"]
+    assert hub.save_run("drive") == files[0]  # pressing Save run afterwards does not duplicate the file
+    hub.start(DEFAULT_PIDS, hz=10, seconds=30)  # the next run clears memory, not the file
+    assert wait_for(lambda: hub.state()["seq"] >= 1)
+    hub.stop()
+    assert len(list((tmp_path / "runs").glob("*-auto.json"))) >= 1 and files[0].exists()
+
+
+def test_a_demo_run_is_not_saved_automatically(tmp_path):
+    hub, _, _ = make(tmp_path)
+    hub.start(DEFAULT_PIDS, hz=10, seconds=30)
+    assert wait_for(lambda: hub.state()["seq"] >= 3)
+    hub.stop()
+    assert not (tmp_path / "runs").exists() and "saved" not in (hub.state()["message"] or "")
+
+
+def test_a_run_that_could_not_be_saved_warns_once_before_a_new_start_clears_it(tmp_path):
+    sim = SimPort("rich")
+    s = Session(Config(port="sim", home=tmp_path, timeout=0.5), port_factory=lambda: sim)
+    hub = LiveHub(s, sim=sim, autosave=True)
+    (tmp_path / "runs").write_text("not a folder")  # makes the save fail
+    hub.start(DEFAULT_PIDS, hz=10, seconds=30)
+    assert wait_for(lambda: hub.state()["seq"] >= 3)
+    hub.stop()
+    assert "could not save the run automatically" in hub.state()["message"]
+    with pytest.raises(HubBusy):
+        hub.start(DEFAULT_PIDS, hz=10, seconds=30)
+    hub.start(DEFAULT_PIDS, hz=10, seconds=30)  # second press discards it on purpose
+    hub.stop()
