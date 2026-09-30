@@ -62,7 +62,10 @@ class Session:
         if not self.config.port:
             raise NoAdapterError("SHADETREE_PORT is not set; live tools need the adapter's serial port")
         if not self._lock.acquire(blocking=False):
-            raise AdapterBusy("the adapter is busy with another tool call; try again in a moment")
+            raise AdapterBusy(
+                "the adapter is busy (another tool call, or the live console is sampling); "
+                "use console_data for live values, or stop the console first"
+            )
 
     @contextmanager
     def raw_port(self) -> Iterator[Port]:
