@@ -389,3 +389,16 @@ def test_a_run_that_could_not_be_saved_warns_once_before_a_new_start_clears_it(t
         hub.start(DEFAULT_PIDS, hz=10, seconds=30)
     hub.start(DEFAULT_PIDS, hz=10, seconds=30)  # second press discards it on purpose
     hub.stop()
+
+
+def test_a_saved_run_keeps_every_sample_even_when_the_chart_buffer_is_small(tmp_path):
+    sim = SimPort("rich")
+    s = Session(Config(port="sim", home=tmp_path, timeout=0.5), port_factory=lambda: sim)
+    hub = LiveHub(s, sim=sim, max_buffer=5, autosave=False)
+    hub.start(DEFAULT_PIDS, hz=10, seconds=30)
+    assert wait_for(lambda: hub.state()["seq"] >= 20)
+    hub.stop()
+    assert len(hub.state(after=0)["channels"]["0C"]["samples"]) == 5   # what the page sees is bounded
+    saved = json.loads(hub.save_run("long-drive").read_text())
+    n = saved["live_sample"]["series"]["0C"]["samples"]
+    assert len(n) >= 20 and n[0][0] < 2.0                               # the saved run starts at the start

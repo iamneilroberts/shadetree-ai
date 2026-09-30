@@ -57,7 +57,8 @@ class LiveHub:
 
     def _reset(self) -> None:
         self.status, self.message, self.seq, self.hz = "idle", None, 0, None
-        self._ch: dict[str, deque] = {}
+        self._ch: dict[str, deque] = {}      # the newest max_buffer samples per channel: what the page and tools read
+        self._full: dict[str, list] = {}     # every sample of the run: what a saved run is written from
         self._sweep_t: deque = deque(maxlen=12)
         self._t0 = self._last_at = self._deadline = None
         self._adapter: dict = {"chip": None, "ati": None, "protocol": None}
@@ -94,6 +95,7 @@ class LiveHub:
                 self._run_id += 1
                 self.hz, self.status = float(hz), "running"
                 self._ch = {p: deque(maxlen=self._max) for p in pids}
+                self._full = {p: [] for p in pids}
             self._stop.clear()
             self._thread = threading.Thread(target=self._run, args=(pids, float(hz), float(seconds)), daemon=True)
             self._thread.start()
@@ -180,6 +182,7 @@ class LiveHub:
             self._extras, self._supported = extras, supported
             for p in extras:
                 self._ch[p] = deque(maxlen=self._max)
+                self._full[p] = []
         return extras
 
     def _read_identity(self, t) -> dict | None:
@@ -262,6 +265,7 @@ class LiveHub:
             seq = self.seq + 1
             for p, v in rows:
                 self._ch[p].append((seq, round(now, 3), v))
+                self._full[p].append((seq, round(now, 3), v))
             self.seq = seq
             self._last_at = self._clock()
             self._sweep_t.append(now)
@@ -327,7 +331,7 @@ class LiveHub:
             seq = self.seq
             series = {p: Series(name=PIDS[p].name, unit=PIDS[p].unit,
                                 samples=[(tt, v) for s, tt, v in d if s <= seq])
-                      for p, d in self._ch.items()}
+                      for p, d in self._full.items()}
         ls = LiveSample(duration_s=self.state()["now"], rate_hz=self.hz or 0.0, series=series)
         rdir = Path(self._s.config.home) / "runs"
         rdir.mkdir(parents=True, exist_ok=True)
