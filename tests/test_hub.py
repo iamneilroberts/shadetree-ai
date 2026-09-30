@@ -31,7 +31,7 @@ def test_hub_samples_and_reports_increments(tmp_path):
     hub.start(DEFAULT_PIDS, hz=10, seconds=30)
     assert wait_for(lambda: hub.state()["seq"] >= 5)
     st = hub.state(after=0)
-    assert st["status"] == "running" and st["demo"] is True and set(st["channels"]) == set(DEFAULT_PIDS)
+    assert st["status"] == "running" and st["demo"] is True and set(DEFAULT_PIDS) <= set(st["channels"]) and set(st["channels"]) == set(DEFAULT_PIDS) | set(st["extras"])
     assert st["channels"]["0C"]["name"] == "engine_rpm" and st["channels"]["0C"]["unit"] == "rpm"
     first = st["seq"]
     assert wait_for(lambda: hub.state()["seq"] > first + 2)
@@ -212,3 +212,61 @@ def test_non_can_protocol_skips_code_decoding_and_says_why(tmp_path):
     st = hub.state()["codes"]
     hub.stop()
     assert st["read"] is False and "not supported" in st["note"]
+
+
+class _NoMapSim(SimPort):
+    """A car that does not answer PID 0B (MAP)."""
+    def write(self, data: bytes) -> None:
+        super().write(data)
+        if data.decode("ascii").rstrip("\r") == "010B":
+            self._pending = "NO DATA\r"
+
+
+def test_a_pid_the_car_never_answers_is_dropped_and_reported(tmp_path):
+    sim = _NoMapSim("rich")
+    hub, _, _ = make(tmp_path, sim=sim)
+    hub.start(DEFAULT_PIDS, hz=10, seconds=30)
+    assert wait_for(lambda: hub.state()["unsupported"] == ["0B"])
+    assert wait_for(lambda: hub.state()["seq"] >= 8)
+    st = hub.state()
+    assert st["status"] == "running" and st["channels"]["0B"]["samples"] == []
+    assert st["channels"]["0C"]["samples"] and st["channels"]["05"]["samples"]
+    hub.stop()
+
+
+def test_a_supported_pid_is_never_reported_unsupported(tmp_path):
+    hub, _, _ = make(tmp_path)
+    hub.start(DEFAULT_PIDS, hz=10, seconds=30)
+    assert wait_for(lambda: hub.state()["seq"] >= 8)
+    assert hub.state()["unsupported"] == []
+    hub.stop()
+
+
+def test_the_run_discovers_extra_readings_up_to_the_pid_cap(tmp_path):
+    hub, _, _ = make(tmp_path)
+    hub.start(DEFAULT_PIDS, hz=10, seconds=30)
+    assert wait_for(lambda: hub.state()["seq"] >= 8)
+    st = hub.state()
+    assert st["extras"] and len(DEFAULT_PIDS) + len(st["extras"]) <= 16
+    assert set(st["extras"]).isdisjoint(DEFAULT_PIDS) and set(st["extras"]) <= set(st["channels"])
+    assert all(st["channels"][p]["samples"] for p in st["extras"])  # every extra gets read (they rotate)
+    hub.stop()
+
+
+def test_mode06_results_are_read_once_and_carried_in_state(tmp_path):
+    hub, _, _ = make(tmp_path)
+    hub.start(DEFAULT_PIDS, hz=10, seconds=30)
+    assert wait_for(lambda: hub.state()["mode06"]["read"])
+    m = hub.state()["mode06"]
+    assert m["mids"] == ["01", "21"] and len(m["results"]) == 3
+    assert {r["mid"] for r in m["results"]} == {"01", "21"}
+    hub.stop()
+
+
+def test_seventeen_pids_are_refused_and_sixteen_are_accepted(tmp_path):
+    hub, _, _ = make(tmp_path)
+    too_many = ["04", "05", "06", "07", "08", "09", "0B", "0C", "0D", "0E", "11", "42", "43", "44", "0F", "5C", "46"]
+    with pytest.raises(LiveLimitError):
+        hub.start(too_many, hz=5, seconds=5)
+    hub.start(too_many[:16], hz=5, seconds=5)
+    hub.stop()

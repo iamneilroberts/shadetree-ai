@@ -117,7 +117,7 @@ def test_mode06_lists_supported_tests_then_reads_them(tmp_path):
     out = build_tools(s)["mode06_tests"]()
     assert out["supported_mids"] == ["01"]
     assert out["results"][0]["tid"] == "8B" and out["results"][0]["within_limits"] is True
-    assert "unverified" in out["note"].lower()
+    assert "raw integers" in out["note"].lower()
 
 
 def test_mode06_rejects_a_bad_mid(tmp_path):  # Review Focus 1

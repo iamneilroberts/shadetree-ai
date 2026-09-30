@@ -35,9 +35,10 @@ With an adapter (OBDLink EX tested; the car parked, ignition on, engine off):
 | Scan: VIN, protocol, supported PIDs, DTCs, MIL, readiness, freeze frame, multi-ECU union | done | 2024 Honda Ridgeline (CAN 29-bit): VIN, PIDs, DTC modes, readiness |
 | Record and replay (snapshot + raw transcript) | done | real Ridgeline transcript replays to the same snapshot |
 | 17 MCP tools (9 offline, 8 live) | done | not yet exercised against a car through Claude |
-| Live console: Cockpit, Scope, Guided test, Analyzer cabinet, Handheld (phone) | done, demo tested in a browser | not yet run against a real adapter; Analyzer and Handheld not yet tried on a real phone |
+| Live console: Cockpit, Scope, Guided test, Analyzer cabinet, Handheld (phone), Readings | done, demo tested in a browser (Readings tab: server data checked in demo, page not yet viewed) | sampling runs against the Ridgeline; Analyzer, Handheld and Readings not yet checked on real hardware or a phone |
+| Extra readings on the console (car's supported PIDs, up to 16 per run, rotated) and unsupported PIDs dropped | done | discovery and sampling not yet seen on a car |
 | Trouble codes on the console (Modes 03/07/0A + lamp), CAN cars only | done in demo | not yet run against a real car |
-| Mode 06 test results | parser written | **not verified**: layout assumed from the standard |
+| Mode 06 test results (MCP tool and console Readings tab) | done; reply layout is 9-byte groups `MID TID UASID value min max` | 2024 Ridgeline: 20 MIDs, 53 results, all within limits; values are raw (unit scaling not applied) |
 | 29-bit ECU header attribution | written | **not verified** on a real car |
 | Legacy protocols (J1850, ISO 9141, KWP) | scanner skips DTC/VIN decode on non-CAN | **not built yet** (needs Austin's older cars) |
 | Reference store, DTC lookup, playbooks, `check_citations` | not built | n/a |

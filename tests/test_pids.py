@@ -54,3 +54,15 @@ def test_every_pid_key_is_two_upper_hex_digits_and_matches_its_def():
     for key, d in PIDS.items():
         assert len(key) == 2 and key == key.upper() and d.pid == key
         int(key, 16)
+
+
+def test_readings_added_for_the_ridgeline_decode_from_its_real_bytes():
+    from obd_reader.pids import decode_pid, pid_label
+    assert decode_pid("3C", bytes.fromhex("1760")).value == 558.4
+    lam = decode_pid("24", bytes.fromhex("7F654979")).value
+    assert 0.99 < lam < 1.01
+    assert decode_pid("23", bytes.fromhex("0155")).value == 3410
+    assert decode_pid("62", bytes.fromhex("91")).value == 20
+    assert decode_pid("A6", bytes.fromhex("0012ADD6")).value == 122415.0
+    assert decode_pid("55", bytes.fromhex("80")).value == 0
+    assert pid_label("51", 1) == "Gasoline" and pid_label("03", 2) == "Closed loop" and pid_label("0C", 800) is None

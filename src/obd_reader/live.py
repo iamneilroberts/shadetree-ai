@@ -8,7 +8,7 @@ from obd_reader.pids import PIDS
 from obd_reader.snapshot import LiveSample, Series
 from obd_reader.transport import Transport
 
-MAX_PIDS = 8
+MAX_PIDS = 16
 MAX_SECONDS = 120.0
 MAX_HZ = 10.0
 MIN_HZ = 0.1  # at most a 10 s pause between sweeps, so the adapter lock is never held for hours

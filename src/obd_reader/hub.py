@@ -13,8 +13,9 @@ from typing import Callable
 
 from obd_reader.adapter import identify
 from obd_reader.dtc_text import describe
-from obd_reader.elm import parse_all
-from obd_reader.live import MAX_HZ, MIN_HZ, LiveLimitError, read_pid_value, summarize, validate_pids
+from obd_reader.elm import decode_supported, parse_all
+from obd_reader.live import MAX_HZ, MAX_PIDS, MIN_HZ, LiveLimitError, read_pid_value, summarize, validate_pids
+from obd_reader.mode06 import read_all as read_mode06
 from obd_reader.pids import PIDS
 from obd_reader.scanner import _dtcs
 from obd_reader.session import Session
@@ -22,8 +23,15 @@ from obd_reader.simulator import SimPort
 from obd_reader.snapshot import LiveSample, Series
 
 MAX_RUN_S = 1800.0
-DEFAULT_PIDS = ["0C", "05", "06", "07", "08", "09", "10", "42"]
+DEFAULT_PIDS = ["0C", "05", "06", "07", "08", "09", "0B", "42"]
+# Readings added to a run, in order of usefulness, for whichever of them the car says it supports.
+# The core channels are read every sweep; these rotate _EXTRAS_PER_SWEEP at a time so the fast ones stay fast.
+EXTRA_PIDS = ["04", "11", "0D", "0E", "43", "44", "0F", "5C", "46", "33", "2F", "24", "28", "15", "19", "3C", "3D",
+              "3E", "3F", "2C", "2D", "2E", "23", "47", "49", "4A", "62", "63", "8E", "55", "56", "57", "58", "03",
+              "1C", "51", "1F", "30", "31", "21", "A6"]
+_EXTRAS_PER_SWEEP = 4
 _SILENT_SWEEPS = 3
+_UNSUPPORTED_SWEEPS = 3  # a PID that gets no value in this many sweeps in a row while others answer is dropped
 _LABEL_RE = re.compile(r"[a-z0-9-]{1,40}")
 
 
@@ -49,6 +57,10 @@ class LiveHub:
         self._t0 = self._last_at = self._deadline = None
         self._adapter: dict = {"chip": None, "ati": None, "protocol": None}
         self._codes: dict = {"read": False, "note": None}
+        self._unsupported: list[str] = []
+        self._missed: set[str] = set()
+        self._extras: list[str] = []
+        self._m06: dict = {"read": False, "note": None, "mids": [], "results": []}
 
     @property
     def running(self) -> bool:
@@ -86,20 +98,32 @@ class LiveHub:
                 t0 = self._clock()
                 self._t0, self._deadline = t0, t0 + seconds
                 silent, period = 0, 1.0 / hz
+                active, misses = list(pids), dict.fromkeys(pids, 0)
+                extras, rot = self._discover_extras(t, pids), 0
                 while not self._stop.is_set():
                     now = self._clock() - t0
                     if now > seconds:
                         self.message = f"auto-stopped after {seconds:g} s"
                         break
-                    got = self._sweep(t, pids, now)
+                    batch = [extras[(rot + i) % len(extras)] for i in range(min(_EXTRAS_PER_SWEEP, len(extras)))]
+                    rot = (rot + _EXTRAS_PER_SWEEP) % len(extras) if extras else 0
+                    got = self._sweep(t, active + batch, now)
                     if self._stop.is_set():  # Stop pressed (possibly mid-sweep): end now, no "silent bus" message
                         break
                     if got:
                         silent = 0
+                        for p in list(active):
+                            misses[p] = misses[p] + 1 if p in self._missed else 0
+                            if misses[p] >= _UNSUPPORTED_SWEEPS:
+                                active.remove(p)
+                                with self._data_lock:
+                                    self._unsupported.append(p)
                         if self._adapter["protocol"] is None:
                             dp = (t.send("ATDP") or [None])[0]
                             self._adapter["protocol"] = dp.removeprefix("AUTO, ") if dp else None
                             self._read_codes(t)
+                            if not self._stop.is_set():
+                                self._read_mode06(t)
                     else:
                         silent += 1
                         if silent >= _SILENT_SWEEPS:
@@ -112,6 +136,43 @@ class LiveHub:
             if self.status != "error":
                 self.status = "stopped"
 
+    def _discover_extras(self, t, core: list[str]) -> list[str]:
+        """Ask the car which Mode 01 PIDs it supports and pick the extra readings it can give, up to the PID cap."""
+        room = MAX_PIDS - len(core)
+        if room <= 0:
+            return []
+        supported: set[str] = set()
+        base = 0x00
+        while base <= 0xC0 and not self._stop.is_set():
+            found: set[str] = set()
+            for p in parse_all(t.send(f"01{base:02X}"), 0x41):
+                if len(p) >= 6 and p[1] == base:
+                    found.update(decode_supported(base, p[2:6]))
+            if not found:
+                break
+            supported |= found
+            if f"{base + 0x20:02X}" not in found:
+                break
+            base += 0x20
+        extras = [p for p in EXTRA_PIDS if p in supported and p in PIDS and p not in core][:room]
+        with self._data_lock:
+            self._extras = extras
+            for p in extras:
+                self._ch[p] = deque(maxlen=self._max)
+        return extras
+
+    def _read_mode06(self, t) -> None:
+        """On-board test results, once per run (CAN only: the layout was verified on CAN)."""
+        proto = self._adapter["protocol"] or ""
+        if self._sim is None and "15765" not in proto:
+            with self._data_lock:
+                self._m06 = {"read": False, "note": f"Mode 06 not supported yet on {proto or 'this'} protocol",
+                             "mids": [], "results": []}
+            return
+        mids, res = read_mode06(t, stop=self._stop.is_set)
+        with self._data_lock:
+            self._m06 = {"read": True, "note": None, "mids": mids, "results": [r.model_dump() for r in res]}
+
     def _read_codes(self, t) -> None:
         """Modes 03/07/0A and the lamp bit, once per run (CAN only: other layouts would decode wrongly)."""
         proto = self._adapter["protocol"] or ""
@@ -119,8 +180,11 @@ class LiveHub:
             with self._data_lock:
                 self._codes = {"read": False, "note": f"trouble codes not supported yet on {proto or 'this'} protocol"}
             return
-        out = {k: [{"code": d.code, **describe(d.code)} for d in _dtcs(t, cmd, sid)]
-               for k, cmd, sid in (("stored", "03", 0x43), ("pending", "07", 0x47), ("permanent", "0A", 0x4A))}
+        out = {}
+        for k, cmd, sid in (("stored", "03", 0x43), ("pending", "07", 0x47), ("permanent", "0A", 0x4A)):
+            if self._stop.is_set():  # Stop pressed: do not finish reading the lists
+                return
+            out[k] = [{"code": d.code, **describe(d.code)} for d in _dtcs(t, cmd, sid)]
         status = [p for p in parse_all(t.send("0101"), 0x41) if len(p) >= 3 and p[1] == 0x01]
         with self._data_lock:
             self._codes = {"read": True, "note": None, **out, "mil": any(p[2] & 0x80 for p in status)}
@@ -128,12 +192,15 @@ class LiveHub:
     def _sweep(self, t, pids: list[str], now: float) -> bool:
         """Read every PID once, then publish the whole sweep at once (a viewer never sees half of one)."""
         rows = []
+        self._missed = set()
         for p in pids:
             if self._stop.is_set():  # a slow link must not delay Stop by a whole sweep
                 return False
             v = read_pid_value(t, p)
             if v is not None:
                 rows.append((p, v))
+            else:
+                self._missed.add(p)
         if not rows:
             return False
         with self._data_lock:
@@ -150,9 +217,11 @@ class LiveHub:
             seq, t0, deadline, last_at = self.seq, self._t0, self._deadline, self._last_at
             status, message, hz, run = self.status, self.message, self.hz, self._run_id
             adapter, st, codes = dict(self._adapter), list(self._sweep_t), dict(self._codes)
+            unsupported, extras, m06 = list(self._unsupported), list(self._extras), dict(self._m06)
             # only sweeps up to `seq`: anything newer is not complete yet
             channels = {
                 p: {"name": PIDS[p].name, "unit": PIDS[p].unit,
+                    "labels": None if PIDS[p].labels is None else {str(k): v for k, v in PIDS[p].labels.items()},
                     "samples": [[s, tt, v] for s, tt, v in d if after < s <= seq]}
                 for p, d in self._ch.items()
             }
@@ -165,7 +234,8 @@ class LiveHub:
             "hz": hz, "hz_measured": None if measured is None else round(measured, 2),
             "seconds_left": (max(0.0, round(deadline - self._clock(), 1))
                              if status == "running" and deadline else None),
-            "adapter": adapter, "codes": codes,
+            "adapter": adapter, "codes": codes, "unsupported": unsupported,
+            "extras": extras, "mode06": m06,
             "channels": channels,
         }
 

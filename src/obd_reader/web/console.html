@@ -225,6 +225,19 @@
   .retro .cnone.wait { color: #a9aaad; text-shadow: none; }
   .retro .hlive { font: 700 11px var(--sil); letter-spacing: .12em; color: #a9aaad; }
   .retro .hlive.on { color: #3fe06a; } .retro .hlive.off { color: #ff8a7a; }
+  #v6 .card { margin-bottom: 12px; }
+  #v6 .xgrid { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
+  #v6 .xt { background: var(--panel2); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; }
+  #v6 .xt .n { font: 700 11.5px var(--cond); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  #v6 .xt .v { font: 700 28px/1.1 var(--cond); font-variant-numeric: tabular-nums; }
+  #v6 .xt .v small { font: 600 13px var(--cond); color: var(--muted); margin-left: 4px; }
+  #v6 .xt .r { font-size: 11.5px; color: var(--muted); }
+  #v6 .note { color: var(--muted); font-size: 12.5px; margin: 0 0 8px; }
+  #v6 table.m6 { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-bottom: 10px; }
+  #v6 table.m6 th, #v6 table.m6 td { text-align: right; padding: 3px 8px; border-bottom: 1px solid var(--line); }
+  #v6 table.m6 th:first-child, #v6 table.m6 td:first-child { text-align: left; }
+  #v6 .m6h { font: 700 13px var(--cond); letter-spacing: .06em; margin: 10px 0 4px; }
+  #v6 .m6h span { color: var(--muted); font-weight: 400; font-family: var(--mono); letter-spacing: 0; }
 </style>
 </head>
 <body>
@@ -237,6 +250,7 @@
     <button class="vbtn" data-view="v3" role="tab">C &middot; Guided test</button>
     <button class="vbtn" data-view="v4" role="tab">D &middot; Analyzer</button>
     <button class="vbtn" data-view="v5" role="tab">E &middot; Handheld</button>
+    <button class="vbtn" data-view="v6" role="tab">F &middot; Readings</button>
   </nav>
 </header>
 <div class="status">
@@ -286,7 +300,7 @@
           <div class="bar"><u></u><i id="b1ltft2"></i></div><div class="ticks"><span>&minus;25</span><span>0</span><span>+25</span></div></div>
       </div>
       <div class="vt" style="grid-column:2 / 4">
-        <div class="card"><h3>Mass airflow</h3><span class="big" id="v1maf">0</span><span class="unit">g/s</span><canvas id="c1maf" height="60"></canvas></div>
+        <div class="card"><h3>Manifold pressure</h3><span class="big" id="v1map">0</span><span class="unit">kPa</span><canvas id="c1map" height="60"></canvas></div>
         <div class="card"><h3>Control module voltage</h3><span class="big" id="v1volts">0</span><span class="unit">V</span><canvas id="c1volts" height="60"></canvas></div>
       </div>
       <div class="card wide"><h3>Fuel trims, last minute</h3>
@@ -309,8 +323,8 @@
         <div class="card"><div class="cap"><span>Fuel trims &middot; %</span>
           <span class="legend"><span style="color:var(--cyan)">&mdash; STFT b1</span><span style="color:var(--cyan)">- - LTFT b1</span><span style="color:var(--amber)">&mdash; STFT b2</span><span style="color:var(--amber)">- - LTFT b2</span></span></div>
           <canvas id="s_trim"></canvas><div class="cursor"></div><div class="tip"></div></div>
-        <div class="card"><div class="cap"><span>Airflow g/s &middot; coolant &deg;C</span>
-          <span class="legend"><span style="color:var(--cyan)">&mdash; MAF</span><span style="color:var(--amber)">- - coolant</span></span></div>
+        <div class="card"><div class="cap"><span>Manifold kPa &middot; coolant &deg;C</span>
+          <span class="legend"><span style="color:var(--cyan)">&mdash; MAP</span><span style="color:var(--amber)">- - coolant</span></span></div>
           <canvas id="s_air"></canvas><div class="cursor"></div><div class="tip"></div></div>
         <div class="card"><div class="cap"><span>Control module voltage &middot; V</span></div><canvas id="s_volt"></canvas><div class="cursor"></div><div class="tip"></div></div>
       </div>
@@ -326,7 +340,7 @@
           <div style="color:var(--muted);font-size:12.5px;margin-top:4px">playbook <span class="cite">[ref:playbook:rich-condition-v1]</span>
             <span class="tag warn">model_drafted &middot; unreviewed</span></div></div>
         <div class="step active" id="st_idle"><div class="hd"><span class="n">1</span>Warm idle</div>
-          <p>Engine warm, A/C off, hands off the throttle. Records 15 s of trims and airflow.</p>
+          <p>Engine warm, A/C off, hands off the throttle. Records 15 s of trims and manifold pressure.</p>
           <div class="prog"><i id="pg_idle"></i></div>
           <button class="b primary" id="go_idle">Start capture</button> <span id="tx_idle" style="color:var(--muted);font-size:12px"></span></div>
         <div class="step" id="st_rev"><div class="hd"><span class="n">2</span>Hold 2500 rpm</div>
@@ -345,7 +359,7 @@
         </div>
         <div class="card" style="margin-bottom:10px"><h3>Engine speed, last minute (target band shaded)</h3><canvas id="c3" height="170"></canvas></div>
         <div class="card"><h3>Captured means</h3>
-          <table><thead><tr><th>Capture</th><th>STFT b1</th><th>LTFT b1</th><th>STFT b2</th><th>LTFT b2</th><th>MAF g/s</th><th>rpm</th></tr></thead>
+          <table><thead><tr><th>Capture</th><th>STFT b1</th><th>LTFT b1</th><th>STFT b2</th><th>LTFT b2</th><th>MAP kPa</th><th>rpm</th></tr></thead>
             <tbody id="results"><tr><td colspan="7" style="text-align:center;color:var(--muted)">No captures yet</td></tr></tbody></table>
           <div class="verdict" id="verdict" style="display:none"></div></div>
       </div>
@@ -377,7 +391,7 @@
       <div class="pan">
         <p class="lab">Coolant <span>&deg;C</span></p><div class="win led" id="a_ect" style="--c:#ffb62e"></div>
         <p class="lab" style="margin-top:10px">Control module <span>VOLTS</span></p><div class="win led" id="a_volts" style="--c:#3fe06a"></div>
-        <p class="lab" style="margin-top:10px">Air flow <span>G/S</span></p><div class="win led" id="a_maf" style="--c:#ffb62e"></div>
+        <p class="lab" style="margin-top:10px">Manifold <span>KPA</span></p><div class="win led" id="a_map" style="--c:#ffb62e"></div>
       </div>
     </div>
     <div class="lamps">
@@ -403,7 +417,7 @@
         <p class="lab">Engine speed <span>RPM</span></p><div class="win led" id="h_rpm" style="--c:#ff3b2b"></div>
         <p class="lab">Coolant <span>&deg;C</span></p><div class="win led" id="h_ect" style="--c:#ffb62e"></div>
         <p class="lab">Control module <span>VOLTS</span></p><div class="win led" id="h_volts" style="--c:#3fe06a"></div>
-        <p class="lab">Air flow <span>G/S</span></p><div class="win led" id="h_maf" style="--c:#ffb62e"></div>
+        <p class="lab">Manifold <span>KPA</span></p><div class="win led" id="h_map" style="--c:#ffb62e"></div>
       </div>
       <div class="hh-pane" data-mode="trims" hidden>
         <p class="lab">Short term &middot; bank 1 <span id="h_v_stft1"></span></p><div class="leds" id="h_l_stft1"></div>
@@ -417,6 +431,15 @@
     <nav class="hh-nav"><button data-mode="codes" class="on">Codes</button><button data-mode="live">Live</button><button data-mode="trims">Trims</button><button data-mode="status">Status</button></nav>
   </div></div><div class="hh-size" id="h_size"></div></div>
   </div></section>
+  <!-- F: READINGS (extra PIDs the car supports + Mode 06 test results) -->
+  <section class="view" id="v6" role="tabpanel">
+    <div class="card"><h3>More readings <span class="tag" id="x_count"></span></h3>
+      <p class="note" id="x_note">Start sampling: the console asks the car which readings it supports and adds them here (the main channels are read every sweep, these rotate a few at a time).</p>
+      <div class="xgrid" id="x_grid"></div></div>
+    <div class="card"><h3>Mode 06 &middot; on-board test results <span class="tag" id="m6_count"></span></h3>
+      <p class="note" id="m6_note">Read once per run. Values are raw integers: the unit scaling table is not applied, so compare a value to its own limits, not to other tests. Monitor names are general knowledge, unverified.</p>
+      <div id="m6"></div></div>
+  </section>
 </main>
 <p class="foot">Values come from one shared sampler, so Claude and this page see the same numbers. Nothing on this page can send a command to the car. The &plusmn;10 % trim window used for the OUTSIDE tag is general knowledge, unverified. The guided test is a draft, unreviewed playbook.</p>
 
@@ -432,13 +455,13 @@
     { id: 'ltft1', pid: '07', name: 'LTFT bank 1',    unit: '%',   dp: 1 },
     { id: 'stft2', pid: '08', name: 'STFT bank 2',    unit: '%',   dp: 1 },
     { id: 'ltft2', pid: '09', name: 'LTFT bank 2',    unit: '%',   dp: 1 },
-    { id: 'maf',   pid: '10', name: 'MAF',            unit: 'g/s', dp: 1 },
+    { id: 'map',   pid: '0B', name: 'MAP',            unit: 'kPa', dp: 0 },
     { id: 'volts', pid: '42', name: 'Control module', unit: 'V',   dp: 2 }
   ];
   var PIDS = CH.map(function (c) { return c.pid; });
   var SPAN = 60;
   var PAL = { cyan: '#4fc3e8', amber: '#f2a93b', mute: '#93a0aa', line: '#2c343b' };
-  var buf = {}, last = {}, lastSeq = 0, runId = null, polling = false, tNow = 0, state = null, fetchedAt = 0, events = [], cap = null, results = {};
+  var xs = {}, buf = {}, last = {}, lastSeq = 0, runId = null, polling = false, tNow = 0, state = null, fetchedAt = 0, events = [], cap = null, results = {};
   CH.forEach(function (c) { buf[c.id] = []; last[c.id] = null; });
   function $(id) { return document.getElementById(id); }
   function fmt(v, dp) { return v === null || v === undefined ? '—' : (dp === 0 ? String(Math.round(v)) : v.toFixed(dp)); }
@@ -448,7 +471,7 @@
   });
 
   /* ---------- data in ---------- */
-  function resetBuffers() { CH.forEach(function (c) { buf[c.id] = []; last[c.id] = null; }); lastSeq = 0; events = []; }
+  function resetBuffers() { CH.forEach(function (c) { buf[c.id] = []; last[c.id] = null; }); lastSeq = 0; events = []; xs = {}; }
   function ingest(st) {
     // a new run (any viewer, or Claude, can start one) restarts the sequence numbers: start over
     if (st.run !== runId || st.seq < lastSeq) { resetBuffers(); runId = st.run; }
@@ -461,6 +484,15 @@
         if (s[0] <= lastSeq) return;
         buf[c.id].push({ t: s[1], v: s[2] }); last[c.id] = s[2];
         (rows[s[0]] = rows[s[0]] || { t: s[1] })[c.id] = s[2];
+      });
+    });
+    Object.keys(st.channels).forEach(function (pid) {     // readings outside the fixed channels: keep latest, min, max
+      if (PIDS.indexOf(pid) >= 0) return;
+      var ch = st.channels[pid], x = xs[pid] = xs[pid] || { pid: pid, v: null, min: null, max: null };
+      x.name = ch.name; x.unit = ch.unit; x.labels = ch.labels;
+      ch.samples.forEach(function (sm) {
+        if (sm[0] <= lastSeq) return;
+        x.v = sm[2]; x.min = x.min === null ? sm[2] : Math.min(x.min, sm[2]); x.max = x.max === null ? sm[2] : Math.max(x.max, sm[2]);
       });
     });
     if (st.seq > lastSeq) lastSeq = st.seq;
@@ -534,7 +566,7 @@
   function capRow(row) {
     if (!cap) return;
     if (cap.t0 === null || row.t < cap.t0) cap.t0 = row.t;
-    ['stft1', 'ltft1', 'stft2', 'ltft2', 'maf', 'rpm'].forEach(function (k) { if (row[k] !== undefined) { cap.sum[k] += row[k]; cap.cnt[k]++; } });
+    ['stft1', 'ltft1', 'stft2', 'ltft2', 'map', 'rpm'].forEach(function (k) { if (row[k] !== undefined) { cap.sum[k] += row[k]; cap.cnt[k]++; } });
     var el = row.t - cap.t0;
     $('pg_' + cap.id).style.width = Math.min(100, el / cap.secs * 100) + '%';
     if (el >= cap.secs) {
@@ -551,11 +583,11 @@
   function startCap(id) {
     if (cap) return;
     if (!state || state.status !== 'running') { showMsg('Start sampling first, then capture.'); return; }
-    cap = { id: id, secs: 15, t0: null, sum: { stft1: 0, ltft1: 0, stft2: 0, ltft2: 0, maf: 0, rpm: 0 }, cnt: { stft1: 0, ltft1: 0, stft2: 0, ltft2: 0, maf: 0, rpm: 0 } };
+    cap = { id: id, secs: 15, t0: null, sum: { stft1: 0, ltft1: 0, stft2: 0, ltft2: 0, map: 0, rpm: 0 }, cnt: { stft1: 0, ltft1: 0, stft2: 0, ltft2: 0, map: 0, rpm: 0 } };
     $('st_' + id).className = 'step active'; $('tx_' + id).textContent = 'capturing…'; $('go_' + id).disabled = true;
   }
   function renderResults() {
-    var rows = '', keys = ['stft1', 'ltft1', 'stft2', 'ltft2', 'maf', 'rpm'], names = { idle: 'Warm idle', rev: '2500 rpm hold' };
+    var rows = '', keys = ['stft1', 'ltft1', 'stft2', 'ltft2', 'map', 'rpm'], names = { idle: 'Warm idle', rev: '2500 rpm hold' };
     ['idle', 'rev'].forEach(function (id) {
       if (!results[id]) return;
       rows += '<tr><td>' + names[id] + '</td>' + keys.map(function (k) { return '<td>' + fmt(results[id][k], k === 'rpm' ? 0 : 1) + '</td>'; }).join('') + '</tr>';
@@ -564,8 +596,8 @@
     var v = $('verdict');
     if (results.idle && results.rev && results.idle.ltft1 !== null && results.rev.ltft1 !== null) {
       var i = results.idle.ltft1, r = results.rev.ltft1, txt;
-      if (i < -10 && r < -10) txt = 'Long-term trim stays strongly negative at higher airflow on both banks. That argues against a vacuum leak, which fades as airflow rises <span class="cite">[ref:playbook:rich-condition-v1#step-4]</span>. Next: check coolant temperature plausibility <span class="cite">[ref:playbook:rich-condition-v1#step-2]</span>.';
-      else if (i > 10 && r < i - 8) txt = 'Long-term trim is high at idle and falls as airflow rises: consistent with an unmetered air leak <span class="cite">[ref:playbook:rich-condition-v1#step-4]</span>.';
+      if (i < -10 && r < -10) txt = 'Long-term trim stays strongly negative at higher load (manifold pressure) on both banks. That argues against a vacuum leak, which fades as load (manifold pressure) rises <span class="cite">[ref:playbook:rich-condition-v1#step-4]</span>. Next: check coolant temperature plausibility <span class="cite">[ref:playbook:rich-condition-v1#step-2]</span>.';
+      else if (i > 10 && r < i - 8) txt = 'Long-term trim is high at idle and falls as load (manifold pressure) rises: consistent with an unmetered air leak <span class="cite">[ref:playbook:rich-condition-v1#step-4]</span>.';
       else txt = 'No large long-term trim error in this run.';
       v.innerHTML = '<b>Reading of this run</b> <span class="tag warn">draft, unreviewed</span><br>' + txt; v.style.display = 'block';
       $('st_cmp').className = 'step done';
@@ -591,15 +623,65 @@
     if (st.message) showMsg(st.message); else if (st.status !== 'disconnected') showMsg('');
     if (st.status === 'disconnected') showMsg('Lost contact with the console server. Is shadetree-ai still running?');
   }
+  var M06 = { '01': 'O2 sensor B1S1', '02': 'O2 sensor B1S2', '03': 'O2 sensor B1S3', '04': 'O2 sensor B1S4', '05': 'O2 sensor B2S1',
+    '06': 'O2 sensor B2S2', '07': 'O2 sensor B2S3', '08': 'O2 sensor B2S4', '21': 'Catalyst bank 1', '22': 'Catalyst bank 2',
+    '31': 'EGR / VVT system', '35': 'VVT bank 1', '36': 'VVT bank 2', '39': 'EVAP 0.150 in leak', '3A': 'EVAP 0.090 in leak',
+    '3B': 'EVAP 0.040 in leak', '3C': 'EVAP 0.020 in leak', '3D': 'EVAP purge flow', '41': 'O2 heater B1S1', '42': 'O2 heater B1S2',
+    '43': 'O2 heater B1S3', '44': 'O2 heater B1S4', '45': 'O2 heater B2S1', '46': 'O2 heater B2S2', '47': 'O2 heater B2S3',
+    '48': 'O2 heater B2S4', '81': 'Fuel system bank 1', '82': 'Fuel system bank 2', 'A1': 'Misfire, all cylinders' };
+  function midName(m) {
+    if (M06[m]) return M06[m];
+    var n = parseInt(m, 16) - 0xA1;
+    return n >= 1 && n <= 12 ? 'Misfire, cylinder ' + n : 'Monitor ' + m;
+  }
+  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; }
+  function renderReadings() {
+    var st = state || {}, g = $('x_grid'), ids = Object.keys(xs).sort();
+    g.textContent = '';
+    ids.forEach(function (pid) {
+      var x = xs[pid], t = el('div', 'xt'), lab = x.labels && x.v !== null ? x.labels[String(Math.round(x.v))] : null;
+      t.appendChild(el('div', 'n', x.name.replace(/_/g, ' ') + ' \u00b7 ' + pid));
+      var v = el('div', 'v', lab ? lab : (x.v === null ? '\u2014' : (Math.abs(x.v) >= 100 || x.v % 1 === 0 ? String(Math.round(x.v * 10) / 10) : x.v.toFixed(2))));
+      if (!lab && x.unit) v.appendChild(el('small', '', x.unit === 'C' ? '\u00b0C' : x.unit));
+      t.appendChild(v);
+      if (!x.labels && x.min !== null) t.appendChild(el('div', 'r', 'min ' + Math.round(x.min * 100) / 100 + ' \u00b7 max ' + Math.round(x.max * 100) / 100));
+      g.appendChild(t);
+    });
+    $('x_count').textContent = ids.length ? ids.length + ' readings' : '';
+    $('x_note').style.display = ids.length ? 'none' : '';
+    var m = st.mode06 || { read: false }, box = $('m6'), res = m.results || [];
+    box.textContent = '';
+    if (!m.read) { box.appendChild(el('p', 'note', m.note || 'Start sampling to read the test results.')); $('m6_count').textContent = ''; return; }
+    var bad = res.filter(function (r) { return r.within_limits === false; }).length;
+    $('m6_count').textContent = res.length + ' tests \u00b7 ' + bad + ' outside limits';
+    $('m6_count').className = 'tag ' + (bad ? 'warn' : 'ok');
+    var by = {};
+    res.forEach(function (r) { (by[r.mid] = by[r.mid] || []).push(r); });
+    Object.keys(by).sort().forEach(function (mid) {
+      var h = el('div', 'm6h', midName(mid) + ' '); h.appendChild(el('span', '', 'MID ' + mid)); box.appendChild(h);
+      var tb = el('table', 'm6'), hd = el('tr');
+      ['Test', 'Unit/scale id', 'Value', 'Min', 'Max', 'Result'].forEach(function (c) { hd.appendChild(el('th', '', c)); });
+      tb.appendChild(hd);
+      by[mid].forEach(function (r) {
+        var tr = el('tr');
+        [r.tid, r.uasid, r.value, r.minimum, r.maximum].forEach(function (c) { tr.appendChild(el('td', '', String(c))); });
+        var ok = r.within_limits, td = el('td');
+        td.appendChild(el('span', 'tag ' + (ok === false ? 'warn' : ok ? 'ok' : ''), ok === false ? 'OUTSIDE' : ok ? 'OK' : 'NO LIMITS'));
+        tr.appendChild(td); tb.appendChild(tr);
+      });
+      box.appendChild(tb);
+    });
+  }
   function render() {
     chips();
     var view = active();
     CH.forEach(function (c) { var e = $('v1' + c.id); if (e) e.textContent = fmt(last[c.id], c.dp); });
+    if (view === 'v6') renderReadings();
     if (view === 'v1') {
       rpmGauge(last.rpm);
       $('v1ectbar').style.width = Math.max(0, Math.min(100, ((last.ect || 20) - 20))) + '%';
       ['stft1', 'ltft1', 'stft2', 'ltft2'].forEach(function (k) { trimTag('t1' + k, last[k]); biBar('b1' + k, last[k]); });
-      trend($('c1maf'), [{ id: 'maf', color: PAL.cyan }], [0, 60]);
+      trend($('c1map'), [{ id: 'map', color: PAL.cyan }], [0, 110]);
       trend($('c1volts'), [{ id: 'volts', color: PAL.amber }], [12, 15]);
       trend($('c1trims'), [{ id: 'stft1', color: PAL.cyan }, { id: 'ltft1', color: PAL.cyan, dash: [6, 4] }, { id: 'stft2', color: PAL.amber }, { id: 'ltft2', color: PAL.amber, dash: [6, 4] }], [-25, 25]);
     } else if (view === 'v2') {
@@ -610,7 +692,7 @@
       }).join('');
       trend($('s_rpm'), [{ id: 'rpm', color: PAL.cyan }], [0, 4000]);
       trend($('s_trim'), [{ id: 'stft1', color: PAL.cyan }, { id: 'ltft1', color: PAL.cyan, dash: [6, 4] }, { id: 'stft2', color: PAL.amber }, { id: 'ltft2', color: PAL.amber, dash: [6, 4] }], [-25, 25]);
-      trend($('s_air'), [{ id: 'maf', color: PAL.cyan }, { id: 'ect', color: PAL.amber, dash: [6, 4] }], [0, 100]);
+      trend($('s_air'), [{ id: 'map', color: PAL.cyan }, { id: 'ect', color: PAL.amber, dash: [6, 4] }], [0, 110]);
       trend($('s_volt'), [{ id: 'volts', color: PAL.cyan }], [12, 15]);
     } else if (view === 'v4') {
       renderCabinet();
@@ -709,7 +791,7 @@
     $('a_codes').innerHTML = r.list.length ? codeRows(r.list, 'cab') : '<div class="cnone' + (r.c.read ? '' : ' wait') + '">' + codeEmpty(r.c, r.live) + '</div>';
     lamp('a_lp_mil', r.mil, r.mil ? 'ON' : (r.c.read ? 'off' : 'unknown'), 'a_lp_milt');
     seven($('a_rpm'), last.rpm, 4, 0, '#ff3b2b', 96); seven($('a_ect'), last.ect, 3, 0, '#ffb62e', 64);
-    seven($('a_volts'), last.volts, 4, 2, '#3fe06a', 64); seven($('a_maf'), last.maf, 4, 1, '#ffb62e', 64);
+    seven($('a_volts'), last.volts, 4, 2, '#3fe06a', 64); seven($('a_map'), last.map, 4, 0, '#ffb62e', 64);
     ['stft1', 'ltft1', 'stft2', 'ltft2'].forEach(function (k) { $('a_l_' + k).innerHTML = ledBar(last[k], 21); $('a_v_' + k).textContent = last[k] === null ? '' : (last[k] > 0 ? '+' : '') + last[k].toFixed(1); });
     lamp('a_lp_l1', l1, l1 ? trimText(last.ltft1) : 'within range', 'a_lp_l1t'); lamp('a_lp_l2', l2, l2 ? trimText(last.ltft2) : 'within range', 'a_lp_l2t');
     lamp('a_lp_ect', last.ect !== null && last.ect < 60, last.ect !== null && last.ect < 60 ? 'reads cold' : 'warm', 'a_lp_ectt');
@@ -724,7 +806,7 @@
     var lv = $('h_live'); lv.textContent = { running: 'LIVE', stopped: 'STOPPED', error: 'ERROR', idle: 'IDLE', disconnected: 'NO LINK' }[st.status] || '--'; lv.className = 'hlive ' + (st.status === 'running' ? 'on' : 'off');
     $('h_codes').innerHTML = r.list.length ? codeRows(r.list, 'hh') + '<p class="cfoot">Meanings are plain-words drafts, unreviewed. Hints: general knowledge, unverified.</p>' : '<div class="cnone' + (r.c.read ? '' : ' wait') + '" style="padding:150px 0">' + codeEmpty(r.c, r.live) + '</div>';
     seven($('h_rpm'), last.rpm, 4, 0, '#ff3b2b', 84); seven($('h_ect'), last.ect, 3, 0, '#ffb62e', 64);
-    seven($('h_volts'), last.volts, 4, 2, '#3fe06a', 64); seven($('h_maf'), last.maf, 4, 1, '#ffb62e', 64);
+    seven($('h_volts'), last.volts, 4, 2, '#3fe06a', 64); seven($('h_map'), last.map, 4, 0, '#ffb62e', 64);
     ['stft1', 'ltft1', 'stft2', 'ltft2'].forEach(function (k) { $('h_l_' + k).innerHTML = ledBar(last[k], 21); $('h_v_' + k).textContent = last[k] === null ? '' : (last[k] > 0 ? '+' : '') + last[k].toFixed(1); });
     $('h_status').innerHTML = ledLamp('', r.mil, 'red', 'Check engine (MIL)', r.mil ? 'ON' : (r.c.read ? 'off' : 'unknown')) +
       ledLamp('', l1, 'red', 'LTFT bank 1', l1 ? trimText(last.ltft1) : 'within range') + ledLamp('', l2, 'red', 'LTFT bank 2', l2 ? trimText(last.ltft2) : 'within range') +
@@ -794,7 +876,7 @@
       var r = cv.getBoundingClientRect(), x = e.clientX - r.left, l = 40, iw = r.width - 48;
       if (x < l || x > l + iw) { cur.style.display = tip.style.display = 'none'; return; }
       var t = tNow - (1 - (x - l) / iw) * SPAN, id = cv.id;
-      var parts = id === 's_rpm' ? ['rpm'] : id === 's_trim' ? ['stft1', 'ltft1', 'stft2', 'ltft2'] : id === 's_air' ? ['maf', 'ect'] : ['volts'];
+      var parts = id === 's_rpm' ? ['rpm'] : id === 's_trim' ? ['stft1', 'ltft1', 'stft2', 'ltft2'] : id === 's_air' ? ['map', 'ect'] : ['volts'];
       var lines = parts.map(function (p) {
         var c = CH.filter(function (q) { return q.id === p; })[0], b = buf[p], best = null;
         b.forEach(function (s) { if (best === null || Math.abs(s.t - t) < Math.abs(best.t - t)) best = s; });

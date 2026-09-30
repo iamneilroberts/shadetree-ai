@@ -30,10 +30,16 @@ ENCODERS: dict[str, Callable[[float], bytes]] = {
     "0C": lambda v: _u16(round(v * 4)),
     "05": lambda v: bytes([_clamp(round(v + 40), 0, 255)]),
     "06": _trim, "07": _trim, "08": _trim, "09": _trim,
-    "10": lambda v: _u16(round(v * 100)),
+    "0B": lambda v: bytes([_clamp(round(v), 0, 255)]),
+    "04": lambda v: bytes([_clamp(round(v * 255 / 100), 0, 255)]),
+    "0D": lambda v: bytes([_clamp(round(v), 0, 255)]),
+    "0E": lambda v: bytes([_clamp(round((v + 64) * 2), 0, 255)]),
+    "11": lambda v: bytes([_clamp(round(v * 255 / 100), 0, 255)]),
+    "3C": lambda v: _u16(round((v + 40) * 10)),
+    "44": lambda v: _u16(round(v * 65536 / 2)),
     "42": lambda v: _u16(round(v * 1000)),
 }
-_KEY = {"0C": "rpm", "05": "ect", "06": "s1", "07": "l1", "08": "s2", "09": "l2", "10": "maf", "42": "volts"}
+_KEY = {"0C": "rpm", "05": "ect", "06": "s1", "07": "l1", "08": "s2", "09": "l2", "0B": "map", "04": "load", "0D": "speed", "0E": "timing", "11": "throttle", "3C": "cat", "44": "lam", "42": "volts"}
 
 
 # (stored, pending) codes as 2-byte DTCs, and whether the lamp is on
@@ -90,21 +96,39 @@ class SimPort:
         else:
             l1, l2 = 1.2 + self._rnd() * 0.4, 0.8 + self._rnd() * 0.4
             s1, s2 = 3 * math.sin(t * 2.3) + self._rnd(), 3 * math.sin(t * 2.0 + 1) + self._rnd()
-        maf = 3.2 + load * 42 + (1.6 if self.scenario == "rich" else 0) + self._rnd() * 0.5
         self._values = {"rpm": self._rpm, "ect": self._ect, "s1": s1, "l1": l1, "s2": s2, "l2": l2,
-                        "maf": maf, "volts": 13.9 + self._rnd() * 0.12}
+                        "map": 28 + load * 70 + (3 if self.scenario == "rich" else 0) + self._rnd() * 0.8, "volts": 13.9 + self._rnd() * 0.12,
+                        "load": 18 + load * 62 + self._rnd() * 0.6, "speed": 0, "timing": 12 + load * 18 + self._rnd() * 0.4,
+                        "throttle": 12 + load * 30 + self._rnd() * 0.3, "cat": 480 + load * 120 + self._rnd(),
+                        "lam": 1.0 + self._rnd() * 0.004}
+
+    @staticmethod
+    def _bitmap(sid: str, base: int, pids: set[int]) -> str:
+        bits = 0
+        for i in range(32):
+            if base + 1 + i in pids or (i == 31 and any(p > base + 32 for p in pids)):
+                bits |= 1 << (31 - i)
+        return f"{sid} {base:02X} " + " ".join(f"{b:02X}" for b in bits.to_bytes(4, "big"))
 
     def write(self, data: bytes) -> None:
         cmd = data.decode("ascii").rstrip("\r")
         if cmd == "010C":
             self._advance()  # one model step per sweep
-        if cmd.startswith("01") and len(cmd) == 4 and cmd != "0101":
+        if cmd in ("0100", "0120", "0140"):
+            self._pending = self._bitmap("41", int(cmd[2:], 16), {int(k, 16) for k in ENCODERS}) + "\r"
+        elif cmd.startswith("01") and len(cmd) == 4 and cmd != "0101":
             pid = cmd[2:]
             if pid in ENCODERS:
                 raw = ENCODERS[pid](self._values[_KEY[pid]])
                 self._pending = f"41 {pid} " + " ".join(f"{b:02X}" for b in raw) + "\r"
             else:
                 self._pending = "NO DATA\r"
+        elif cmd in ("0600", "0620"):
+            self._pending = "46 00 80 00 00 01\r" if cmd == "0600" else "46 20 80 00 00 00\r"
+        elif cmd == "0601":
+            self._pending = "46 01 80 14 00 C7 00 00 00 C8 01 87 14 00 9B 00 00 01 0E\r"
+        elif cmd == "0621":
+            self._pending = "46 21 A1 0B 00 00 00 00 0B B8\r"
         elif cmd in ("03", "07", "0A"):
             stored, pending = _CODES[self.scenario]
             self._pending = _dtc_reply({"03": 0x43, "07": 0x47, "0A": 0x4A}[cmd], {"03": stored, "07": pending, "0A": []}[cmd]) + "\r"

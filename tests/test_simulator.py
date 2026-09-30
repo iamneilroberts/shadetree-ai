@@ -6,7 +6,7 @@ from obd_reader.transport import Transport
 
 from conftest import FakeClock
 
-PIDS8 = ["0C", "05", "06", "07", "08", "09", "10", "42"]
+PIDS8 = ["0C", "05", "06", "07", "08", "09", "0B", "42"]
 
 
 def sweep(sim, t):
@@ -38,7 +38,7 @@ def test_every_scenario_stays_in_physical_ranges():
                 assert 400 <= v["0C"] <= 3200 and 20 <= v["05"] <= 110
                 for p in ("06", "07", "08", "09"):
                     assert -30 <= v[p] <= 30
-                assert 0 <= v["10"] <= 80 and 11 <= v["42"] <= 15
+                assert 20 <= v["0B"] <= 110 and 11 <= v["42"] <= 15
 
 
 def test_rich_scenario_reads_a_cold_coolant_and_negative_trims_at_idle_and_at_2500():
@@ -48,7 +48,7 @@ def test_rich_scenario_reads_a_cold_coolant_and_negative_trims_at_idle_and_at_25
         assert all(r["07"] < -15 and r["09"] < -15 for r in rows)
 
 
-def test_lean_scenario_trims_fade_as_airflow_rises():
+def test_lean_scenario_trims_fade_as_load_rises():
     idle, rev = run("lean")[-10:], run("lean", rev=True)[-10:]
     assert all(r["07"] > 10 for r in idle) and all(r["07"] < 8 for r in rev)
 
@@ -68,7 +68,7 @@ def test_non_pid_commands_and_unsupported_pids():
     assert t.send("ATE0") == ["OK"]
     assert t.send("ATDP") == ["SIMULATED (no car)"]
     assert t.send("STI") == ["?"]
-    assert t.send("0111") == ["NO DATA"]
+    assert t.send("0110") == ["NO DATA"]
 
 
 def test_unknown_scenario_is_rejected():
@@ -95,3 +95,16 @@ def test_lean_car_codes_and_healthy_car_has_none():
     assert _codes("lean", "07") == ["47 01 01 01"]
     assert _codes("healthy", "03") == ["43 00"]
     assert _codes("healthy", "0101")[0].startswith("41 01 00")
+
+
+def test_support_bitmaps_chain_to_the_next_page_and_name_the_extra_readings():
+    t = Transport(SimPort())
+    first = t.send("0100")[0].split()
+    assert first[:2] == ["41", "00"] and int(first[5], 16) & 1  # more pages follow
+    page2 = bytes.fromhex("".join(t.send("0120")[0].split()[2:]))
+    assert page2[-1] & 1  # PID 40 page is supported too (control module voltage, equivalence ratio)
+
+
+def test_mode06_answers_two_monitors():
+    t = Transport(SimPort())
+    assert t.send("0600")[0].startswith("46 00") and t.send("0621")[0].startswith("46 21")

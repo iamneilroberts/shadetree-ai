@@ -10,7 +10,7 @@ from obd_reader.capture import capture
 from obd_reader.console import ConsoleService
 from obd_reader.elm import parse_all
 from obd_reader.live import downsample, sample, summarize, validate_pids
-from obd_reader.mode06 import parse_results, supported_mids
+from obd_reader.mode06 import read_all
 from obd_reader.pids import PIDS, decode_pid, pid_name
 from obd_reader.session import Session
 from obd_reader.snapshot import Snapshot
@@ -26,7 +26,6 @@ TOOL_NAMES = OFFLINE_TOOLS | LIVE_TOOLS
 _MID_RE = re.compile(r"[0-9A-Fa-f]{2}")
 _LABEL_RE = re.compile(r"[a-z0-9-]{1,40}")
 _PROTO_RE = re.compile(r"[0-9]")  # 0 = automatic, 1-9 = a fixed protocol; A-C (J1939, user CAN) are refused
-MAX_MODE06_MIDS = 40
 
 
 class NoSnapshotError(LookupError):
@@ -198,30 +197,14 @@ def build_tools(session: Session) -> dict[str, Callable]:
         return {"duration_s": ls.duration_s, "hz": ls.rate_hz, "series": _series_out(ls), "notes": notes}
 
     def mode06_tests(mid: str | None = None) -> dict:
-        """Read Mode 06 on-board test results (raw values; format unverified on hardware). mid is a 2-digit hex monitor id, or omit for all supported."""
+        """Read Mode 06 on-board test results (raw values, no unit scaling). mid is a 2-digit hex monitor id, or omit for all supported."""
         if mid is not None and not _MID_RE.fullmatch(mid):
             raise ValueError("mid must be 2 hex digits")
         with session.connection("mode06") as t:
-            if mid is None:
-                mids: set[str] = set()
-                base = 0x00
-                while base <= 0xE0:
-                    found = supported_mids(parse_all(t.send(f"06{base:02X}"), 0x46), base)
-                    if not found:
-                        break
-                    mids |= found
-                    if f"{base + 0x20:02X}" not in found:
-                        break
-                    base += 0x20
-                wanted = sorted(mids)[:MAX_MODE06_MIDS]
-            else:
-                mids, wanted = {mid.upper()}, [mid.upper()]
-            results = []
-            for m in wanted:
-                for payload in parse_all(t.send(f"06{m}"), 0x46):
-                    results += [r.model_dump() for r in parse_results(payload)]
-        return {"supported_mids": sorted(mids), "results": results,
-                "note": "Mode 06 layout is unverified on real hardware; values are raw integers with no unit scaling."}
+            mids, res = read_all(t, None if mid is None else [mid.upper()])
+            results = [r.model_dump() for r in res]
+        return {"supported_mids": list(mids), "results": results,
+                "note": "values are raw integers with no unit scaling; layout verified on one 2024 Ridgeline only."}
 
     # ---- live console: one shared sampler, viewed by a web page and by Claude ---------------------
 

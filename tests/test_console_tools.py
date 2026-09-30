@@ -54,7 +54,7 @@ def test_console_data_matches_what_the_page_sees(tmp_path):  # Review Focus 5
         st = get_state(out["url"])
         assert data["status"] == "running" and data["seq"] <= st["seq"]
         assert data["channels"]["0C"]["name"] == "engine_rpm" and data["channels"]["0C"]["stats"]["n"] >= 8
-        assert set(data["channels"]) == {"0C", "05", "06", "07", "08", "09", "10", "42"}
+        assert {"0C", "05", "06", "07", "08", "09", "0B", "42"} <= set(data["channels"]) and len(data["channels"]) <= 16
     finally:
         ConsoleService.shutdown_all()
 
