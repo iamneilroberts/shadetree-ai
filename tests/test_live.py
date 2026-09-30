@@ -65,3 +65,13 @@ def test_downsample_keeps_endpoints_and_caps_points():  # Review Focus 5
     out = downsample(pts)
     assert len(out) <= MAX_POINTS and out[0] == pts[0] and out[-1] == pts[-1]
     assert downsample(pts[:10]) == pts[:10]
+
+
+def test_read_pid_value_decodes_or_returns_none():
+    from obd_reader.live import read_pid_value
+
+    port = ScriptedPort({"0C": "1AF8"})
+    t = Transport(port)
+    assert read_pid_value(t, "0C") == 1726.0
+    assert read_pid_value(t, "0D") is None  # ECU answers NO DATA
+    assert port.writes == ["010C", "010D"]

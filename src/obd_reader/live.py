@@ -37,6 +37,15 @@ def validate_pids(pids: list[str]) -> list[str]:
     return out
 
 
+def read_pid_value(transport: Transport, pid: str) -> float | int | None:
+    """One Mode 01 request for an already-validated PID; None if no ECU answered it."""
+    d = PIDS[pid]
+    for payload in parse_all(transport.send(f"01{pid}"), 0x41):
+        if len(payload) >= 2 + d.nbytes and payload[1] == int(pid, 16):
+            return d.decode(payload[2 : 2 + d.nbytes])
+    return None
+
+
 def sample(
     transport: Transport,
     pids: list[str],
@@ -58,11 +67,9 @@ def sample(
         if t > seconds:
             break
         for p in pids:
-            d = PIDS[p]
-            for payload in parse_all(transport.send(f"01{p}"), 0x41):
-                if len(payload) >= 2 + d.nbytes and payload[1] == int(p, 16):
-                    series[p].samples.append((round(t, 3), d.decode(payload[2 : 2 + d.nbytes])))
-                    break
+            v = read_pid_value(transport, p)
+            if v is not None:
+                series[p].samples.append((round(t, 3), v))
         if any(s.samples for s in series.values()):
             silent = 0
         else:
