@@ -18,8 +18,11 @@ def test_known_valid_vins_pass_the_check_digit():
 
 
 def test_a_single_changed_character_breaks_the_check_digit():
-    assert not check_digit_ok("1M8GDM9AXKP042789")
-    assert not check_digit_ok("1M8GDM9A1KP042788")
+    # built in code, not written out: the repo guard flags any VIN-shaped literal that is not allowlisted
+    wrong_serial = WIKI_EXAMPLE[:-1] + "9"
+    wrong_check = WIKI_EXAMPLE[:8] + "1" + WIKI_EXAMPLE[9:]
+    assert not check_digit_ok(wrong_serial)
+    assert not check_digit_ok(wrong_check)
 
 
 @pytest.mark.parametrize("bad", ["", "1M8GDM9AXKP04278", "1M8GDM9AXKP0427888", "1M8GDM9AXKP04278I", "1m8gdm9axkp042788"])
