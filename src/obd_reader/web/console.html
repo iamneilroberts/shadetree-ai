@@ -238,6 +238,21 @@
   #v6 table.m6 th:first-child, #v6 table.m6 td:first-child { text-align: left; }
   #v6 .m6h { font: 700 13px var(--cond); letter-spacing: .06em; margin: 10px 0 4px; }
   #v6 .m6h span { color: var(--muted); font-weight: 400; font-family: var(--mono); letter-spacing: 0; }
+  .q { width: 22px; height: 22px; border-radius: 50%; border: 1px solid var(--line); background: var(--panel2); color: var(--muted);
+       font: 700 12px/1 var(--cond); cursor: pointer; padding: 0; }
+  .q:hover, .q:focus-visible { color: var(--ink); border-color: var(--muted); }
+  #v6 .xt { position: relative; }
+  #v6 .xt .q { position: absolute; top: 6px; right: 6px; }
+  #v6 .xt .n { padding-right: 26px; }
+  #v6 .m6h .q { margin-left: 8px; vertical-align: middle; }
+  #helpPanel { position: fixed; z-index: 50; width: min(360px, calc(100vw - 24px)); background: var(--panel2); border: 1px solid var(--muted);
+               border-radius: 8px; padding: 12px 14px; box-shadow: 0 10px 30px rgba(0,0,0,.55); display: none; font-size: 12.5px; }
+  #helpPanel.open { display: block; }
+  #helpPanel h4 { margin: 0 0 6px; font: 700 14px var(--cond); letter-spacing: .06em; text-transform: uppercase; }
+  #helpPanel h5 { margin: 10px 0 3px; font: 700 11px var(--cond); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  #helpPanel p { margin: 0; } #helpPanel ul { margin: 0; padding-left: 18px; }
+  #helpPanel .live { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--line); }
+  #helpPanel .draft { margin-top: 8px; color: var(--muted); font-size: 11px; }
 </style>
 </head>
 <body>
@@ -444,6 +459,7 @@
 </main>
 <p class="foot">Values come from one shared sampler, so Claude and this page see the same numbers. Nothing on this page can send a command to the car. The &plusmn;10 % trim window used for the OUTSIDE tag is general knowledge, unverified. The guided test is a draft, unreviewed playbook.</p>
 
+<div id="helpPanel" role="dialog" aria-live="polite"></div>
 <script>
 (function () {
   'use strict';
@@ -487,14 +503,16 @@
         (rows[s[0]] = rows[s[0]] || { t: s[1] })[c.id] = s[2];
       });
     });
-    Object.keys(st.channels).forEach(function (pid) {     // readings outside the fixed channels: keep latest, min, max
+    Object.keys(st.channels).forEach(function (pid) {     // readings outside the fixed channels: keep latest, min, max and the last minute
       if (PIDS.indexOf(pid) >= 0) return;
-      var ch = st.channels[pid], x = xs[pid] = xs[pid] || { pid: pid, v: null, min: null, max: null };
+      var ch = st.channels[pid], x = xs[pid] = xs[pid] || { pid: pid, v: null, min: null, max: null, hist: [] };
       x.name = ch.name; x.unit = ch.unit; x.labels = ch.labels;
       ch.samples.forEach(function (sm) {
         if (sm[0] <= lastSeq) return;
         x.v = sm[2]; x.min = x.min === null ? sm[2] : Math.min(x.min, sm[2]); x.max = x.max === null ? sm[2] : Math.max(x.max, sm[2]);
+        x.hist.push({ t: sm[1], v: sm[2] });
       });
+      while (x.hist.length && x.hist[0].t < tNow - SPAN - 2) x.hist.shift();
     });
     if (st.seq > lastSeq) lastSeq = st.seq;
     CH.forEach(function (c) { var b = buf[c.id]; while (b.length && b[0].t < tNow - SPAN - 2) b.shift(); });
@@ -637,22 +655,111 @@
     var n = parseInt(m, 16) - 0xA1;
     return n >= 1 && n <= 12 ? 'Misfire, cylinder ' + n : 'Monitor ' + m;
   }
+  function midGroup(m) {
+    var n = parseInt(m, 16);
+    if (n >= 0x01 && n <= 0x08) return 'o2_sensor';
+    if (n >= 0x41 && n <= 0x48) return 'o2_heater';
+    if (n === 0x21 || n === 0x22) return 'catalyst';
+    if (n === 0x31 || n === 0x35 || n === 0x36) return 'egr_vvt';
+    if (n >= 0x39 && n <= 0x3D) return 'evap';
+    if (n === 0x81 || n === 0x82) return 'fuel_system';
+    if (n >= 0xA1 && n <= 0xAD) return 'misfire';
+    return 'other';
+  }
   function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; }
+  /* ---------- reading lookups, tile state and help popups ---------- */
+  var HELP = { pids: {}, mode06: {} }, helpKey = null;
+  function chFor(pid) { for (var i = 0; i < CH.length; i++) if (CH[i].pid === pid) return CH[i]; return null; }
+  function latest(pid) { var c = chFor(pid); if (c) return last[c.id]; return xs[pid] ? xs[pid].v : null; }
+  function series(pid) { var c = chFor(pid); return c ? buf[c.id] : (xs[pid] && xs[pid].hist) || []; }
+  function unitOf(pid) { var c = chFor(pid), u = c ? c.unit : xs[pid] && xs[pid].unit; return u === 'C' ? '°C' : (u || ''); }
+  function pidName(pid) { var c = chFor(pid); return c ? c.name : xs[pid] ? xs[pid].name.replace(/_/g, ' ') : pid; }
+  function fmtAny(v) { return Math.abs(v) >= 100 || v % 1 === 0 ? String(Math.round(v * 10) / 10) : v.toFixed(1); }
+  function winMedian(pid) {   // median of the last 10 s, so a brief spike does not flip a tile
+    var s = series(pid).filter(function (p) { return p.t >= tNow - 10; });
+    if (!s.length) return null;
+    var v = s.map(function (p) { return p.v; }).sort(function (a, b) { return a - b; }), m = v.length >> 1;
+    return v.length % 2 ? v[m] : (v[m - 1] + v[m]) / 2;
+  }
+  function watchFor(pid) {
+    var e = HELP.pids[pid]; if (!e || typeof e !== 'object') return null;
+    var rpm = winMedian('0C');
+    return pid === '42' && rpm !== null && rpm < 300 && e.watch_engine_off ? e.watch_engine_off : (e.watch || null);
+  }
+  function judge(v, w) {
+    if (v === null || v === undefined) return 'none';
+    if (!w) return 'neutral';
+    function inside(r) { return (r[0] === null || v >= r[0]) && (r[1] === null || v <= r[1]); }
+    return inside(w.ok) ? 'ok' : inside(w.out) ? 'watch' : 'out';
+  }
+  // update the nodes in box by key instead of rebuilding them: a ? button replaced between mouse-down and mouse-up loses the click
+  function keyed(box, items, make, update) {
+    var nodes = box._nodes = box._nodes || {}, order = items.map(function (i) { return i.key; }), sig = order.join('|');
+    Object.keys(nodes).forEach(function (k) { if (order.indexOf(k) < 0) { box.removeChild(nodes[k].root); delete nodes[k]; box._sig = null; } });
+    items.forEach(function (it) { if (!nodes[it.key]) { nodes[it.key] = make(it); box._sig = null; } update(nodes[it.key], it); });
+    if (box._sig !== sig) { order.forEach(function (k) { box.appendChild(nodes[k].root); }); box._sig = sig; }
+  }
+  function qbtn(key) { var b = el('button', 'q', '?'); b.type = 'button'; b.setAttribute('data-help', key); b.setAttribute('aria-label', 'Help'); return b; }
+  function helpEntry(key) {
+    var m = key.indexOf('m06:') === 0, e = m ? HELP.mode06[key.slice(4)] : HELP.pids[key];
+    if (e && typeof e === 'object') return e;
+    return { title: m ? 'On-board test' : pidName(key), measures: 'No bundled help for this reading yet.', use: [], typical: '', status: ['model_drafted', 'unreviewed'] };
+  }
+  function liveLine(key) {
+    if (key.indexOf('m06:') === 0) return '';
+    var v = latest(key); if (v === null || v === undefined) return 'not reported by this car';
+    var u = unitOf(key), s = judge(winMedian(key), watchFor(key));
+    return 'now ' + fmtAny(v) + (u ? ' ' + u : '') + (s === 'ok' ? ': normal' : s === 'watch' ? ': watch' : s === 'out' ? ': out of range' : '');
+  }
+  function closeHelp() { $('helpPanel').className = ''; helpKey = null; }
+  function openHelp(btn, key) {
+    var h = helpEntry(key), box = $('helpPanel');
+    box.textContent = '';
+    box.appendChild(el('h4', '', String(h.title)));
+    box.appendChild(el('h5', '', 'What it measures')); box.appendChild(el('p', '', String(h.measures)));
+    if (Array.isArray(h.use) && h.use.length) {
+      box.appendChild(el('h5', '', 'How to use it'));
+      var ul = el('ul'); h.use.forEach(function (x) { ul.appendChild(el('li', '', String(x))); }); box.appendChild(ul);
+    }
+    if (h.typical) { box.appendChild(el('h5', '', 'Typical / worry if')); box.appendChild(el('p', '', String(h.typical))); }
+    var lv = liveLine(key); if (lv) box.appendChild(el('div', 'live', lv));
+    if (Array.isArray(h.status) && h.status.indexOf('unreviewed') >= 0) box.appendChild(el('div', 'draft', 'Wording drafted by the model, not yet reviewed.'));
+    box.className = 'open'; helpKey = key;
+    var r = btn.getBoundingClientRect(), w = box.offsetWidth || 360, hgt = box.offsetHeight || 0, below = r.bottom + 8;
+    box.style.left = Math.max(12, Math.min(r.left, window.innerWidth - w - 12)) + 'px';
+    box.style.top = (below + hgt > window.innerHeight ? Math.max(12, r.top - hgt - 8) : below) + 'px';
+  }
+  document.addEventListener('click', function (e) {
+    var b = e.target && e.target.closest ? e.target.closest('.q') : null;
+    if (b) { var k = b.getAttribute('data-help'); if (helpKey === k) closeHelp(); else openHelp(b, k); return; }
+    if (helpKey !== null && !$('helpPanel').contains(e.target)) closeHelp();
+  });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeHelp(); });
+  function loadHelp() {
+    fetch(api('/api/help'))
+      .then(function (r) { if (!r.ok) throw new Error(String(r.status)); return r.json(); })
+      .then(function (j) { if (j && j.pids && typeof j.pids === 'object' && j.mode06 && typeof j.mode06 === 'object') { HELP = j; render(); } })
+      .catch(function () {});
+  }
+  function makeX(it) {
+    var root = el('div', 'xt'), n = el('div', 'n'), v = el('div', 'v'), r = el('div', 'r');
+    root.appendChild(qbtn(it.key)); root.appendChild(n); root.appendChild(v); root.appendChild(r);
+    return { root: root, n: n, v: v, r: r };
+  }
+  function updX(nd, it) {
+    var x = it.x, lab = x.labels && x.v !== null ? x.labels[String(Math.round(x.v))] : null;
+    nd.n.textContent = x.name.replace(/_/g, ' ') + ' \u00b7 ' + it.key;
+    nd.v.textContent = lab ? lab : (x.v === null ? '\u2014' : (Math.abs(x.v) >= 100 || x.v % 1 === 0 ? String(Math.round(x.v * 10) / 10) : x.v.toFixed(2)));
+    if (!lab && x.unit) nd.v.appendChild(el('small', '', x.unit === 'C' ? '\u00b0C' : x.unit));
+    nd.r.textContent = !x.labels && x.min !== null ? 'min ' + Math.round(x.min * 100) / 100 + ' \u00b7 max ' + Math.round(x.max * 100) / 100 : '';
+  }
   function renderReadings() {
-    var st = state || {}, g = $('x_grid'), ids = Object.keys(xs).sort();
-    g.textContent = '';
-    ids.forEach(function (pid) {
-      var x = xs[pid], t = el('div', 'xt'), lab = x.labels && x.v !== null ? x.labels[String(Math.round(x.v))] : null;
-      t.appendChild(el('div', 'n', x.name.replace(/_/g, ' ') + ' \u00b7 ' + pid));
-      var v = el('div', 'v', lab ? lab : (x.v === null ? '\u2014' : (Math.abs(x.v) >= 100 || x.v % 1 === 0 ? String(Math.round(x.v * 10) / 10) : x.v.toFixed(2))));
-      if (!lab && x.unit) v.appendChild(el('small', '', x.unit === 'C' ? '\u00b0C' : x.unit));
-      t.appendChild(v);
-      if (!x.labels && x.min !== null) t.appendChild(el('div', 'r', 'min ' + Math.round(x.min * 100) / 100 + ' \u00b7 max ' + Math.round(x.max * 100) / 100));
-      g.appendChild(t);
-    });
+    var st = state || {}, ids = Object.keys(xs).sort();
+    keyed($('x_grid'), ids.map(function (p) { return { key: p, x: xs[p] }; }), makeX, updX);
     $('x_count').textContent = ids.length ? ids.length + ' readings' : '';
     $('x_note').style.display = ids.length ? 'none' : '';
     var m = st.mode06 || { read: false }, box = $('m6'), res = m.results || [];
+    var msig = JSON.stringify(m); if (box._msig === msig) return; box._msig = msig;   // results do not change after the read; rebuilding would drop clicks
     box.textContent = '';
     if (!m.read) { box.appendChild(el('p', 'note', m.note || 'Start sampling to read the test results.')); $('m6_count').textContent = ''; return; }
     var bad = res.filter(function (r) { return r.within_limits === false; }).length;
@@ -661,7 +768,7 @@
     var by = {};
     res.forEach(function (r) { (by[r.mid] = by[r.mid] || []).push(r); });
     Object.keys(by).sort().forEach(function (mid) {
-      var h = el('div', 'm6h', midName(mid) + ' '); h.appendChild(el('span', '', 'MID ' + mid)); box.appendChild(h);
+      var h = el('div', 'm6h', midName(mid) + ' '); h.appendChild(el('span', '', 'MID ' + mid)); h.appendChild(qbtn('m06:' + midGroup(mid))); box.appendChild(h);
       var tb = el('table', 'm6'), hd = el('tr');
       ['Test', 'Unit/scale id', 'Value', 'Min', 'Max', 'Result'].forEach(function (c) { hd.appendChild(el('th', '', c)); });
       tb.appendChild(hd);
@@ -896,6 +1003,7 @@
   window.addEventListener('resize', render);
   setInterval(poll, 400);
   poll();
+  loadHelp();
 })();
 </script>
 </body>

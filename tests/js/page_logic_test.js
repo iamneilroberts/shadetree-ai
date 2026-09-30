@@ -3,37 +3,54 @@ const fs = require('fs'), vm = require('vm'), assert = require('assert');
 const html = fs.readFileSync(process.argv[2], 'utf8');
 const js = html.match(/<script>([\s\S]*?)<\/script>/)[1];
 
-function makeEnv(states, viewId = 'v1') {
-  const els = {}, handlers = {}, posts = [];
-  function el(id) {
-    if (!els[id]) els[id] = {
-      id, style: {}, className: '', textContent: '', innerHTML: '', hidden: false, dataset: {}, disabled: false,
-      classList: { toggle() {} }, getAttribute() { return null; }, clientWidth: 0, clientHeight: 0,
-      addEventListener(t, fn) { handlers[id + ':' + t] = fn; }, querySelector() { return null; }
-    };
-    return els[id];
-  }
+function makeNode(id, handlers) {
+  const n = {
+    id, style: {}, className: '', innerHTML: '', hidden: false, dataset: {}, disabled: false, type: '',
+    clientWidth: 0, clientHeight: 0, offsetWidth: 0, offsetHeight: 0, children: [], attrs: {}, _t: '',
+    classList: { toggle() {} },
+    setAttribute(k, v) { this.attrs[k] = String(v); },
+    getAttribute(k) { return k in this.attrs ? this.attrs[k] : null; },
+    appendChild(c) { this.children = this.children.filter(x => x !== c); this.children.push(c); return c; },
+    removeChild(c) { this.children = this.children.filter(x => x !== c); return c; },
+    contains(t) { return t === this || this.children.some(c => c.contains(t)); },
+    closest(sel) { return sel[0] === '.' && this.className.split(' ').includes(sel.slice(1)) ? this : null; },
+    getBoundingClientRect() { return { left: 0, top: 0, bottom: 0, right: 0 }; },
+    addEventListener(t, fn) { handlers[id + ':' + t] = fn; }, querySelector() { return null; }
+  };
+  Object.defineProperty(n, 'textContent', { get() { return this._t; }, set(v) { this._t = v; this.children = []; } });
+  return n;
+}
+
+function makeEnv(states, viewId = 'v1', help = null) {
+  const els = {}, handlers = {}, docHandlers = {}, posts = [];
+  function el(id) { return els[id] || (els[id] = makeNode(id, handlers)); }
   let timer = null, i = 0, now = 0;
   const sandbox = {
-    console, URLSearchParams, Promise, Math, Object, Array, Number, String, JSON, Date,
-    document: { getElementById: el, querySelectorAll: () => [], querySelector: () => ({ id: viewId }) },
-    window: { addEventListener() {}, devicePixelRatio: 1 },
+    console, URLSearchParams, Promise, Math, Object, Array, Number, String, JSON, Date, parseInt, isFinite,
+    document: { getElementById: el, querySelectorAll: () => [], querySelector: () => ({ id: viewId }),
+                createElement: () => makeNode('new', handlers), addEventListener(t, fn) { docHandlers[t] = fn; } },
+    window: { addEventListener() {}, devicePixelRatio: 1, innerWidth: 500, innerHeight: 800 },
     location: { search: '?t=abc', hash: '' }, history: { replaceState() {} },
     performance: { now: () => now },
     setInterval: (fn) => { timer = fn; }, encodeURIComponent,
     fetch: (url, opts) => {
       if (opts && opts.method === 'POST') { posts.push({ url, body: JSON.parse(opts.body) }); return Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true, path: '/x/runs/a-run.json' }) }); }
+      if (/\/api\/help/.test(url)) return Promise.resolve(help ? { ok: true, json: () => Promise.resolve(help) } : { ok: false, json: () => Promise.resolve({}) });
       const st = states[Math.min(i++, states.length - 1)];
       return Promise.resolve({ ok: true, json: () => Promise.resolve(st) });
     }
   };
   vm.runInNewContext(js, sandbox);
   return {
-    el, handlers, posts, sandbox,
+    el, handlers, docHandlers, posts, sandbox,
     timer() { timer(); },
     async tick() { timer(); await new Promise(r => setImmediate(r)); await new Promise(r => setImmediate(r)); }
   };
 }
+
+function walk(n, f) { f(n); (n.children || []).forEach(c => walk(c, f)); }
+function flat(n) { let s = n.textContent || ''; (n.children || []).forEach(c => { s += ' ' + flat(c); }); return s; }
+function findQ(root, key) { let r = null; walk(root, n => { if (n.className === 'q' && n.getAttribute('data-help') === key) r = n; }); return r; }
 
 // state factory: sweeps seq0+1..seq0+n at 0.4 s spacing, values from fn(seq, t)
 function statesFor(n, fn, seq0 = 0, t0 = 0) {
@@ -181,6 +198,43 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
   assert.strictEqual((await carText(undefined)).textContent, 'car ?', 'no vehicle field');
   const evilCar = await carText({ key: null, known: false, runs: 0, note: '<img src=x onerror=1>' });
   assert.strictEqual(evilCar.innerHTML, '', 'chipCar is text only'); assert(evilCar.textContent.includes('<img src=x onerror=1>'), 'note shown literally');
+
+  // 5) help popups: catalog text is shown as text, one panel at a time, closes on Escape/outside click, stays on screen
+  const HELPFIX = { pids: { '04': { title: 'Engine load', measures: '<img src=x onerror=1>', use: ['first tip', 'second tip'],
+                                     typical: 'about 15-30 % at idle', status: ['model_drafted', 'unreviewed'] } },
+                    mode06: { evap: { title: 'EVAP leak test', measures: 'Checks the fuel vapor system.', use: ['a', 'b'], typical: 'pass',
+                                      status: ['model_drafted', 'unreviewed'] } } };
+  const m06 = { read: true, note: null, mids: ['3A'], results: [{ mid: '3A', tid: '01', uasid: '10', value: 1, minimum: 0, maximum: 5, within_limits: true }] };
+  const extraStates = statesFor(4, () => Object.assign(idle(), { '04': 28, '99': 7 })).map(st => Object.assign(st, { mode06: m06 }));
+  const hp = makeEnv(extraStates, 'v6', HELPFIX);
+  for (let k = 0; k < 5; k++) await hp.tick();
+  const panel = hp.el('helpPanel');
+  const q04 = findQ(hp.el('x_grid'), '04');
+  assert(q04, 'every extra reading card has a ? button');
+  hp.docHandlers.click({ target: q04 });
+  assert.strictEqual(panel.className, 'open');
+  assert(flat(panel).includes('<img src=x onerror=1>') && panel.innerHTML === '', 'catalog text is shown as text');
+  assert(/first tip/.test(flat(panel)) && /now 28/.test(flat(panel)) && /not yet reviewed/.test(flat(panel)), 'tips, live value, unreviewed tag');
+  hp.docHandlers.click({ target: findQ(hp.el('x_grid'), '04') });
+  assert.strictEqual(panel.className, '', 'the same ? again closes it');
+  hp.docHandlers.click({ target: q04 }); hp.docHandlers.keydown({ key: 'Escape' });
+  assert.strictEqual(panel.className, '', 'Escape closes');
+  hp.docHandlers.click({ target: q04 }); hp.docHandlers.click({ target: {} });
+  assert.strictEqual(panel.className, '', 'a click outside closes');
+  hp.docHandlers.click({ target: findQ(hp.el('x_grid'), '99') });
+  assert(/No bundled help/.test(flat(panel)), 'a reading with no entry gets the generic popup');
+  hp.docHandlers.click({ target: findQ(hp.el('m6'), 'm06:evap') });
+  assert(/EVAP leak test/.test(flat(panel)) && panel.className === 'open', 'Mode 06 lines have help, and opening another replaces the first');
+  assert.strictEqual(hp.el('x_grid').children.filter(c => c.className === 'xt').length, 3, 'cards (0x04, 0x10, 0x99) are updated in place, not duplicated');
+  hp.docHandlers.keydown({ key: 'Escape' });
+  panel.offsetWidth = 360; q04.getBoundingClientRect = () => ({ left: 480, top: 100, bottom: 120, right: 500 });
+  hp.docHandlers.click({ target: q04 });
+  const left = parseFloat(panel.style.left);
+  assert(left >= 12 && left <= 500 - 360 - 12, 'panel stays inside a 500 px viewport, got left=' + left);
+  const bad = makeEnv(extraStates, 'v6', { pids: null, mode06: null });
+  for (let k = 0; k < 5; k++) await bad.tick();
+  bad.docHandlers.click({ target: findQ(bad.el('x_grid'), '04') });
+  assert(/No bundled help/.test(flat(bad.el('helpPanel'))), 'a malformed help reply falls back to the generic popup, no crash');
 
   console.log('page logic OK');
 })().catch(e => { console.error('FAIL', e.message); process.exit(1); });
