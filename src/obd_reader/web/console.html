@@ -290,7 +290,11 @@
 </div>
 <div class="msgbar" id="msg" hidden></div>
 <div id="replayPanel" hidden>
-  <label>Saved run <select class="b" id="rp_runs"></select></label>
+  <label>Source <select class="b" id="rp_src"><option value="examples">Examples</option><option value="mine">My runs</option></select></label>
+  <label>Make <select class="b" id="rp_make"></select></label>
+  <label>Model <select class="b" id="rp_model"></select></label>
+  <label>Year <select class="b" id="rp_year"></select></label>
+  <label>Run <select class="b" id="rp_runs"></select></label>
   <button class="b primary" id="rp_load">Load</button>
   <label>or a file <input type="file" id="rp_file" accept=".json,application/json"></label>
   <p id="rp_err"></p>
@@ -593,18 +597,53 @@
       $('replayPanel').hidden = true; poll();
     });
   }
-  function fillRuns(list) {
-    var sel = $('rp_runs'); sel.textContent = '';
-    list.forEach(function (r) { var o = el('option', '', r.name.replace(/\.json$/, '') + ' · ' + mmss(r.duration) + ' · ' + Math.round(r.size / 1024) + ' KB'); o.value = r.name; sel.appendChild(o); });
-    if (!list.length) sel.appendChild(el('option', '', 'no saved runs yet'));
+  /* picker: Source, then Make -> Model -> Year (each narrows the next), then the runs newest first */
+  var runsBy = { examples: [], mine: [] }, NOLABEL = '(unlabelled)';
+  function facet(r, k) { return r.meta ? String(r.meta[k]) : NOLABEL; }
+  function facetValues(list, k) {
+    var seen = {}, out = [];
+    list.forEach(function (r) { var v = facet(r, k); if (!seen[v]) { seen[v] = 1; out.push(v); } });
+    return out.sort(function (a, b) {
+      if (a === NOLABEL || b === NOLABEL) return (a === NOLABEL) - (b === NOLABEL);
+      return k === 'year' ? Number(b) - Number(a) : a.localeCompare(b);
+    });
   }
+  function setOptions(sel, values) {
+    var keep = sel.value; sel.textContent = '';
+    values.forEach(function (v) { var o = el('option', '', v); o.value = v; sel.appendChild(o); });
+    sel.value = values.indexOf(keep) >= 0 ? keep : (values[0] || '');
+  }
+  function runLabel(r) {
+    var when = typeof r.time === 'string' ? r.time.slice(0, 16).replace('T', ' ') + ' UTC' : '?';
+    return when + ' · ' + mmss(r.duration) + ' · ' + (r.meta ? r.meta.title : r.name.replace(/\.json$/, ''));
+  }
+  function fillRuns() {
+    var src = $('rp_src').value === 'examples' ? 'examples' : 'mine', list = runsBy[src];
+    ['make', 'model', 'year'].forEach(function (k) {
+      var sel = $('rp_' + k); setOptions(sel, facetValues(list, k));
+      list = list.filter(function (r) { return facet(r, k) === sel.value; });
+    });
+    list = list.slice().sort(function (a, b) { return String(b.time || '').localeCompare(String(a.time || '')); });
+    var sel = $('rp_runs'); sel.textContent = '';
+    list.forEach(function (r) { var o = el('option', '', runLabel(r)); o.value = r.name; sel.appendChild(o); });
+    if (!list.length) sel.appendChild(el('option', '', src === 'examples' ? 'no example runs' : 'no saved runs yet'));
+    sel.value = list.length ? list[0].name : '';
+  }
+  function gotRuns(j) {
+    runsBy = { examples: (j && j.examples) || [], mine: (j && j.runs) || [] };
+    $('rp_src').value = runsBy.examples.length ? 'examples' : 'mine';
+    fillRuns();
+  }
+  ['rp_src', 'rp_make', 'rp_model', 'rp_year'].forEach(function (id) { $(id).addEventListener('change', fillRuns); });
   $('replayBtn').addEventListener('click', function () {
     var p = $('replayPanel'); p.hidden = !p.hidden;
     if (p.hidden) return;
     replayErr('');
-    fetch(api('/api/runs')).then(function (r) { return r.json(); }).then(function (j) { fillRuns((j && j.runs) || []); }).catch(function () { fillRuns([]); });
+    fetch(api('/api/runs')).then(function (r) { return r.json(); }).then(gotRuns).catch(function () { gotRuns(null); });
   });
-  $('rp_load').addEventListener('click', function () { var v = $('rp_runs').value; if (v) loadReplay({ name: v }); });
+  $('rp_load').addEventListener('click', function () {
+    var v = $('rp_runs').value; if (v) loadReplay({ source: $('rp_src').value === 'examples' ? 'examples' : 'mine', name: v });
+  });
   $('rp_file').addEventListener('change', function (e) {
     var f = e.target.files && e.target.files[0]; if (!f) return;
     if (f.size > 8 * 1024 * 1024) { replayErr('file too large (8 MB at most)'); e.target.value = ''; return; }

@@ -35,7 +35,7 @@ function makeEnv(states, viewId = 'v0', help = null, runs = [], store = {}) {
     setInterval: (fn) => { timer = fn; }, encodeURIComponent,
     fetch: (url, opts) => {
       if (opts && opts.method === 'POST') { posts.push({ url, body: JSON.parse(opts.body) }); return Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true, path: '/x/runs/a-run.json' }) }); }
-      if (/\/api\/runs/.test(url)) return Promise.resolve({ ok: true, json: () => Promise.resolve({ runs }) });
+      if (/\/api\/runs/.test(url)) return Promise.resolve({ ok: true, json: () => Promise.resolve(Array.isArray(runs) ? { runs } : runs) });
       if (/\/api\/help/.test(url)) return Promise.resolve(help ? { ok: true, json: () => Promise.resolve(help) } : { ok: false, json: () => Promise.resolve({}) });
       const st = states[Math.min(i++, states.length - 1)];
       return Promise.resolve({ ok: true, json: () => Promise.resolve(st) });
@@ -312,7 +312,7 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
   // 8) replay UI: banner, transport bar, controls, picker, upload
   const REPLAY = (over) => Object.assign({ name: 'drive.json', duration: 370, pos: 151, speed: 1, playing: true, ended: false }, over);
   const rstates = (r) => statesFor(3, idle).map(st => Object.assign(st, { replay: r, vehicle: { key: 'ABCDEFGH-P', known: false, runs: 0, note: null } }));
-  const RUNS = [{ name: 'a.json', size: 2048, duration: 370 }, { name: '<b>.json', size: 10, duration: 5 }];
+  const RUNS = [{ name: 'a.json', size: 2048, duration: 370, time: '2026-09-30T21:32:56Z', meta: null }, { name: '<b>.json', size: 10, duration: 5, time: '2026-09-29T10:00:00Z', meta: null }];
   const rp1 = makeEnv(rstates(REPLAY()), 'v0', null, RUNS);
   for (let k = 0; k < 4; k++) await rp1.tick();
   assert.strictEqual(rp1.el('rbar').hidden, false); assert.strictEqual(rp1.el('replayBanner').hidden, false);
@@ -351,10 +351,11 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
   pk.handlers['replayBtn:click'](); await new Promise(r => setImmediate(r)); await new Promise(r => setImmediate(r));
   assert.strictEqual(pk.el('replayPanel').hidden, false);
   assert.strictEqual(pk.el('rp_runs').children.length, 2);
-  assert(/a · 6:10 · 2 KB/.test(pk.el('rp_runs').children[0].textContent), 'option label: ' + pk.el('rp_runs').children[0].textContent);
+  assert.strictEqual(pk.el('rp_src').value, 'mine', 'no examples: the picker opens on My runs');
+  assert.strictEqual(pk.el('rp_runs').children[0].textContent, '2026-09-30 21:32 UTC · 6:10 · a', 'option label: timestamp · length · title');
   assert(pk.el('rp_runs').children[1].textContent.includes('<b>') && pk.el('rp_runs').children[1].innerHTML === '', 'run names are shown as text');
   pk.el('rp_runs').value = 'a.json'; pk.handlers['rp_load:click'](); await new Promise(r => setImmediate(r));
-  assert.deepStrictEqual(pk.posts[pk.posts.length - 1].body, { name: 'a.json' }); assert.strictEqual(pk.el('replayPanel').hidden, true);
+  assert.deepStrictEqual(pk.posts[pk.posts.length - 1].body, { source: 'mine', name: 'a.json' }); assert.strictEqual(pk.el('replayPanel').hidden, true);
   const upload = async (file) => { pk.handlers['rp_file:change']({ target: { files: [file], value: 'x' } }); await new Promise(r => setImmediate(r)); await new Promise(r => setImmediate(r)); };
   await upload({ name: 'x.json', size: 100, text: () => Promise.resolve(JSON.stringify({ kind: 'live_run' })) });
   assert.deepStrictEqual(pk.posts[pk.posts.length - 1].body, { run: { kind: 'live_run' }, name: 'x.json' });
@@ -368,6 +369,56 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
   pk.el('rp_runs').value = 'a.json'; pk.handlers['rp_load:click'](); await new Promise(r => setImmediate(r)); await new Promise(r => setImmediate(r));
   assert.strictEqual(pk.el('rp_err').textContent, 'not a saved run'); assert.strictEqual(pk.el('replayPanel').hidden, false, 'the panel stays open on an error');
 
+
+  // 8b) replay picker: source, then Make -> Model -> Year narrowing, then runs newest first
+  const M = (make, model, year, title) => ({ make, model, year, title });
+  const EX = { runs: [{ name: 'mine-1.json', size: 9, duration: 30, time: '2026-09-01T08:00:00Z', meta: M('Ford', 'F-150', 1999, 'my truck') }],
+    examples: [
+      { name: 'h1.json', size: 9, duration: 366, time: '2026-09-30T21:32:56Z', meta: M('Honda', 'Ridgeline', 2024, 'Ridgeline 6 min drive') },
+      { name: 't-old.json', size: 9, duration: 60, time: '2026-01-02T03:04:05Z', meta: M('Toyota', 'Highlander', 2023, 'old drive') },
+      { name: 'h2.json', size: 9, duration: 90, time: '2026-08-01T00:00:00Z', meta: M('Honda', 'Ridgeline', 2023, 'older truck') },
+      { name: 'p.json', size: 9, duration: 90, time: '2026-08-02T00:00:00Z', meta: M('Honda', 'Pilot', 2024, '<img src=x onerror=1>') },
+      { name: 't-new.json', size: 9, duration: 125, time: '2026-09-15T12:00:00Z', meta: M('Toyota', 'Highlander', 2023, 'new drive') },
+      { name: 'nolabel.json', size: 9, duration: 5, time: '2026-07-01T00:00:00Z', meta: null }] };
+  const pp = makeEnv(statesFor(3, idle), 'v0', null, EX);
+  for (let k = 0; k < 3; k++) await pp.tick();
+  pp.el('replayPanel').hidden = true;
+  pp.handlers['replayBtn:click'](); await new Promise(r => setImmediate(r)); await new Promise(r => setImmediate(r));
+  const opts = (id) => pp.el(id).children.map(c => c.textContent);
+  const vals = (id) => pp.el(id).children.map(c => c.value);
+  const pick = (id, v) => { pp.el(id).value = v; pp.handlers[id + ':change'](); };
+  assert.strictEqual(pp.el('rp_src').value, 'examples', 'examples exist: the picker opens on them');
+  assert.deepStrictEqual(opts('rp_make'), ['Honda', 'Toyota', '(unlabelled)'], 'makes sorted, unlabelled last');
+  assert.strictEqual(pp.el('rp_make').value, 'Honda');
+  assert.deepStrictEqual(opts('rp_model'), ['Pilot', 'Ridgeline'], 'models narrowed to the make');
+  assert.deepStrictEqual(opts('rp_year'), ['2024']);
+  assert.strictEqual(pp.el('rp_runs').children[0].textContent, '2026-08-02 00:00 UTC · 1:30 · <img src=x onerror=1>');
+  assert.strictEqual(pp.el('rp_runs').children[0].innerHTML, '', 'labels are shown as text');
+  pick('rp_model', 'Ridgeline');
+  assert.deepStrictEqual(opts('rp_year'), ['2024', '2023'], 'years newest first');
+  assert.deepStrictEqual(vals('rp_runs'), ['h1.json']);
+  assert.strictEqual(pp.el('rp_runs').children[0].textContent, '2026-09-30 21:32 UTC · 6:06 · Ridgeline 6 min drive');
+  pick('rp_year', '2023'); assert.deepStrictEqual(vals('rp_runs'), ['h2.json']);
+  pick('rp_make', 'Toyota');
+  assert.deepStrictEqual(opts('rp_model'), ['Highlander']); assert.deepStrictEqual(opts('rp_year'), ['2023']);
+  assert.deepStrictEqual(vals('rp_runs'), ['t-new.json', 't-old.json'], 'runs newest first');
+  assert.strictEqual(pp.el('rp_runs').value, 't-new.json');
+  pick('rp_make', '(unlabelled)');
+  assert.deepStrictEqual(opts('rp_model'), ['(unlabelled)']); assert.deepStrictEqual(opts('rp_year'), ['(unlabelled)']);
+  assert.strictEqual(pp.el('rp_runs').children[0].textContent, '2026-07-01 00:00 UTC · 0:05 · nolabel', 'an unlabelled run shows its file name');
+  pp.handlers['rp_load:click'](); await new Promise(r => setImmediate(r));
+  assert.deepStrictEqual(pp.posts[pp.posts.length - 1].body, { source: 'examples', name: 'nolabel.json' });
+  pp.el('replayPanel').hidden = false;
+  pick('rp_src', 'mine');
+  assert.deepStrictEqual(opts('rp_make'), ['Ford']); assert.deepStrictEqual(vals('rp_runs'), ['mine-1.json']);
+  pp.handlers['rp_load:click'](); await new Promise(r => setImmediate(r));
+  assert.deepStrictEqual(pp.posts[pp.posts.length - 1].body, { source: 'mine', name: 'mine-1.json' });
+  const none = makeEnv(statesFor(3, idle), 'v0', null, { runs: [], examples: [] });
+  for (let k = 0; k < 3; k++) await none.tick();
+  none.el('replayPanel').hidden = true;
+  none.handlers['replayBtn:click'](); await new Promise(r => setImmediate(r)); await new Promise(r => setImmediate(r));
+  assert.deepStrictEqual(none.el('rp_runs').children.map(c => c.textContent), ['no saved runs yet']);
+  const before = none.posts.length; none.handlers['rp_load:click'](); assert.strictEqual(none.posts.length, before, 'nothing to load');
 
   // 9) after a seek (new run id, seq restarts below the page's old position) the page refetches the whole refill
   const fullState = (run, n, v) => ({ status: 'running', run, message: null, demo: false, seq: n, now: 0.4 * n, since_last_sample: 0.1, hz: 2.5,
