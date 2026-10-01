@@ -14,7 +14,7 @@ Make the console one coherent product instead of five differently styled views (
 New data capture, Mode 06 sampling changes, any server API other than `--scenarios`, splitting the page into multiple files or adding a framework (the one-file, hash-pinned-CSP design stays).
 
 ## Retained features (checklist test per stage)
-Capture all supported, Demo button, Save run, replay with the Examples/My runs picker and `?example=`, Mode 06 section, All readings stats (Now, Min, Max, Avg, Std, Samples, last-seen, min/max time), Units, Theme, "?" help popups, codes and readiness, Guided test, upload, transport bar. Each must stay reachable in the new layout.
+Capture all supported, Demo button, Save run, replay with the Examples/My runs picker and `?example=`, Mode 06 section, All readings stats (Now, Min, Max, Avg, Std, Samples, last-seen, min/max time), Units, Theme, "?" help popups, codes and the lamp, Guided test, upload, transport bar. Each must stay reachable in the new layout.
 
 ## Design
 
