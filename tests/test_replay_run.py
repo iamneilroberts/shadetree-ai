@@ -150,3 +150,100 @@ def test_a_file_with_a_huge_number_is_skipped_by_the_list_not_fatal(tmp_path):
     (tmp_path / "huge.json").write_text('{"kind": "live_run", "live_sample": {"duration_s": ' + "9" * 400 + "}}")
     _put(tmp_path, "ok.json", run_obj())
     assert [r["name"] for r in rr.list_runs(tmp_path)] == ["ok.json"]
+
+
+# ---- labels (meta) and run listing for the replay picker ----
+from hypothesis import given, strategies as st  # noqa: E402
+
+from obd_reader.vin import with_check_digit  # noqa: E402
+
+META = {"make": "Honda", "model": "Ridgeline", "year": 2024, "title": "Ridgeline 6 min drive"}
+
+
+def test_a_meta_block_is_ignored_by_load_run_and_old_files_still_load():
+    o = run_obj()
+    plain = rr.load_run(copy.deepcopy(o))
+    o["meta"] = dict(META)
+    assert rr.load_run(o) == plain
+    o["meta"] = {"make": 5, "year": "x"}
+    assert rr.load_run(o) == plain, "a broken meta block never stops a replay"
+
+
+def test_clean_meta_accepts_a_good_label_and_drops_unknown_keys():
+    assert rr.clean_meta({**META, "vin": "x"}) == META
+
+
+@pytest.mark.parametrize("bad", [
+    {**META, "make": ""}, {**META, "make": "x" * 41}, {**META, "model": "x" * 41}, {**META, "title": "x" * 81},
+    {**META, "year": "2024"}, {**META, "year": 2024.0}, {**META, "year": True}, {**META, "year": 1995}, {**META, "year": 2101},
+    {**META, "title": "line\nbreak"}, {**META, "make": None},
+    {k: v for k, v in META.items() if k != "title"}, "not a dict", None,
+])
+def test_clean_meta_rejects_bad_labels(bad):
+    with pytest.raises(ValueError):
+        rr.clean_meta(bad)
+
+
+def test_clean_meta_rejects_a_vin_shaped_string_in_any_label():
+    vin = with_check_digit("5FPYK3F5?RB999999")
+    for key in ("make", "model", "title"):
+        for text in (vin, f"drive {vin}", vin.lower(), "1" * 17):
+            with pytest.raises(ValueError, match="VIN"):
+                rr.clean_meta({**META, key: text[:40]})
+
+
+@given(st.text(alphabet="ABCDEFGHJKLMNPRSTUVWXYZ0123456789", min_size=17, max_size=40))
+def test_any_run_of_17_vin_characters_is_rejected(s):
+    with pytest.raises(ValueError):
+        rr.clean_meta({**META, "make": s})
+
+
+def test_label_run_writes_the_meta_block_and_the_file_still_loads(tmp_path):
+    p = _put(tmp_path, "a-run.json", run_obj())
+    rr.label_run(p, make=" Honda ", model="Ridgeline", year=2024, title="Ridgeline 6 min drive")
+    obj = json.loads(p.read_text())
+    assert obj["meta"] == META
+    rr.load_run(obj)
+    assert sorted(x.name for x in tmp_path.iterdir()) == ["a-run.json"], "no temp file left behind"
+
+
+def test_label_run_refuses_bad_labels_and_non_runs_and_leaves_the_file_alone(tmp_path):
+    p = _put(tmp_path, "a-run.json", run_obj())
+    before = p.read_text()
+    with pytest.raises(ValueError):
+        rr.label_run(p, make="Honda", model="Ridgeline", year=2024, title=with_check_digit("5FPYK3F5?RB999999"))
+    assert p.read_text() == before
+    snap = _put(tmp_path, "snap.json", {"kind": "snapshot"})
+    with pytest.raises(ValueError):
+        rr.label_run(snap, **{**META})
+
+
+def test_list_runs_reports_labels_and_a_timestamp_from_the_name_or_the_file_time(tmp_path):
+    labelled = run_obj()
+    labelled["meta"] = dict(META)
+    _put(tmp_path, "2026-09-30T21-32-56Z-drive.json", labelled, 1000)
+    broken = run_obj()
+    broken["meta"] = {"make": "x" * 99}
+    _put(tmp_path, "plain.json", broken, 1_700_000_000)
+    out = {r["name"]: r for r in rr.list_runs(tmp_path)}
+    assert out["2026-09-30T21-32-56Z-drive.json"]["meta"] == META
+    assert out["2026-09-30T21-32-56Z-drive.json"]["time"] == "2026-09-30T21:32:56Z", "the name wins over the file time"
+    assert out["plain.json"]["meta"] is None, "a bad label lists as unlabelled"
+    assert out["plain.json"]["time"] == "2023-11-14T22:13:20Z"
+
+
+def test_list_runs_is_newest_first_by_timestamp(tmp_path):
+    _put(tmp_path, "2026-01-01T00-00-00Z-old.json", run_obj(), 3000)
+    _put(tmp_path, "2026-06-01T00-00-00Z-new.json", run_obj(), 1000)
+    assert [r["name"] for r in rr.list_runs(tmp_path)] == ["2026-06-01T00-00-00Z-new.json", "2026-01-01T00-00-00Z-old.json"]
+
+
+def test_label_run_cli(tmp_path, capsys):
+    from obd_reader.__main__ import main
+
+    p = _put(tmp_path, "a-run.json", run_obj())
+    assert main(["label-run", str(p), "--make", "Honda", "--model", "Ridgeline", "--year", "2024",
+                 "--title", "Ridgeline 6 min drive"]) == 0
+    assert json.loads(p.read_text())["meta"] == META
+    assert main(["label-run", str(p), "--make", "Honda", "--model", "Ridgeline", "--year", "1990", "--title", "t"]) == 1
+    assert "error" in capsys.readouterr().err

@@ -89,6 +89,14 @@ def _export_run(args) -> int:
     return 0
 
 
+def _label_run(args) -> int:
+    from obd_reader.replay_run import label_run
+
+    meta = label_run(args.file, make=args.make, model=args.model, year=args.year, title=args.title)
+    print(f"labelled {args.file}: {meta['year']} {meta['make']} {meta['model']} \u00b7 {meta['title']}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(prog="shadetree-ai")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -125,6 +133,13 @@ def build_parser() -> argparse.ArgumentParser:
     ex.add_argument("--dest", type=Path, default=Path("shadetree-share.tgz"), help="bundle to write")
     ex.add_argument("--latest", type=int, default=1, help="how many of the newest runs to include")
     ex.set_defaults(func=_export_run)
+    lr = sub.add_parser("label-run", help="add the make, model, year and title the console's replay picker shows (no VIN)")
+    lr.add_argument("file", type=Path, help="a saved run .json")
+    lr.add_argument("--make", required=True, help="e.g. Honda (at most 40 characters)")
+    lr.add_argument("--model", required=True, help="e.g. Ridgeline (at most 40 characters)")
+    lr.add_argument("--year", required=True, type=int, help="model year, e.g. 2024")
+    lr.add_argument("--title", required=True, help="short description, e.g. 'Ridgeline 6 min drive' (at most 80 characters)")
+    lr.set_defaults(func=_label_run)
     return ap
 
 

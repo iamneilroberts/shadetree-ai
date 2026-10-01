@@ -3,8 +3,10 @@ bounded and copied; nothing from it is executed or used as a path."""
 import bisect
 import json
 import math
+import os
 import re
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 
 from obd_reader.profiles import KEY_RE
@@ -15,6 +17,10 @@ MAX_LISTED = 50
 _HEX2 = re.compile(r"[0-9A-F]{2}")
 _NAME = re.compile(r"[A-Za-z0-9T:_.-]{1,100}\.json")
 _CODE = re.compile(r"[PCBU][0-9A-F]{4}")
+_VIN_RUN = re.compile(r"[A-HJ-NPR-Z0-9]{17}")   # any 17 VIN characters in a row, checked on the upper-cased label
+_STAMP = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}Z")
+META_TEXT = {"make": 40, "model": 40, "title": 80}
+MIN_YEAR, MAX_YEAR = 1996, 2100
 
 
 @dataclass(frozen=True)
@@ -146,6 +152,50 @@ def load_run(obj) -> Run:
                vehicle=_vehicle(obj.get("vehicle")), times=[t for t, _ in sweeps])
 
 
+def clean_meta(m) -> dict:
+    """The picker label of a run: {make, model, year, title}. Short plain text, an integer year, never a VIN."""
+    if not isinstance(m, dict):
+        raise ValueError("meta must be an object with make, model, year and title")
+    out = {}
+    for k, limit in META_TEXT.items():
+        v = m.get(k)
+        if not isinstance(v, str) or not 1 <= len(v) <= limit or not v.isprintable():
+            raise ValueError(f"{k} must be 1 to {limit} printable characters")
+        if _VIN_RUN.search(v.upper()):
+            raise ValueError(f"{k} looks like it holds a VIN: labels are public, leave the VIN out")
+        out[k] = v
+    y = m.get("year")
+    if type(y) is not int or not MIN_YEAR <= y <= MAX_YEAR:
+        raise ValueError(f"year must be a whole number from {MIN_YEAR} to {MAX_YEAR}")
+    return {"make": out["make"], "model": out["model"], "year": y, "title": out["title"]}
+
+
+def label_run(path, *, make: str, model: str, year: int, title: str) -> dict:
+    """Write the meta block into a saved run file (the file must already be a valid run)."""
+    meta = clean_meta({"make": make.strip(), "model": model.strip(), "year": year, "title": title.strip()})
+    p = Path(path)
+    if p.stat().st_size > MAX_FILE_BYTES:
+        raise ValueError("file too large")
+    obj = json.loads(p.read_text(encoding="utf-8"))
+    load_run(obj)
+    obj["meta"] = meta
+    tmp = p.with_name(p.name + ".tmp")
+    tmp.write_text(json.dumps(obj, indent=2), encoding="utf-8")
+    os.replace(tmp, p)
+    return meta
+
+
+def _when(p: Path) -> datetime:
+    """Run time: the UTC stamp a saved run's name starts with, else the file time."""
+    m = _STAMP.match(p.name)
+    if m:
+        try:
+            return datetime.strptime(m.group(), "%Y-%m-%dT%H-%M-%SZ").replace(tzinfo=timezone.utc)
+        except ValueError:
+            pass
+    return datetime.fromtimestamp(p.stat().st_mtime, timezone.utc)
+
+
 def read_run_file(runs_dir, name) -> dict:
     if not isinstance(name, str) or not _NAME.fullmatch(name):
         raise ValueError("not a run file name")
@@ -166,12 +216,12 @@ def read_run_file(runs_dir, name) -> dict:
 def list_runs(runs_dir) -> list[dict]:
     d = Path(runs_dir)
     try:
-        files = [p for p in d.iterdir() if _NAME.fullmatch(p.name) and p.is_file() and not p.is_symlink()]
-        files.sort(key=lambda p: (p.stat().st_mtime, p.name), reverse=True)
+        files = [(_when(p), p) for p in d.iterdir() if _NAME.fullmatch(p.name) and p.is_file() and not p.is_symlink()]
+        files.sort(key=lambda w: (w[0], w[1].name), reverse=True)
     except OSError:
         return []
     out = []
-    for p in files:
+    for when, p in files:
         if len(out) >= MAX_LISTED:
             break
         try:
@@ -186,5 +236,9 @@ def list_runs(runs_dir) -> list[dict]:
                 continue
         except (OSError, ValueError, KeyError, TypeError, AttributeError, OverflowError, RecursionError):
             continue
-        out.append({"name": p.name, "size": size, "duration": dur})
+        try:
+            meta = clean_meta(obj.get("meta"))
+        except ValueError:
+            meta = None
+        out.append({"name": p.name, "size": size, "duration": dur, "time": f"{when:%Y-%m-%dT%H:%M:%SZ}", "meta": meta})
     return out
