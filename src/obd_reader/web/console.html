@@ -1133,6 +1133,7 @@
   $('d_edit').addEventListener('click', function () {
     ED.on = !ED.on; ED.draft = specsFor(curScenario()).slice(); ED.sig = null;
     $('d_edit').setAttribute('aria-pressed', ED.on ? 'true' : 'false');
+    if (ED.box && !ED.on) drawEditor();
     render();
   });
   function renderDashboard() {

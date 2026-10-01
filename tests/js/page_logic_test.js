@@ -905,6 +905,9 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
     E3.e.el('d_tabs').children[1].on.click(); await E3.e.tick();
     assert.strictEqual(E3.ed().hidden, true, 'switching ends edit mode'); assert.strictEqual(E3.e.el('d_edit').getAttribute('aria-pressed'), 'false');
     E3.e.el('d_edit').on.click(); assert.strictEqual(E3.rows().length, 8, "the next edit starts from the new scenario's gauges"); assert.ok(E3.rows()[0].children[0].textContent.includes('(06, bar)'));
+    // the pencil pressed twice closes the editor: hidden, no rows, aria-pressed false
+    E3.e.el('d_edit').on.click();
+    assert.strictEqual(E3.e.el('d_edit').getAttribute('aria-pressed'), 'false'); assert.strictEqual(E3.ed().hidden, true, 'pencil off hides the editor'); assert.strictEqual(E3.ed().children.length, 0, 'and clears its rows');
     // the editor follows the PIDs in the run when they change
     const more = statesFor(20, base).concat(statesFor(30, () => Object.assign(base(), { '10': 5 }), 20, 8));
     const E4 = await mkEd({}, more, 10); E4.e.el('d_edit').on.click();
