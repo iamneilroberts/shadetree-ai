@@ -31,7 +31,7 @@ function makeEnv(states, viewId = 'v0', help = null, runs = [], store = {}, page
     console, URLSearchParams, Promise, Math, Object, Array, Number, String, JSON, Date, parseInt, isFinite,
     document: { documentElement: el('html'), getElementById: el, querySelectorAll: () => [], querySelector: () => ({ id: viewId }),
                 createElement: () => makeNode('new', handlers), addEventListener(t, fn) { docHandlers[t] = fn; } },
-    window: { addEventListener() {}, devicePixelRatio: 1, innerWidth: 500, innerHeight: 800, __shadetreeParts: (p) => { parts = p; } },
+    window: { addEventListener() {}, devicePixelRatio: 1, innerWidth: 500, innerHeight: 800, __shadetreeParts: page.noHook ? undefined : (p) => { parts = p; } },
     location: { search: page.search || '?t=abc', hash: '' }, history: { replaceState() {} },
     performance: { now: () => now },
     setInterval: (fn) => { timer = fn; }, encodeURIComponent,
@@ -721,6 +721,26 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
   assert.deepStrictEqual(tcells(tbl.body.children[0]).slice(1), ['—', '—', '—', '—', '—', '—'], 'a PID not in the run: dashes, not zeros');
   PT.pidRows(tbl.body, ['05']); assert.deepStrictEqual(tbl.body.children.map(c => c.getAttribute('data-key')), ['05'], 'shrinking drops the old rows');
   assert.strictEqual(pt.el('x_grid').children.filter(c => c.className === 'xr').length, 11, 'All readings is unchanged beside it');
+
+  // stage-1 reviewer carry-overs: MAP range, LED bars light from the low end (trims centre on 0), the hook is optional, pidRows keeps its nodes
+  const gm = (await gOver({ '0B': 180 })).parts().gaugeModel({ pid: '0B', form: 'dial' });
+  assert(gm.hi >= 250, 'the MAP dial reaches 250 kPa (turbo, boost): ' + gm.hi); assert.strictEqual(gm.v, 180, 'a 180 kPa reading is shown as is, not clamped');
+  const ledCls = (g) => (gpart(g, 'gface').innerHTML.match(/<i class="[^"]*"><\/i>/g) || []).map(x => x.match(/class="([^"]*)"/)[1]);
+  const gm05 = (await gOver({ '05': 10 })), t05 = ledCls(gk(gbox(gm05, [{ pid: '05', form: 'bar' }]), '05:bar'));
+  assert(t05[0] !== '' && !t05.some(c => /\bz\b/.test(c)), 'a temperature bar (metric, 10 C in -20..130) lights from cell 0 and has no zero marker: ' + t05.join('|'));
+  const tUs = ledCls(gk(gbox(await gOver({ '05': 93.33 }, null, OVF, { 'shadetree.units': 'us' }), [{ pid: '05', form: 'bar' }]), '05:bar'));   // 200 F in -4..266 F
+  assert(tUs[0] !== '' && tUs.some(c => c === '') && !tUs.some(c => /\bz\b/.test(c)), 'US units: 200 F lights from cell 0, no zero marker: ' + tUs.join('|'));
+  assert.strictEqual(tUs.filter(c => c !== '').length, 16, 'and lights up to the value (cells 0..15 of 21)');
+  const trimC = ledCls(gk(gbox(await gOver({ '07': 15 }), [{ pid: '07', form: 'bar' }]), '07:bar'));
+  assert(trimC[0] === '' && trimC[10] !== '' && trimC.some(c => /\bz\b/.test(c)), 'a trim bar still centres on 0 and keeps its zero marker: ' + trimC.join('|'));
+  assert(!gm.centre, 'a non-trim PID is not centred');
+  assert.strictEqual((await gOver({ '07': 15 })).parts().gaugeModel({ pid: '07', form: 'bar' }).centre, true, 'a trim PID is centred');
+  const noHook = makeEnv(speedStates(true), 'v0', OVF, [], {}, { noHook: true }); for (let k = 0; k < 5; k++) await noHook.tick();
+  assert.strictEqual(noHook.parts(), null, 'no hook defined: nothing is exposed'); let noHookG = null; walk(noHook.el('d_panel'), n => { if (n.className === 'gauges') noHookG = n; });
+  assert(noHookG && noHookG.children.length > 0, 'and the page still runs and draws its gauges');
+  const rr = makeEnv(speedStates(true), 'v6', OVF, [], {}); for (let k = 0; k < 3; k++) await rr.tick();
+  const rt = rr.parts().pidTableEl(); rr.parts().pidRows(rt.body, ['0D', '05']); const rows1 = Array.from(rt.body.children);
+  rr.parts().pidRows(rt.body, ['0D', '05']); assert(rows1.length === 2 && rt.body.children.every((c, i) => c === rows1[i]), 'the same PID list twice keeps the row nodes');
 
   // Dashboard: scenario tabs (and the phone dropdown), up to 8 gauges, the run's PID table with the scenario's PIDs marked, the health strip only in General
   const dash = async (store = {}, page = {}, states = statesFor(30, base)) => {

@@ -113,6 +113,14 @@ def _block(selector):
     return dict((k, " ".join(v.split())) for k, v in re.findall(r"(--[\w-]+):\s*([^;]+);", body))
 
 
+def _block_all(selector):
+    """The custom properties of every rule whose selector is exactly `selector`, merged in source order."""
+    out = {}
+    for body in re.findall(r"(?:^|[}\s])" + re.escape(selector) + r"\s*\{([^}]*)\}", _css()):
+        out.update((k, " ".join(v.split())) for k, v in re.findall(r"(--[\w-]+):\s*([^;]+);", body))
+    return out
+
+
 PLAIN_DARK = {"--bg": "#0e1113", "--panel": "#171b1f", "--panel2": "#1e2429", "--line": "#2c343b", "--ink": "#e8edf0", "--muted": "#93a0aa",
               "--cyan": "#4fc3e8", "--amber": "#f2a93b", "--ok": "#7fcf94", "--bad": "#f07a5a", "--on-accent": "#06222c", "--banner": "#f2a93b",
               "--msg-bg": "#2a2114", "--banner-ink": "#1a1204"}
@@ -131,12 +139,12 @@ NEUTRAL = re.compile(r"rgba\((?:0,0,0|255,255,255),[.\d]+\)|#000\b")  # black/wh
 
 def test_colours_live_only_in_the_token_blocks():
     rules = re.sub(r":root(?:\[[^\]]*\])*\s*\{[^}]*\}", "", _css())
-    assert re.findall(r"#[0-9a-fA-F]{3,8}\b|rgba?\(", NEUTRAL.sub("", rules)) == []
+    assert re.findall(r"#[0-9a-fA-F]{3,8}\b|(?:rgba?|hsla?)\(", NEUTRAL.sub("", rules)) == []
     markup = HTML[HTML.index("</style>"):HTML.index("<script>")]
-    assert re.findall(r"#[0-9a-fA-F]{3,8}\b", " ".join(re.findall(r'style="([^"]*)"', markup))) == []
+    assert re.findall(r"#[0-9a-fA-F]{3,8}\b|(?:rgba?|hsla?)\(", " ".join(re.findall(r'style="([^"]*)"', markup))) == []
     js = re.search(r"<script>(.*?)</script>", HTML, re.S).group(1)
     js = re.sub(r"\n\s*var PALS = [^\n]*", "", js)  # canvas colours: a canvas cannot read CSS variables
-    assert re.findall(r"#[0-9a-fA-F]{6}\b", js) == []
+    assert re.findall(r"#[0-9a-fA-F]{3,8}\b|(?:rgba?|hsla?)\(", js) == []
 
 
 def _lum(hexs):
@@ -157,13 +165,17 @@ def _palette(skin, theme):
            ([':root[data-skin="retro"][data-theme="light"]'] if skin == "retro" and theme == "light" else [])
     p = {}
     for s in sels:
-        p.update(_block(s))
+        p.update(_block_all(s))
+    for k in p:  # resolve var(--x) chains (the gauge tokens point at the general and device tokens)
+        while (m := re.fullmatch(r"var\((--[\w-]+)\)", p[k])):
+            p[k] = p[m.group(1)]
     return p
 
 
 TEXT_PAIRS = [("--ink", "--bg"), ("--ink", "--panel"), ("--ink", "--panel2"), ("--muted", "--bg"), ("--muted", "--panel"), ("--muted", "--panel2"),
               ("--cyan", "--panel"), ("--amber", "--panel"), ("--ok", "--panel"), ("--bad", "--panel"), ("--on-accent", "--cyan"),
-              ("--amber", "--msg-bg"), ("--banner-ink", "--banner")]
+              ("--amber", "--msg-bg"), ("--banner-ink", "--banner"),
+              ("--amber", "--panel2"), ("--bad", "--panel2"), ("--g-ink", "--g-face")]  # gauge text: the amber/red notes sit on the gauge card, digits on the face
 
 
 @pytest.mark.parametrize("skin,theme", [("plain", "dark"), ("plain", "light"), ("retro", "dark"), ("retro", "light")])
