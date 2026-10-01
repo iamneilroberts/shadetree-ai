@@ -51,3 +51,14 @@ def test_engine_off_battery_band_is_open_above_so_charging_is_never_flagged():
     # hybrids and start-stop pauses read rpm 0 while charging at 14 V; surface charge after shutdown reads 13+ V
     w = HELP["42"]["watch_engine_off"]
     assert w["ok"][1] is None and w["out"][1] is None and w["ok"][0] is not None and w["out"][0] is not None
+
+
+def test_metric_numbers_in_the_help_text_come_with_us_equivalents():
+    import re
+    for pid, e in HELP.items():
+        text = " ".join([e["measures"], e["typical"], *e["use"]])
+        assert not re.search(r"\d C\b", text), f"{pid}: write temperatures as degrees C"
+        if "°C" in text:
+            assert "°F" in text, pid
+        if "kPa" in text:
+            assert "inHg" in text, pid

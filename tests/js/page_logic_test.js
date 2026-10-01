@@ -21,7 +21,7 @@ function makeNode(id, handlers) {
   return n;
 }
 
-function makeEnv(states, viewId = 'v0', help = null, runs = []) {
+function makeEnv(states, viewId = 'v0', help = null, runs = [], store = {}) {
   const els = {}, handlers = {}, docHandlers = {}, posts = [];
   function el(id) { return els[id] || (els[id] = makeNode(id, handlers)); }
   let timer = null, i = 0, now = 0;
@@ -41,9 +41,10 @@ function makeEnv(states, viewId = 'v0', help = null, runs = []) {
       return Promise.resolve({ ok: true, json: () => Promise.resolve(st) });
     }
   };
+  if (store !== null) sandbox.localStorage = { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); } };
   vm.runInNewContext(js, sandbox);
   return {
-    el, handlers, docHandlers, posts, sandbox,
+    el, handlers, docHandlers, posts, sandbox, store,
     timer() { timer(); }, setHelp(h) { help = h; }, advance(ms) { now += ms; },
     async tick() { timer(); await new Promise(r => setImmediate(r)); await new Promise(r => setImmediate(r)); }
   };
@@ -398,6 +399,57 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
   await new Promise(r => setImmediate(r)); await new Promise(r => setImmediate(r));
   for (let k = 0; k < 3; k++) await rp2.tick();
   assert.strictEqual(rp2.el('rb_time').textContent, '3:20 / 6:10', 'the scrubber follows playback again after a failed seek');
+
+  // 11) units toggle: display only, metric by default, remembered, applied wherever a value is shown
+  const uStates = (over, tweak) => statesFor(30, () => Object.assign(base(), over)).map(st => (tweak ? tweak(st) : st));
+  const uEnv = async (over, view = 'v0', store = {}, tweak = null) => {
+    const e = makeEnv(uStates(over, tweak), view, OVF, [], store);
+    for (let k = 0; k < 32; k++) await e.tick();
+    return e;
+  };
+  const big = (e, key) => part(tile(e, key), 'big'), tunit = (e, key) => part(tile(e, key), 'unit');
+  const rowVal = (e, key) => { let r = null; walk(e.el('o_attn'), n => { if (n.getAttribute('data-key') === key) r = n; }); return part(r, 'val'); };
+  const toggle = async (e) => { e.handlers['unitsBtn:click'](); for (let k = 0; k < 2; k++) await e.tick(); };
+  const store = {};
+  const um = await uEnv({ '05': 118 }, 'v0', store);
+  assert.strictEqual(big(um, 'ect'), '118'); assert.strictEqual(tunit(um, 'ect'), '°C'); assert.strictEqual(um.el('unitsBtn').textContent, 'Units: Metric');
+  assert.strictEqual(big(um, 'map'), '36'); assert.strictEqual(rowVal(um, '05'), '118 °C');
+  await toggle(um);
+  assert.strictEqual(big(um, 'ect'), '244'); assert.strictEqual(tunit(um, 'ect'), '°F');
+  assert.strictEqual(big(um, 'map'), '10.6'); assert.strictEqual(tunit(um, 'map'), 'inHg');
+  assert.strictEqual(big(um, 'trims'), '2.0'); assert.strictEqual(tunit(um, 'trims'), '%', 'percent does not change');
+  assert.strictEqual(rowVal(um, '05'), '244 °F', 'attention rows follow the unit');
+  assert.strictEqual(um.el('unitsBtn').textContent, 'Units: US'); assert.strictEqual(store['shadetree.units'], 'us');
+  assert.strictEqual(tile(um, 'ect').className, 'tile out', 'the state is judged on the metric value');
+  um.docHandlers.click({ target: findQ(um.el('o_tiles'), '05') });
+  assert(/now 244 °F/.test(flat(um.el('helpPanel'))), 'the popup live line follows the unit: ' + flat(um.el('helpPanel')));
+  const um2 = await uEnv({}, 'v0', store);
+  assert.strictEqual(big(um2, 'ect'), '194', 'the choice is remembered');
+  await toggle(um2); assert.strictEqual(big(um2, 'ect'), '90'); assert.strictEqual(store['shadetree.units'], 'metric');
+  const noStore = makeEnv(uStates({}), 'v0', OVF, [], null);
+  for (let k = 0; k < 32; k++) await noStore.tick();
+  assert.strictEqual(big(noStore, 'ect'), '90', 'without storage it starts metric');
+  await toggle(noStore); assert.strictEqual(big(noStore, 'ect'), '194', 'and still toggles');
+
+  // All readings: speed, plus the min and max line
+  const speedStates = statesFor(4, idle).map(st => { st.channels['0D'] = { name: 'vehicle_speed', unit: 'km/h', samples: [[st.seq, st.now, 60]] }; return st; });
+  const sp = makeEnv(speedStates, 'v6', OVF, [], { 'shadetree.units': 'us' });
+  for (let k = 0; k < 5; k++) await sp.tick();
+  let spCard = null; walk(sp.el('x_grid'), n => { if (n.className === 'xt' && n.children[0].getAttribute('data-help') === '0D') spCard = n; });
+  assert(/37 mph/.test(flat(spCard)) && /min 37 · max 37/.test(flat(spCard)), 'extra readings convert too: ' + flat(spCard));
+
+  // Analyzer, Handheld and Guided test: labels and digits
+  const an = await uEnv({ '05': 41 }, 'v4', {});
+  assert(/aria-label="41"/.test(an.el('a_ect').innerHTML) && /aria-label="36"/.test(an.el('a_map').innerHTML));
+  assert.strictEqual(an.el('a_ect_u').textContent, '°C'); assert.strictEqual(an.el('a_map_u').textContent, 'KPA');
+  await toggle(an);
+  assert(/aria-label="106"/.test(an.el('a_ect').innerHTML) && /aria-label="10.6"/.test(an.el('a_map').innerHTML), 'cabinet digits convert');
+  assert.strictEqual(an.el('a_ect_u').textContent, '°F'); assert.strictEqual(an.el('a_map_u').textContent, 'INHG');
+  const hh2 = await uEnv({ '05': 41 }, 'v5', { 'shadetree.units': 'us' });
+  assert(/aria-label="106"/.test(hh2.el('h_ect').innerHTML) && /aria-label="10.6"/.test(hh2.el('h_map').innerHTML), 'handheld digits convert');
+  assert.strictEqual(hh2.el('h_ect_u').textContent, '°F'); assert.strictEqual(hh2.el('h_map_u').textContent, 'INHG');
+  const gt = await uEnv({ '05': 41 }, 'v3', { 'shadetree.units': 'us' });
+  assert.strictEqual(gt.el('v3ect').textContent, '106'); assert.strictEqual(gt.el('v3ect_u').textContent, '°F'); assert.strictEqual(gt.el('v3map_u').textContent, 'inHg');
 
   console.log('page logic OK');
 })().catch(e => { console.error('FAIL', e.message); process.exit(1); });

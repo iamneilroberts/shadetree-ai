@@ -91,6 +91,8 @@ The console is read-only: it can only start and stop sampling and save a run to 
 
 **Help popups:** every reading, tile and Mode 06 line has a "?" that says what it measures, how to use it and typical values. The wording is ours and unreviewed (the popup says so); the colors on the Overview use general rules of thumb, not limits for your particular car.
 
+**Units:** the **Units** button switches the page between metric and US units (°C/°F, km/h/mph, kPa/psi, g/s to lb/min; manifold and barometric pressure show in inHg). It only changes what is displayed: saved runs, replays and the Overview colors stay metric underneath, and the choice is remembered in the browser.
+
 **Replay:** press **Replay…** in the status bar, pick a saved run from `runs/` (or choose a run file, such as a bundle copied from the laptop) and press Load. The page shows the run as it was sampled: play, pause, speed (0.5x to 8x), drag the scrubber, restart, Exit replay. A replay never touches the adapter and writes nothing; live sampling and Save run are off while one is loaded, and Claude's `console_data` says its numbers are a replay. Runs saved from now on also store the trouble codes, Mode 06 results and the partial car key, so their replays show those too; older runs replay the readings only.
 
 **Car memory:** on CAN cars the console reads the VIN once per run and keeps only a partial key (make, model, engine and year; never the serial) in the "car" chip. It remembers, per key, which readings the car never answers, in `profiles/` (local, gitignored), and stops asking for them sooner next time. A saved profile is a hint, not a fact: a PID that answers is always kept.
