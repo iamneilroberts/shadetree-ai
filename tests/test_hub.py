@@ -402,3 +402,158 @@ def test_a_saved_run_keeps_every_sample_even_when_the_chart_buffer_is_small(tmp_
     saved = json.loads(hub.save_run("long-drive").read_text())
     n = saved["live_sample"]["series"]["0C"]["samples"]
     assert len(n) >= 20 and n[0][0] < 2.0                               # the saved run starts at the start
+
+
+from obd_reader.replay_run import load_run
+
+
+def _run_obj(n=10, codes=None):
+    ts = [round(0.4 * k, 3) for k in range(1, n + 1)]
+    o = {"kind": "live_run", "demo": False, "adapter": {"protocol": "ISO 15765-4 (CAN 29/500)"},
+         "live_sample": {"duration_s": ts[-1], "rate_hz": 2.5, "series": {
+             "0C": {"name": "engine_rpm", "unit": "rpm", "samples": [[t, 700 + 10 * i] for i, t in enumerate(ts)]},
+             "AB": {"name": "made_up", "unit": None, "samples": [[t, i] for i, t in enumerate(ts)]}}}}
+    if codes:
+        o["codes"] = codes
+    return o
+
+
+def _replay_hub(tmp_path, playing=False, **kw):
+    hub, _, _ = make(tmp_path)
+    hub.start_replay(load_run(_run_obj(**kw)), "drive.json", playing=playing)
+    return hub
+
+
+def test_replay_state_and_stepping_publish_sweeps(tmp_path):
+    hub = _replay_hub(tmp_path)
+    st = hub.state()
+    assert st["status"] == "running" and st["demo"] is False and st["seq"] == 0
+    assert st["replay"] == {"name": "drive.json", "duration": 4.0, "pos": 0.0, "speed": 1.0, "playing": False, "ended": False}
+    assert st["adapter"] == {"chip": None, "ati": "replay", "protocol": "ISO 15765-4 (CAN 29/500)"}
+    assert st["codes"] == {"read": False, "note": "not stored in this run"} and st["mode06"]["read"] is False
+    hub._replay_advance(1.0)
+    st = hub.state()
+    assert st["seq"] == 2 and st["now"] == 1.0 and st["replay"]["pos"] == 1.0
+    assert [s[2] for s in st["channels"]["0C"]["samples"]] == [700.0, 710.0]
+    assert st["channels"]["AB"]["name"] == "made_up" and st["channels"]["0C"]["name"] == "engine_rpm"
+    hub.exit_replay()
+
+
+def test_speed_scales_the_advance_and_bad_values_are_refused(tmp_path):
+    hub = _replay_hub(tmp_path)
+    hub.replay_control("speed", speed=4)
+    hub._replay_advance(0.5)
+    assert hub.state()["replay"]["pos"] == 2.0 and hub.state()["replay"]["speed"] == 4.0
+    for bad in (3, 0, -1, True, "fast", None):
+        with pytest.raises(ValueError):
+            hub.replay_control("speed", speed=bad)
+    with pytest.raises(ValueError):
+        hub.replay_control("explode")
+    with pytest.raises(ValueError):
+        hub.replay_control("seek", pos=float("nan"))
+    hub.exit_replay()
+
+
+def test_backward_seek_resets_the_page_and_refills_the_last_minute(tmp_path):
+    hub = _replay_hub(tmp_path)
+    hub._replay_advance(3.0)
+    before = hub.state()
+    hub.replay_control("seek", pos=1.0)
+    st = hub.state()
+    assert st["run"] != before["run"], "a new run id makes viewers drop their buffers"
+    assert st["seq"] == 2 and st["now"] == 1.0 and [s[2] for s in st["channels"]["0C"]["samples"]] == [700.0, 710.0]
+    assert st["replay"]["ended"] is False
+    hub.exit_replay()
+
+
+def test_play_pause_end_and_restart(tmp_path):
+    hub = _replay_hub(tmp_path)
+    hub.replay_control("play")
+    assert hub.state()["replay"]["playing"] is True
+    hub.replay_control("pause")
+    hub._replay_advance(10.0)  # past the end
+    r = hub.state()["replay"]
+    assert r["pos"] == 4.0 and r["ended"] is True and r["playing"] is False and hub.state()["seq"] == 10
+    hub.replay_control("play")  # from the end: starts over
+    r = hub.state()["replay"]
+    assert r["pos"] < 0.5 and r["ended"] is False and r["playing"] is True  # the player thread is running now, so not exactly 0
+    hub.replay_control("restart")
+    assert hub.state()["replay"]["pos"] < 0.5
+    hub.exit_replay()
+
+
+def test_the_player_thread_advances_while_playing_and_holds_when_paused(tmp_path):
+    hub = _replay_hub(tmp_path, playing=True)
+    hub.replay_control("speed", speed=8)
+    assert wait_for(lambda: hub.state()["replay"]["ended"], 5)
+    assert hub.state()["seq"] == 10
+    hub.replay_control("restart")
+    hub.replay_control("pause")
+    seq = hub.state()["seq"]
+    time.sleep(0.3)
+    assert hub.state()["seq"] == seq
+    hub.exit_replay()
+
+
+def test_exit_returns_to_idle_and_stop_means_exit(tmp_path):
+    hub = _replay_hub(tmp_path)
+    hub._replay_advance(1.0)
+    hub.stop()
+    st = hub.state()
+    assert st["status"] == "idle" and st["replay"] is None and st["seq"] == 0 and st["channels"] == {}
+    assert not hub.running
+
+
+def test_live_sampling_and_replay_exclude_each_other(tmp_path):
+    hub = _replay_hub(tmp_path)
+    with pytest.raises(HubBusy, match="replay"):
+        hub.start(DEFAULT_PIDS, hz=10, seconds=30)
+    hub.exit_replay()
+    hub.start(DEFAULT_PIDS, hz=10, seconds=30)
+    assert wait_for(lambda: hub.state()["seq"] >= 2)
+    with pytest.raises(HubBusy):
+        hub.start_replay(load_run(_run_obj()), "x.json")
+    assert hub.state()["status"] == "running" and hub.state()["replay"] is None
+    hub.stop()
+
+
+def test_loading_another_run_replaces_the_first(tmp_path):
+    hub = _replay_hub(tmp_path)
+    hub._replay_advance(1.0)
+    hub.start_replay(load_run(_run_obj(n=5)), "second.json", playing=False)
+    st = hub.state()
+    assert st["replay"]["name"] == "second.json" and st["replay"]["duration"] == 2.0 and st["seq"] == 0
+    hub.exit_replay()
+
+
+def test_a_replay_never_writes_a_file_and_cannot_be_saved(tmp_path):
+    sim = SimPort("rich")
+    s = Session(Config(port="sim", home=tmp_path, timeout=0.5), port_factory=lambda: sim)
+    hub = LiveHub(s, sim=sim, autosave=True)
+    hub.start_replay(load_run(_run_obj()), "drive.json", playing=False)
+    hub._replay_advance(10.0)
+    with pytest.raises(ValueError, match="replay"):
+        hub.save_run("x")
+    hub.exit_replay()
+    assert not (tmp_path / "runs").exists()
+
+
+def test_unsaved_live_run_is_not_silently_replaced_by_a_replay(tmp_path):
+    hub, _, _ = make(tmp_path)
+    hub._unsaved = True
+    with pytest.raises(HubBusy, match="could not be saved"):
+        hub.start_replay(load_run(_run_obj()), "x.json")
+    hub.start_replay(load_run(_run_obj()), "x.json", playing=False)  # asking again discards it
+    hub.exit_replay()
+
+
+def test_codes_and_key_in_the_run_reach_the_state(tmp_path):
+    codes = {"read": True, "note": None, "mil": True, "stored": [{"code": "P0117", "desc": "d", "hint": "h", "known": True}], "pending": [], "permanent": []}
+    obj = _run_obj(codes=codes)
+    obj["vehicle"] = {"key": "9SXSMUL1-T"}
+    hub, _, _ = make(tmp_path)
+    hub.start_replay(load_run(obj), "x.json", playing=False)
+    st = hub.state()
+    assert st["codes"]["stored"][0]["code"] == "P0117" and st["codes"]["mil"] is True
+    assert st["vehicle"]["key"] == "9SXSMUL1-T"
+    hub.exit_replay()

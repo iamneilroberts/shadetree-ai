@@ -18,6 +18,7 @@ from obd_reader.live import MAX_HZ, MAX_PIDS, MIN_HZ, LiveLimitError, read_pid_v
 from obd_reader.mode06 import read_all as read_mode06
 from obd_reader.pids import PIDS
 from obd_reader.profiles import ProfileStore
+from obd_reader.replay_run import Run
 from obd_reader.scanner import _dtcs
 from obd_reader.session import Session
 from obd_reader.simulator import SimPort
@@ -34,6 +35,9 @@ EXTRA_PIDS = ["04", "11", "0D", "0E", "43", "44", "0F", "5C", "46", "33", "2F", 
 _EXTRAS_PER_SWEEP = 4
 _SILENT_SWEEPS = 3
 _UNSUPPORTED_SWEEPS = 3  # a PID that gets no value in this many sweeps in a row while others answer is dropped
+_SPEEDS = (0.5, 1.0, 2.0, 4.0, 8.0)
+_REPLAY_TICK = 0.05
+_REPLAY_WINDOW_S = 60.0
 _LABEL_RE = re.compile(r"[a-z0-9-]{1,40}")
 
 
@@ -72,10 +76,22 @@ class LiveHub:
         self._supported: set[str] = set()
         self._prior: dict | None = None
         self._saved: tuple[Path, int] | None = None  # (file, seq) of the last save of this run
+        self._replay: dict | None = None     # while a saved run is loaded: name, run, pos, speed, playing, ended, i
 
     @property
     def running(self) -> bool:
         return self._thread is not None and self._thread.is_alive()
+
+    @property
+    def runs_dir(self) -> Path:
+        return Path(self._s.config.home) / "runs"
+
+    def _meta(self, p: str):
+        d = PIDS.get(p)
+        if d is not None:
+            return d.name, d.unit, None if d.labels is None else {str(k): v for k, v in d.labels.items()}
+        name, unit = (self._replay["run"].names.get(p) if self._replay else None) or (p, None)
+        return name, unit, None
 
     def start(self, pids: list[str], hz: float = 2.5, seconds: float = 600.0) -> None:
         pids = validate_pids(pids)
@@ -84,6 +100,8 @@ class LiveHub:
         if not (isinstance(seconds, (int, float)) and math.isfinite(seconds) and 0 < seconds <= MAX_RUN_S):
             raise LiveLimitError(f"seconds must be in (0, {MAX_RUN_S:g}]")
         with self._lock:
+            if self._replay is not None:
+                raise HubBusy("a replay is loaded: exit it to sample live")
             if self.running:
                 raise HubBusy("the console is already sampling; stop it first")
             if self._unsaved:  # starting clears the last run: say so once, then let the person decide
@@ -101,10 +119,126 @@ class LiveHub:
             self._thread.start()
 
     def stop(self, timeout: float = 5.0) -> None:
+        if self._replay is not None:
+            return self.exit_replay()
         self._stop.set()
         th = self._thread
         if th is not None and th.is_alive():
             th.join(timeout)
+
+    def start_replay(self, run: Run, name: str, playing: bool = True) -> None:
+        with self._lock:
+            if self._replay is None and self.running:
+                raise HubBusy("the console is already sampling; stop it first")
+            if self._unsaved:
+                self._unsaved = False
+                raise HubBusy("the last run could not be saved and loading a replay clears it: press Save run, "
+                              "or load again to discard it")
+            if self._replay is not None:
+                self._join_player()
+            with self._data_lock:
+                self._reset()
+                self._run_id += 1
+                self.status, self.hz = "running", (run.rate_hz or None)
+                self._adapter = {"chip": None, "ati": "replay", "protocol": run.protocol}
+                self._codes = run.codes or {"read": False, "note": "not stored in this run"}
+                self._m06 = run.mode06 or {"read": False, "note": "not stored in this run", "mids": [], "results": []}
+                self._vehicle = run.vehicle
+                self._ch = {p: deque(maxlen=self._max) for p in run.names}
+                self._replay = {"name": name, "run": run, "pos": 0.0, "speed": 1.0, "playing": bool(playing), "ended": False, "i": 0}
+            self._stop.clear()
+            self._thread = threading.Thread(target=self._replay_loop, daemon=True)
+            self._thread.start()
+
+    def _join_player(self) -> None:
+        self._stop.set()
+        th = self._thread
+        if th is not None and th.is_alive():
+            th.join(5.0)
+
+    def exit_replay(self) -> None:
+        with self._lock:
+            if self._replay is None:
+                return
+            self._join_player()
+            with self._data_lock:
+                self._reset()
+                self._run_id += 1
+            self._stop.clear()
+
+    def _replay_loop(self) -> None:
+        last = self._clock()
+        while not self._stop.is_set():
+            now = self._clock()
+            dt, last = now - last, now
+            with self._data_lock:
+                rp = self._replay
+                playing = rp is not None and rp["playing"]
+            if playing:
+                self._replay_advance(dt)
+            self._stop.wait(_REPLAY_TICK)
+
+    def _replay_advance(self, dt: float) -> None:
+        with self._data_lock:
+            rp = self._replay
+            if rp is None:
+                return
+            run = rp["run"]
+            rp["pos"] = min(run.duration, rp["pos"] + dt * rp["speed"])
+            self._publish_until(rp)
+            if rp["pos"] >= run.duration:
+                rp["playing"], rp["ended"] = False, True
+
+    def _publish_until(self, rp: dict) -> None:
+        """Publish every sweep up to the replay position (the caller holds the data lock)."""
+        run, i = rp["run"], rp["i"]
+        while i < len(run.sweeps) and run.sweeps[i][0] <= rp["pos"]:
+            t, vals = run.sweeps[i]
+            i += 1
+            self.seq += 1
+            for p, v in vals.items():
+                self._ch[p].append((self.seq, t, v))
+            self._sweep_t.append(t)
+            self._last_at = self._clock()
+        rp["i"] = i
+
+    def _seek_locked(self, rp: dict, pos: float) -> None:
+        run = rp["run"]
+        self._ch = {p: deque(maxlen=self._max) for p in run.names}
+        self._sweep_t.clear()
+        self.seq = 0
+        self._run_id += 1
+        rp["pos"], rp["ended"] = pos, False
+        rp["i"] = run.first_in_window(pos, _REPLAY_WINDOW_S)
+        self._publish_until(rp)
+        if pos >= run.duration:
+            rp["playing"], rp["ended"] = False, True
+
+    def replay_control(self, action: str, pos: float | None = None, speed: float | None = None) -> None:
+        with self._data_lock:
+            rp = self._replay
+            if rp is None:
+                raise ValueError("no replay is loaded")
+            run = rp["run"]
+            if action == "pause":
+                rp["playing"] = False
+            elif action == "play":
+                if rp["ended"]:
+                    self._seek_locked(rp, 0.0)
+                rp["playing"] = True
+            elif action == "restart":
+                self._seek_locked(rp, 0.0)
+                rp["playing"] = True
+            elif action == "seek":
+                if isinstance(pos, bool) or not isinstance(pos, (int, float)) or not math.isfinite(pos):
+                    raise ValueError("pos must be a number")
+                self._seek_locked(rp, min(max(float(pos), 0.0), run.duration))
+            elif action == "speed":
+                if isinstance(speed, bool) or not isinstance(speed, (int, float)) or float(speed) not in _SPEEDS:
+                    raise ValueError("speed must be one of 0.5, 1, 2, 4, 8")
+                rp["speed"] = float(speed)
+            else:
+                raise ValueError("unknown replay action")
 
     def _run(self, pids: list[str], hz: float, seconds: float) -> None:
         try:
@@ -280,22 +414,24 @@ class LiveHub:
             vehicle = None if self._vehicle is None else dict(self._vehicle)
             # only sweeps up to `seq`: anything newer is not complete yet
             channels = {
-                p: {"name": PIDS[p].name, "unit": PIDS[p].unit,
-                    "labels": None if PIDS[p].labels is None else {str(k): v for k, v in PIDS[p].labels.items()},
+                p: {"name": self._meta(p)[0], "unit": self._meta(p)[1], "labels": self._meta(p)[2],
                     "samples": [[s, tt, v] for s, tt, v in d if after < s <= seq]}
                 for p, d in self._ch.items()
             }
-        now = (self._clock() - t0) if t0 is not None else 0.0
+            rp = self._replay
+            replay = None if rp is None else {"name": rp["name"], "duration": rp["run"].duration, "pos": round(rp["pos"], 3),
+                                              "speed": rp["speed"], "playing": rp["playing"], "ended": rp["ended"]}
+        now = replay["pos"] if replay else (self._clock() - t0) if t0 is not None else 0.0
         measured = (len(st) - 1) / (st[-1] - st[0]) if len(st) >= 2 and st[-1] > st[0] else None
         return {
-            "status": status, "message": message, "demo": self._sim is not None, "run": run,
+            "status": status, "message": message, "demo": self._sim is not None and replay is None, "run": run,
             "seq": seq, "now": round(now, 3),
             "since_last_sample": None if last_at is None else round(self._clock() - last_at, 2),
             "hz": hz, "hz_measured": None if measured is None else round(measured, 2),
             "seconds_left": (max(0.0, round(deadline - self._clock(), 1))
                              if status == "running" and deadline else None),
             "adapter": adapter, "codes": codes, "unsupported": unsupported,
-            "extras": extras, "mode06": m06, "vehicle": vehicle,
+            "extras": extras, "mode06": m06, "vehicle": vehicle, "replay": replay,
             "channels": channels,
         }
 
@@ -304,17 +440,20 @@ class LiveHub:
         with self._data_lock:
             snap = {p: list(d) for p, d in self._ch.items()}
         for p, rows in snap.items():
+            name, unit, _ = self._meta(p)
             if not rows:
-                out[p] = {"name": PIDS[p].name, "unit": PIDS[p].unit, "stats": {"n": 0}, "latest": None}
+                out[p] = {"name": name, "unit": unit, "stats": {"n": 0}, "latest": None}
                 continue
             cut = rows[-1][1] - seconds
             win = [(tt, v) for _, tt, v in rows if tt >= cut]
-            out[p] = {"name": PIDS[p].name, "unit": PIDS[p].unit,
-                      "stats": summarize(Series(name=PIDS[p].name, unit=PIDS[p].unit, samples=win)),
+            out[p] = {"name": name, "unit": unit,
+                      "stats": summarize(Series(name=name, unit=unit, samples=win)),
                       "latest": rows[-1][2]}
         return out
 
     def save_run(self, label: str) -> Path:
+        if self._replay is not None:
+            raise ValueError("a replay cannot be saved")
         if not _LABEL_RE.fullmatch(label):
             raise ValueError("label must be 1-40 chars of [a-z0-9-]")
         with self._data_lock:
