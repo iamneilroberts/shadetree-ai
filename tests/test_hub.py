@@ -597,3 +597,27 @@ def test_a_seek_in_a_long_run_refills_only_the_last_minute(tmp_path):
     assert first[1] == 90.0, "the window is the 60 s before the seek point"
     assert hub.state()["seq"] == 61
     hub.exit_replay()
+
+
+def test_live_stats_cover_every_sample_of_the_run_not_just_the_chart_buffer(tmp_path):
+    sim = SimPort("rich")
+    s = Session(Config(port="sim", home=tmp_path, timeout=0.5), port_factory=lambda: sim)
+    hub = LiveHub(s, sim=sim, max_buffer=5, autosave=False)
+    hub.start(DEFAULT_PIDS, hz=10, seconds=30)
+    assert wait_for(lambda: hub.state()["seq"] >= 12)
+    hub.stop()
+    vals = [v for _, _, v in hub._full["0C"]]
+    st = hub.state()["stats"]["0C"]
+    assert st["n"] == len(vals) > 5 and st["min"] == min(vals) and st["max"] == max(vals)
+    assert st["avg"] == pytest.approx(sum(vals) / len(vals), abs=1e-3)
+
+
+def test_replay_stats_cover_the_whole_run_from_the_start_and_after_a_seek(tmp_path):
+    hub = _replay_hub(tmp_path)
+    want = {"0C": {"n": 10, "min": 700.0, "max": 790.0, "avg": 745.0}, "AB": {"n": 10, "min": 0.0, "max": 9.0, "avg": 4.5}}
+    assert hub.state()["seq"] == 0 and hub.state()["stats"] == want
+    hub._replay_advance(1.0)
+    hub.replay_control("seek", pos=0.5)
+    assert hub.state()["stats"] == want
+    hub.exit_replay()
+    assert hub.state()["stats"] == {}

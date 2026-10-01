@@ -21,27 +21,34 @@ function makeNode(id, handlers) {
   return n;
 }
 
-function makeEnv(states, viewId = 'v0', help = null, runs = [], store = {}) {
+function makeEnv(states, viewId = 'v0', help = null, runs = [], store = {}, page = {}) {   // page: { search, postReply(url, body), prefersLight, storageThrows }
   const els = {}, handlers = {}, docHandlers = {}, posts = [];
   function el(id) { return els[id] || (els[id] = makeNode(id, handlers)); }
   let timer = null, i = 0, now = 0;
   const sandbox = {
     console, URLSearchParams, Promise, Math, Object, Array, Number, String, JSON, Date, parseInt, isFinite,
-    document: { getElementById: el, querySelectorAll: () => [], querySelector: () => ({ id: viewId }),
+    document: { documentElement: el('html'), getElementById: el, querySelectorAll: () => [], querySelector: () => ({ id: viewId }),
                 createElement: () => makeNode('new', handlers), addEventListener(t, fn) { docHandlers[t] = fn; } },
     window: { addEventListener() {}, devicePixelRatio: 1, innerWidth: 500, innerHeight: 800 },
-    location: { search: '?t=abc', hash: '' }, history: { replaceState() {} },
+    location: { search: page.search || '?t=abc', hash: '' }, history: { replaceState() {} },
     performance: { now: () => now },
     setInterval: (fn) => { timer = fn; }, encodeURIComponent,
     fetch: (url, opts) => {
-      if (opts && opts.method === 'POST') { posts.push({ url, body: JSON.parse(opts.body) }); return Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true, path: '/x/runs/a-run.json' }) }); }
-      if (/\/api\/runs/.test(url)) return Promise.resolve({ ok: true, json: () => Promise.resolve({ runs }) });
+      if (opts && opts.method === 'POST') {
+        const body = JSON.parse(opts.body), r = page.postReply && page.postReply(url, body);
+        posts.push({ url, body });
+        if (r) return Promise.resolve({ ok: r.ok, status: r.status, json: () => Promise.resolve(r.j) });
+        return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ ok: true, path: '/x/runs/a-run.json' }) });
+      }
+      if (/\/api\/runs/.test(url)) return Promise.resolve({ ok: true, json: () => Promise.resolve(Array.isArray(runs) ? { runs } : runs) });
       if (/\/api\/help/.test(url)) return Promise.resolve(help ? { ok: true, json: () => Promise.resolve(help) } : { ok: false, json: () => Promise.resolve({}) });
       const st = states[Math.min(i++, states.length - 1)];
       return Promise.resolve({ ok: true, json: () => Promise.resolve(st) });
     }
   };
   if (store !== null) sandbox.localStorage = { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); } };
+  if (page.storageThrows) sandbox.localStorage = { getItem() { throw new Error('blocked'); }, setItem() { throw new Error('blocked'); } };
+  if (page.prefersLight !== undefined) sandbox.window.matchMedia = (q) => ({ matches: /light/.test(q) === page.prefersLight });
   vm.runInNewContext(js, sandbox);
   return {
     el, handlers, docHandlers, posts, sandbox, store,
@@ -109,7 +116,18 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
   await new Promise(r => setImmediate(r));
   const start = env3.posts.find(p => /\/api\/start/.test(p.url));
   assert(start && start.url.includes('t=abc') && start.body.pids.length === 8 && start.body.hz === 2.5, 'start request');
-  assert.strictEqual(env3.el('simctl').hidden, true, 'sim controls hidden outside demo');
+  assert.strictEqual(env3.el('simctl').hidden, true, 'sim controls (and the Demo button in them) hidden outside demo');
+  // a --demo console comes up idle: its Demo button starts the simulated run, and hides while it runs
+  const demoIdle = { status: 'idle', message: null, demo: true, seq: 0, now: 0, since_last_sample: null, hz: null, hz_measured: null, seconds_left: null, adapter: {}, channels: {} };
+  const dm = makeEnv([demoIdle, demoIdle, Object.assign({}, demoIdle, { status: 'running' })]);
+  await dm.tick();
+  assert.strictEqual(dm.el('simctl').hidden, false); assert.strictEqual(dm.el('demoBtn').hidden, false, 'Demo button shown on an idle demo console');
+  dm.handlers['demoBtn:click']();
+  await new Promise(r => setImmediate(r));
+  const dstart = dm.posts.find(p => /\/api\/start/.test(p.url));
+  assert(dstart && dstart.url.includes('t=abc') && dstart.body.pids.length === 8 && dstart.body.hz === 2.5, 'Demo starts the run like Start sampling');
+  for (let k = 0; k < 2; k++) await dm.tick();
+  assert.strictEqual(dm.el('demoBtn').hidden, true, 'hidden while the simulated run is going');
 
   // 4) a new run (seq restarts) resets the buffers instead of mixing runs
   const env4 = makeEnv(statesFor(5, idle).concat(statesFor(2, rev, 0, 0)), 'v3');
@@ -230,7 +248,7 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
   assert(/No bundled help/.test(flat(panel)), 'a reading with no entry gets the generic popup');
   hp.docHandlers.click({ target: findQ(hp.el('m6'), 'm06:evap') });
   assert(/EVAP leak test/.test(flat(panel)) && panel.className === 'open', 'Mode 06 lines have help, and opening another replaces the first');
-  assert.strictEqual(hp.el('x_grid').children.filter(c => c.className === 'xt').length, 3, 'cards (0x04, 0x10, 0x99) are updated in place, not duplicated');
+  assert.strictEqual(hp.el('x_grid').children.filter(c => c.className === 'xr').length, 10, 'rows (7 main channels, 0x04, 0x10, 0x99) are updated in place, not duplicated');
   hp.docHandlers.keydown({ key: 'Escape' });
   panel.offsetWidth = 360; q04.getBoundingClientRect = () => ({ left: 480, top: 100, bottom: 120, right: 500 });
   hp.docHandlers.click({ target: q04 });
@@ -312,7 +330,7 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
   // 8) replay UI: banner, transport bar, controls, picker, upload
   const REPLAY = (over) => Object.assign({ name: 'drive.json', duration: 370, pos: 151, speed: 1, playing: true, ended: false }, over);
   const rstates = (r) => statesFor(3, idle).map(st => Object.assign(st, { replay: r, vehicle: { key: 'ABCDEFGH-P', known: false, runs: 0, note: null } }));
-  const RUNS = [{ name: 'a.json', size: 2048, duration: 370 }, { name: '<b>.json', size: 10, duration: 5 }];
+  const RUNS = [{ name: 'a.json', size: 2048, duration: 370, time: '2026-09-30T21:32:56Z', meta: null }, { name: '<b>.json', size: 10, duration: 5, time: '2026-09-29T10:00:00Z', meta: null }];
   const rp1 = makeEnv(rstates(REPLAY()), 'v0', null, RUNS);
   for (let k = 0; k < 4; k++) await rp1.tick();
   assert.strictEqual(rp1.el('rbar').hidden, false); assert.strictEqual(rp1.el('replayBanner').hidden, false);
@@ -351,10 +369,11 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
   pk.handlers['replayBtn:click'](); await new Promise(r => setImmediate(r)); await new Promise(r => setImmediate(r));
   assert.strictEqual(pk.el('replayPanel').hidden, false);
   assert.strictEqual(pk.el('rp_runs').children.length, 2);
-  assert(/a · 6:10 · 2 KB/.test(pk.el('rp_runs').children[0].textContent), 'option label: ' + pk.el('rp_runs').children[0].textContent);
+  assert.strictEqual(pk.el('rp_src').value, 'mine', 'no examples: the picker opens on My runs');
+  assert.strictEqual(pk.el('rp_runs').children[0].textContent, '2026-09-30 21:32 UTC · 6:10 · a', 'option label: timestamp · length · title');
   assert(pk.el('rp_runs').children[1].textContent.includes('<b>') && pk.el('rp_runs').children[1].innerHTML === '', 'run names are shown as text');
   pk.el('rp_runs').value = 'a.json'; pk.handlers['rp_load:click'](); await new Promise(r => setImmediate(r));
-  assert.deepStrictEqual(pk.posts[pk.posts.length - 1].body, { name: 'a.json' }); assert.strictEqual(pk.el('replayPanel').hidden, true);
+  assert.deepStrictEqual(pk.posts[pk.posts.length - 1].body, { source: 'mine', name: 'a.json' }); assert.strictEqual(pk.el('replayPanel').hidden, true);
   const upload = async (file) => { pk.handlers['rp_file:change']({ target: { files: [file], value: 'x' } }); await new Promise(r => setImmediate(r)); await new Promise(r => setImmediate(r)); };
   await upload({ name: 'x.json', size: 100, text: () => Promise.resolve(JSON.stringify({ kind: 'live_run' })) });
   assert.deepStrictEqual(pk.posts[pk.posts.length - 1].body, { run: { kind: 'live_run' }, name: 'x.json' });
@@ -368,6 +387,56 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
   pk.el('rp_runs').value = 'a.json'; pk.handlers['rp_load:click'](); await new Promise(r => setImmediate(r)); await new Promise(r => setImmediate(r));
   assert.strictEqual(pk.el('rp_err').textContent, 'not a saved run'); assert.strictEqual(pk.el('replayPanel').hidden, false, 'the panel stays open on an error');
 
+
+  // 8b) replay picker: source, then Make -> Model -> Year narrowing, then runs newest first
+  const M = (make, model, year, title) => ({ make, model, year, title });
+  const EX = { runs: [{ name: 'mine-1.json', size: 9, duration: 30, time: '2026-09-01T08:00:00Z', meta: M('Ford', 'F-150', 1999, 'my truck') }],
+    examples: [
+      { name: 'h1.json', size: 9, duration: 366, time: '2026-09-30T21:32:56Z', meta: M('Honda', 'Ridgeline', 2024, 'Ridgeline 6 min drive') },
+      { name: 't-old.json', size: 9, duration: 60, time: '2026-01-02T03:04:05Z', meta: M('Toyota', 'Highlander', 2023, 'old drive') },
+      { name: 'h2.json', size: 9, duration: 90, time: '2026-08-01T00:00:00Z', meta: M('Honda', 'Ridgeline', 2023, 'older truck') },
+      { name: 'p.json', size: 9, duration: 90, time: '2026-08-02T00:00:00Z', meta: M('Honda', 'Pilot', 2024, '<img src=x onerror=1>') },
+      { name: 't-new.json', size: 9, duration: 125, time: '2026-09-15T12:00:00Z', meta: M('Toyota', 'Highlander', 2023, 'new drive') },
+      { name: 'nolabel.json', size: 9, duration: 5, time: '2026-07-01T00:00:00Z', meta: null }] };
+  const pp = makeEnv(statesFor(3, idle), 'v0', null, EX);
+  for (let k = 0; k < 3; k++) await pp.tick();
+  pp.el('replayPanel').hidden = true;
+  pp.handlers['replayBtn:click'](); await new Promise(r => setImmediate(r)); await new Promise(r => setImmediate(r));
+  const opts = (id) => pp.el(id).children.map(c => c.textContent);
+  const vals = (id) => pp.el(id).children.map(c => c.value);
+  const pick = (id, v) => { pp.el(id).value = v; pp.handlers[id + ':change'](); };
+  assert.strictEqual(pp.el('rp_src').value, 'examples', 'examples exist: the picker opens on them');
+  assert.deepStrictEqual(opts('rp_make'), ['Honda', 'Toyota', '(unlabelled)'], 'makes sorted, unlabelled last');
+  assert.strictEqual(pp.el('rp_make').value, 'Honda');
+  assert.deepStrictEqual(opts('rp_model'), ['Pilot', 'Ridgeline'], 'models narrowed to the make');
+  assert.deepStrictEqual(opts('rp_year'), ['2024']);
+  assert.strictEqual(pp.el('rp_runs').children[0].textContent, '2026-08-02 00:00 UTC · 1:30 · <img src=x onerror=1>');
+  assert.strictEqual(pp.el('rp_runs').children[0].innerHTML, '', 'labels are shown as text');
+  pick('rp_model', 'Ridgeline');
+  assert.deepStrictEqual(opts('rp_year'), ['2024', '2023'], 'years newest first');
+  assert.deepStrictEqual(vals('rp_runs'), ['h1.json']);
+  assert.strictEqual(pp.el('rp_runs').children[0].textContent, '2026-09-30 21:32 UTC · 6:06 · Ridgeline 6 min drive');
+  pick('rp_year', '2023'); assert.deepStrictEqual(vals('rp_runs'), ['h2.json']);
+  pick('rp_make', 'Toyota');
+  assert.deepStrictEqual(opts('rp_model'), ['Highlander']); assert.deepStrictEqual(opts('rp_year'), ['2023']);
+  assert.deepStrictEqual(vals('rp_runs'), ['t-new.json', 't-old.json'], 'runs newest first');
+  assert.strictEqual(pp.el('rp_runs').value, 't-new.json');
+  pick('rp_make', '(unlabelled)');
+  assert.deepStrictEqual(opts('rp_model'), ['(unlabelled)']); assert.deepStrictEqual(opts('rp_year'), ['(unlabelled)']);
+  assert.strictEqual(pp.el('rp_runs').children[0].textContent, '2026-07-01 00:00 UTC · 0:05 · nolabel', 'an unlabelled run shows its file name');
+  pp.handlers['rp_load:click'](); await new Promise(r => setImmediate(r));
+  assert.deepStrictEqual(pp.posts[pp.posts.length - 1].body, { source: 'examples', name: 'nolabel.json' });
+  pp.el('replayPanel').hidden = false;
+  pick('rp_src', 'mine');
+  assert.deepStrictEqual(opts('rp_make'), ['Ford']); assert.deepStrictEqual(vals('rp_runs'), ['mine-1.json']);
+  pp.handlers['rp_load:click'](); await new Promise(r => setImmediate(r));
+  assert.deepStrictEqual(pp.posts[pp.posts.length - 1].body, { source: 'mine', name: 'mine-1.json' });
+  const none = makeEnv(statesFor(3, idle), 'v0', null, { runs: [], examples: [] });
+  for (let k = 0; k < 3; k++) await none.tick();
+  none.el('replayPanel').hidden = true;
+  none.handlers['replayBtn:click'](); await new Promise(r => setImmediate(r)); await new Promise(r => setImmediate(r));
+  assert.deepStrictEqual(none.el('rp_runs').children.map(c => c.textContent), ['no saved runs yet']);
+  const before = none.posts.length; none.handlers['rp_load:click'](); assert.strictEqual(none.posts.length, before, 'nothing to load');
 
   // 9) after a seek (new run id, seq restarts below the page's old position) the page refetches the whole refill
   const fullState = (run, n, v) => ({ status: 'running', run, message: null, demo: false, seq: n, now: 0.4 * n, since_last_sample: 0.1, hz: 2.5,
@@ -431,12 +500,35 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
   assert.strictEqual(big(noStore, 'ect'), '90', 'without storage it starts metric');
   await toggle(noStore); assert.strictEqual(big(noStore, 'ect'), '194', 'and still toggles');
 
-  // All readings: speed, plus the min and max line
-  const speedStates = statesFor(4, idle).map(st => { st.channels['0D'] = { name: 'vehicle_speed', unit: 'km/h', samples: [[st.seq, st.now, 60]] }; return st; });
-  const sp = makeEnv(speedStates, 'v6', OVF, [], { 'shadetree.units': 'us' });
+  // All readings: one table row per channel (main channels and extras, speed included): name (unit), now, min, max, average
+  const RSTATS = { '0D': { n: 9, min: 0, max: 112.65, avg: 50 }, '05': { n: 9, min: 20, max: 90, avg: 70 }, '0C': { n: 9, min: 650, max: 3200, avg: 1500.4 },
+                   '0B': { n: 9, min: 30, max: 101, avg: 40 } };
+  const speedStates = (replay) => statesFor(4, idle).map(st => {
+    st.channels['0D'] = { name: 'vehicle_speed', unit: 'km/h', samples: [[st.seq, st.now, 60]] };
+    st.channels['0B'] = { name: 'intake_manifold_pressure', unit: 'kPa', samples: [[st.seq, st.now, 36]] };
+    st.channels['03'] = { name: 'fuel_system_status', unit: null, labels: { '2': 'closed loop' }, samples: [[st.seq, st.now, 2]] };
+    st.stats = RSTATS; if (replay) st.replay = { name: 'r.json', duration: 300, pos: st.now, speed: 1, playing: true, ended: false };
+    return st;
+  });
+  const rrow = (e, key) => { let r = null; walk(e.el('x_grid'), n => { if (n.className === 'xr' && n.getAttribute('data-key') === key) r = n; }); return r; };
+  const cells = (e, key) => rrow(e, key).children.map(c => flat(c).replace(/\s*\?$/, '').trim().replace(/\s+/g, ' '));   // the name cell ends with its ? button
+  const sp = makeEnv(speedStates(true), 'v6', OVF, [], { 'shadetree.units': 'us' });
   for (let k = 0; k < 5; k++) await sp.tick();
-  let spCard = null; walk(sp.el('x_grid'), n => { if (n.className === 'xt' && n.children[0].getAttribute('data-help') === '0D') spCard = n; });
-  assert(/37 mph/.test(flat(spCard)) && /min 37 · max 37/.test(flat(spCard)), 'extra readings convert too: ' + flat(spCard));
+  assert.deepStrictEqual(cells(sp, '0D'), ['Vehicle speed (mph)', '37', '0', '70', '31'], 'speed row converts every column: ' + cells(sp, '0D'));
+  assert.deepStrictEqual(cells(sp, '05'), ['Coolant temp (°F)', '106', '68', '194', '158'], 'a main channel is a row too');
+  assert.deepStrictEqual(cells(sp, '0B'), ['MAP (inHg)', '10.6', '8.9', '29.8', '11.8'], 'manifold pressure in inHg');
+  assert.deepStrictEqual(cells(sp, '0C'), ['Engine speed (rpm)', '700', '650', '3200', '1500']);
+  assert.deepStrictEqual(cells(sp, '06'), ['STFT bank 1 (%)', '-12.0', '—', '—', '—'], 'no stats from the server: dashes, not made-up numbers');
+  assert.deepStrictEqual(cells(sp, '03'), ['Fuel system status', 'closed loop', '—', '—', '—'], 'a status reading shows its label and no statistics');
+  assert(findQ(rrow(sp, '0D'), '0D'), 'every row keeps its ? help button');
+  assert.strictEqual(sp.el('x_grid').children.filter(c => c.className === 'xr').length, 11, 'all 11 channels on one table, in pid order');
+  assert.strictEqual(sp.el('x_grid').children[0].getAttribute('data-key'), '03');
+  assert(/11 readings · stats over the whole run/.test(sp.el('x_count').textContent), sp.el('x_count').textContent);
+  await toggle(sp);
+  assert.deepStrictEqual(cells(sp, '0D'), ['Vehicle speed (km/h)', '60', '0', '112.7', '50'], 'metric after the toggle');
+  const spl = makeEnv(speedStates(false), 'v6', OVF, [], {});
+  for (let k = 0; k < 5; k++) await spl.tick();
+  assert(/stats over this run so far/.test(spl.el('x_count').textContent), 'live says the stats are over the run so far');
 
   // Analyzer, Handheld and Guided test: labels and digits
   const an = await uEnv({ '05': 41 }, 'v4', {});
@@ -450,6 +542,47 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
   assert.strictEqual(hh2.el('h_ect_u').textContent, '°F'); assert.strictEqual(hh2.el('h_map_u').textContent, 'INHG');
   const gt = await uEnv({ '05': 41 }, 'v3', { 'shadetree.units': 'us' });
   assert.strictEqual(gt.el('v3ect').textContent, '106'); assert.strictEqual(gt.el('v3ect_u').textContent, '°F'); assert.strictEqual(gt.el('v3map_u').textContent, 'inHg');
+
+  // ?example=<file>: the page replays that example run on load, as picking it under Examples does; only examples, strict names
+  const EXN = '2026-09-30T21-32-56Z-drive-rebuilt.json';
+  const exEnv = async (search, postReply) => { const e = makeEnv(statesFor(3, idle), 'v0', null, [], {}, { search, postReply }); for (let k = 0; k < 3; k++) await e.tick(); return e; };
+  const replays = (e) => e.posts.filter(p => /^\/api\/replay\?/.test(p.url));
+  const exOk = await exEnv('?t=abc&example=' + EXN);
+  assert.deepStrictEqual(replays(exOk).map(p => p.body), [{ source: 'examples', name: EXN }], 'loads the example by name from Examples only');
+  assert.strictEqual(replays(exOk)[0].url, '/api/replay?t=abc', 'the token still goes only in the request URL');
+  assert.strictEqual(exOk.el('exNote').textContent, '', 'no notice when it loads (the fake DOM ignores the hidden attribute)');
+  const exNone = await exEnv('?t=abc');
+  assert.strictEqual(replays(exNone).length, 0, 'no parameter, no replay'); assert.strictEqual(exNone.el('exNote').textContent, '');
+  const exMissing = await exEnv('?t=abc&example=missing.json', () => ({ ok: false, status: 404, j: { error: 'no such saved run' } }));
+  assert.strictEqual(exMissing.el('exNote').hidden, false); assert.strictEqual(exMissing.el('exNote').textContent, 'Example not found: missing.json');
+  for (const bad of ['../runs/mine.json', '%2e%2e%2fmine.json', 'runs/mine.json', 'mine', '', 'a b.json', '<img src=x onerror=1>.json']) {
+    const e = await exEnv('?t=abc&example=' + bad);
+    assert.strictEqual(replays(e).length, 0, 'an invalid name is never sent: ' + bad);
+    assert.strictEqual(e.el('exNote').hidden, false, 'and says so: ' + bad);
+    assert(/^Example not found/.test(e.el('exNote').textContent) && e.el('exNote').innerHTML === '', 'as text: ' + bad);
+    assert(!e.el('exNote').textContent.includes('abc'), 'the token never reaches the notice');
+  }
+  const exBusy = await exEnv('?t=abc&example=' + EXN, () => ({ ok: false, status: 409, j: { error: 'the console is already sampling; stop it first' } }));
+  assert.strictEqual(exBusy.el('exNote').textContent, 'Could not load the example: the console is already sampling; stop it first', 'a busy console is not "not found"');
+
+  // Theme: the stored choice beats the system preference; a bad stored value is ignored; dark when nothing is known; blocked storage is tolerated
+  const thEnv = async (store, page) => { const e = makeEnv(statesFor(2, idle), 'v0', null, [], store, page); for (let k = 0; k < 2; k++) await e.tick(); return e; };
+  const theme = (e) => e.el('html').getAttribute('data-theme');
+  const th1 = await thEnv({ 'shadetree.theme': 'light' }, { prefersLight: false });
+  assert.strictEqual(theme(th1), 'light', 'stored light beats a dark system'); assert.strictEqual(th1.el('themeBtn').textContent, 'Theme: Dark', 'the label names the mode a click switches to');
+  assert.strictEqual(theme(await thEnv({ 'shadetree.theme': 'dark' }, { prefersLight: true })), 'dark', 'stored dark beats a light system');
+  assert.strictEqual(theme(await thEnv({}, { prefersLight: true })), 'light', 'no stored choice: follow the system');
+  assert.strictEqual(theme(await thEnv({ 'shadetree.theme': 'purple' }, { prefersLight: true })), 'light', 'a bad stored value is ignored');
+  const th0 = await thEnv({}, {});
+  assert.strictEqual(theme(th0), 'dark', 'no matchMedia: dark, as the page always was'); assert.strictEqual(th0.el('themeBtn').textContent, 'Theme: Light');
+  const thStore = {}, th2 = await thEnv(thStore, { prefersLight: false });
+  th2.handlers['themeBtn:click']();
+  assert.strictEqual(theme(th2), 'light'); assert.strictEqual(thStore['shadetree.theme'], 'light', 'the choice is remembered');
+  assert.strictEqual(th2.el('themeBtn').textContent, 'Theme: Dark');
+  th2.handlers['themeBtn:click'](); assert.strictEqual(theme(th2), 'dark'); assert.strictEqual(thStore['shadetree.theme'], 'dark');
+  const th3 = await thEnv({}, { prefersLight: true, storageThrows: true });
+  assert.strictEqual(theme(th3), 'light', 'blocked storage: still follows the system');
+  th3.handlers['themeBtn:click'](); assert.strictEqual(theme(th3), 'dark', 'and still toggles');
 
   console.log('page logic OK');
 })().catch(e => { console.error('FAIL', e.message); process.exit(1); });

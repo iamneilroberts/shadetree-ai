@@ -99,12 +99,24 @@ def test_console_data_rejects_silly_windows(tmp_path):
 def test_cli_console_demo_builds_a_working_service(tmp_path):
     from obd_reader.__main__ import build_parser, console_main
 
+    from pathlib import Path
+
+    from obd_reader.hub import DEFAULT_PIDS
+
+    examples = Path(__file__).resolve().parents[1] / "examples" / "runs"
+    run = sorted(p.name for p in examples.glob("*.json"))[0]
     args = build_parser().parse_args(["console", "--demo", "--http-port", "0", "--scenario", "lean",
-                                      "--out-dir", str(tmp_path)])
+                                      "--out-dir", str(tmp_path), "--examples-dir", str(examples)])
     svc = console_main(args, block=False)
+    url = svc.server.url
     try:
-        assert wait_seq(svc.server.url, 3)
-        assert svc.hub.state()["demo"] is True
+        st = svc.hub.state()
+        assert st["status"] == "idle" and st["demo"] is True, "a demo console comes up idle, not sampling"
+        assert post_json(url, "/api/replay", {"source": "examples", "name": run}) == 200, "so ?example= loads with no refusal"
+        assert post_json(url, "/api/replay/control", {"action": "exit"}) == 200
+        assert post_json(url, "/api/start", {"pids": DEFAULT_PIDS}) == 200, "the page's Demo button starts the simulated run"
+        assert wait_seq(url, 3) and svc.hub.state()["demo"] is True and svc.hub._sim.scenario == "lean", "--scenario still applies"
+        assert post_json(url, "/api/replay", {"source": "examples", "name": run}) == 409, "a run that really is active is still refused"
     finally:
         svc.stop()
 

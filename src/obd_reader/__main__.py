@@ -47,12 +47,13 @@ def console_main(args, block: bool = True):
 
     session = Session(Config(port=args.port, home=args.out_dir))
     svc = ConsoleService(session, demo=args.demo, host=args.host, http_port=args.http_port,
-                         allow_lan=args.allow_lan, scenario=args.scenario, allow_hosts=args.allow_host)
+                         allow_lan=args.allow_lan, scenario=args.scenario, allow_hosts=args.allow_host,
+                         examples_dir=args.examples_dir)
     server = svc.ensure()
     if args.host not in ("127.0.0.1", "localhost", "::1"):
         print("warning: the console is reachable from your network; anyone with the link can watch live data",
               file=sys.stderr)
-    if not args.no_start:
+    if not args.no_start and not args.demo:   # a demo console comes up idle: the page's Demo button starts the simulated run
         svc.start_sampling(seconds=args.seconds)
     print(f"console: {server.url}", flush=True)
     if args.allow_host:
@@ -89,6 +90,14 @@ def _export_run(args) -> int:
     return 0
 
 
+def _label_run(args) -> int:
+    from obd_reader.replay_run import label_run
+
+    meta = label_run(args.file, make=args.make, model=args.model, year=args.year, title=args.title)
+    print(f"labelled {args.file}: {meta['year']} {meta['make']} {meta['model']} \u00b7 {meta['title']}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(prog="shadetree-ai")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -109,7 +118,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     co = sub.add_parser("console", help="open the live console web page (read-only)")
     co.add_argument("--port", default=None, help="adapter serial device (not needed with --demo)")
-    co.add_argument("--demo", action="store_true", help="use the built-in simulated car instead of an adapter")
+    co.add_argument("--demo", action="store_true", help="use the built-in simulated car instead of an adapter; the page comes up idle and its Demo button starts the simulated run")
     co.add_argument("--scenario", default="rich", choices=["healthy", "rich", "lean"], help="demo scenario")
     co.add_argument("--http-port", type=int, default=8765, help="local web port (0 = any free port)")
     co.add_argument("--host", default="127.0.0.1", help="bind address (non-loopback needs --allow-lan)")
@@ -119,12 +128,21 @@ def build_parser() -> argparse.ArgumentParser:
     co.add_argument("--seconds", type=float, default=600.0, help="auto-stop after this many seconds")
     co.add_argument("--no-start", action="store_true", help="open the page without starting sampling")
     co.add_argument("--out-dir", type=Path, default=Path("."), help="runs/ and transcripts/ go here")
+    co.add_argument("--examples-dir", type=Path, default=None,
+                    help="folder of public example runs for the replay picker (default: examples/runs in the repo, if present)")
     co.set_defaults(func=lambda a: (console_main(a), 0)[1])
     ex = sub.add_parser("export-run", help="bundle the newest saved run(s) and transcripts into one .tgz to move to another machine")
     ex.add_argument("--out-dir", type=Path, default=Path("."), help="where runs/ and transcripts/ are")
     ex.add_argument("--dest", type=Path, default=Path("shadetree-share.tgz"), help="bundle to write")
     ex.add_argument("--latest", type=int, default=1, help="how many of the newest runs to include")
     ex.set_defaults(func=_export_run)
+    lr = sub.add_parser("label-run", help="add the make, model, year and title the console's replay picker shows (no VIN)")
+    lr.add_argument("file", type=Path, help="a saved run .json")
+    lr.add_argument("--make", required=True, help="e.g. Honda (at most 40 characters)")
+    lr.add_argument("--model", required=True, help="e.g. Ridgeline (at most 40 characters)")
+    lr.add_argument("--year", required=True, type=int, help="model year, e.g. 2024")
+    lr.add_argument("--title", required=True, help="short description, e.g. 'Ridgeline 6 min drive' (at most 80 characters)")
+    lr.set_defaults(func=_label_run)
     return ap
 
 
