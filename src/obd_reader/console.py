@@ -222,7 +222,8 @@ class ConsoleServer:
                     return
                 try:
                     if path == "/api/start":
-                        outer.hub.start(body.get("pids"), hz=body.get("hz", 2.5), seconds=body.get("seconds", 600.0))
+                        outer.hub.start(body.get("pids"), hz=body.get("hz", 2.5), seconds=body.get("seconds", 600.0),
+                                        capture=body.get("capture", "default"))
                         return self._json(200, {"ok": True})
                     if path == "/api/stop":
                         outer.hub.stop()

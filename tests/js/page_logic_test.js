@@ -129,6 +129,20 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
   for (let k = 0; k < 2; k++) await dm.tick();
   assert.strictEqual(dm.el('demoBtn').hidden, true, 'hidden while the simulated run is going');
 
+  // "Capture all supported": unticked, Start sends the same request as before; ticked, it adds capture: 'all' (Demo too); locked while running
+  assert(!('capture' in start.body), 'the default start request is unchanged');
+  const ca = makeEnv([demoIdle, demoIdle, Object.assign({}, demoIdle, { status: 'running', channels: { '05': { name: 'coolant_temp', unit: 'C', samples: [] } }, tiers: { fast: ['0C'], slow: ['05', '42'], slow_per_sweep: 1 } })], 'v6');
+  await ca.tick();
+  assert.strictEqual(ca.el('capAll').disabled, false, 'the option can be changed before a run');
+  ca.el('capAll').checked = true;
+  ca.handlers['pause:click'](); ca.handlers['demoBtn:click']();
+  await new Promise(r => setImmediate(r));
+  const cstarts = ca.posts.filter(p => /\/api\/start/.test(p.url));
+  assert(cstarts.length === 2 && cstarts.every(p => p.body.capture === 'all' && p.body.pids.length === 8 && p.body.hz === 2.5), 'capture all on both buttons');
+  for (let k = 0; k < 2; k++) await ca.tick();
+  assert.strictEqual(ca.el('capAll').disabled, true, 'locked while a run is going: it only applies at Start');
+  assert(/all supported: 1 fast every sweep, 2 slow in rotation/.test(ca.el('x_count').textContent), ca.el('x_count').textContent);
+
   // 4) a new run (seq restarts) resets the buffers instead of mixing runs
   const env4 = makeEnv(statesFor(5, idle).concat(statesFor(2, rev, 0, 0)), 'v3');
   for (let k = 0; k < 7; k++) await env4.tick();

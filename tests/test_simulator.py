@@ -118,3 +118,18 @@ def test_sim_answers_the_vin_request_in_multi_frame_layout_and_it_parses():
     assert lines[0] == "014" and lines[1].startswith("0: 49 02 01")
     payload = parse_all(lines, 0x49)[0]
     assert payload[3:20].decode("ascii") == SIM_VIN and VIN_RE.fullmatch(SIM_VIN)
+
+
+def test_sim_reports_a_realistic_set_of_supported_pids_and_answers_each_one():
+    from obd_reader.elm import decode_supported, parse_all
+    from obd_reader.pids import PIDS
+    t = Transport(SimPort())
+    sup = set()
+    for base in (0x00, 0x20, 0x40):
+        for p in parse_all(t.send(f"01{base:02X}"), 0x41):
+            sup |= set(decode_supported(base, p[2:6]))
+    readings = {p for p in sup if p not in ("20", "40")}
+    assert 20 <= len(readings) <= 30 and readings <= set(PIDS), sorted(readings)
+    for pid in readings:
+        raw = bytes.fromhex(t.send(f"01{pid}")[0].replace(" ", ""))
+        assert raw[:2] == bytes([0x41, int(pid, 16)]) and decode_pid(pid, raw[2:]) is not None, pid

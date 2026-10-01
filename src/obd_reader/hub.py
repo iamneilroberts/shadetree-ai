@@ -34,12 +34,24 @@ EXTRA_PIDS = ["04", "11", "0D", "0E", "43", "44", "0F", "5C", "46", "33", "2F", 
               "3E", "3F", "2C", "2D", "2E", "23", "47", "49", "4A", "62", "63", "8E", "55", "56", "57", "58", "03",
               "1C", "51", "1F", "30", "31", "21", "A6"]
 _EXTRAS_PER_SWEEP = 4
+# "Capture all supported": every decodable Mode 01 PID the car reports, in two tiers. The fast tier is read every
+# sweep (the run's rate, 2.5 Hz from the page); the rest rotate, enough per sweep for about SLOW_HZ each, at most
+# SLOW_MAX_PER_SWEEP so the fast tier keeps its cadence. Real-adapter throughput is unverified.
+FAST_PIDS = ["0C", "0D", "04", "11"]
+SLOW_HZ = 0.25
+SLOW_MAX_PER_SWEEP = 4
+CAPTURE_MODES = ("default", "all")
 _SILENT_SWEEPS = 3
 _UNSUPPORTED_SWEEPS = 3  # a PID that gets no value in this many sweeps in a row while others answer is dropped
 _SPEEDS = (0.5, 1.0, 2.0, 4.0, 8.0)
 _REPLAY_TICK = 0.05
 _REPLAY_WINDOW_S = 60.0
 _LABEL_RE = re.compile(r"[a-z0-9-]{1,40}")
+
+
+def slow_per_sweep(n_slow: int, hz: float) -> int:
+    """How many slow-tier PIDs to read each sweep so each comes round at about SLOW_HZ, within the cap."""
+    return 0 if n_slow <= 0 else min(SLOW_MAX_PER_SWEEP, max(1, math.ceil(n_slow * SLOW_HZ / hz)))
 
 
 class HubBusy(RuntimeError):
@@ -73,6 +85,7 @@ class LiveHub:
         self._unsupported: list[str] = []
         self._missed: set[str] = set()
         self._extras: list[str] = []
+        self._tiers: dict | None = None      # capture-all runs: {"fast", "slow", "slow_per_sweep"}
         self._m06: dict = {"read": False, "note": None, "mids": [], "results": []}
         self._vehicle: dict | None = None
         self._key: str | None = None
@@ -96,8 +109,10 @@ class LiveHub:
         name, unit = (self._replay["run"].names.get(p) if self._replay else None) or (p, None)
         return name, unit, None
 
-    def start(self, pids: list[str], hz: float = 2.5, seconds: float = 600.0) -> None:
+    def start(self, pids: list[str], hz: float = 2.5, seconds: float = 600.0, capture: str = "default") -> None:
         pids = validate_pids(pids)
+        if not isinstance(capture, str) or capture not in CAPTURE_MODES:
+            raise LiveLimitError("capture must be default or all")
         if not (isinstance(hz, (int, float)) and math.isfinite(hz) and MIN_HZ <= hz <= MAX_HZ):
             raise LiveLimitError(f"hz must be between {MIN_HZ:g} and {MAX_HZ:g}")
         if not (isinstance(seconds, (int, float)) and math.isfinite(seconds) and 0 < seconds <= MAX_RUN_S):
@@ -118,7 +133,7 @@ class LiveHub:
                 self._ch = {p: deque(maxlen=self._max) for p in pids}
                 self._full = {p: [] for p in pids}
             self._stop.clear()
-            self._thread = threading.Thread(target=self._run, args=(pids, float(hz), float(seconds)), daemon=True)
+            self._thread = threading.Thread(target=self._run, args=(pids, float(hz), float(seconds), capture == "all"), daemon=True)
             self._thread.start()
 
     def stop(self, timeout: float = 5.0) -> None:
@@ -253,7 +268,7 @@ class LiveHub:
             else:
                 raise ValueError("unknown replay action")
 
-    def _run(self, pids: list[str], hz: float, seconds: float) -> None:
+    def _run(self, pids: list[str], hz: float, seconds: float, capture_all: bool = False) -> None:
         try:
             with self._s.connection("console") as t:
                 a = identify(t)
@@ -261,15 +276,19 @@ class LiveHub:
                 t0 = self._clock()
                 self._t0, self._deadline = t0, t0 + seconds
                 silent, period = 0, 1.0 / hz
-                active, misses = list(pids), dict.fromkeys(pids, 0)
-                extras, rot = self._discover_extras(t, pids), 0
+                plan = self._capture_plan(t, hz) if capture_all else None
+                if plan:
+                    active, extras, per = plan
+                else:
+                    active, extras, per = list(pids), self._discover_extras(t, pids), _EXTRAS_PER_SWEEP
+                misses, rot = dict.fromkeys(active, 0), 0
                 while not self._stop.is_set():
                     now = self._clock() - t0
                     if now > seconds:
                         self.message = f"auto-stopped after {seconds:g} s"
                         break
-                    batch = [extras[(rot + i) % len(extras)] for i in range(min(_EXTRAS_PER_SWEEP, len(extras)))]
-                    rot = (rot + _EXTRAS_PER_SWEEP) % len(extras) if extras else 0
+                    batch = [extras[(rot + i) % len(extras)] for i in range(min(per, len(extras)))]
+                    rot = (rot + per) % len(extras) if extras else 0
                     got = self._sweep(t, active + batch, now)
                     if self._stop.is_set():  # Stop pressed (possibly mid-sweep): end now, no "silent bus" message
                         break
@@ -311,6 +330,33 @@ class LiveHub:
         room = MAX_PIDS - len(core)
         if room <= 0:
             return []
+        supported = self._discover_supported(t)
+        extras = [p for p in EXTRA_PIDS if p in supported and p in PIDS and p not in core][:room]
+        with self._data_lock:
+            self._extras, self._supported = extras, supported
+            for p in extras:
+                self._ch[p] = deque(maxlen=self._max)
+                self._full[p] = []
+        return extras
+
+    def _capture_plan(self, t, hz: float) -> tuple[list[str], list[str], int] | None:
+        """Capture all supported: the fast tier and every other decodable PID the car reports, as the run's channels.
+        None when the car gives no support bitmap (the run then reads the PIDs it was started with)."""
+        supported = self._discover_supported(t)
+        fast = [p for p in FAST_PIDS if p in supported]
+        slow = sorted(p for p in supported if p in PIDS and p not in fast)
+        if not fast and not slow:
+            return None
+        per = slow_per_sweep(len(slow), hz)
+        with self._data_lock:
+            self._extras, self._supported = slow, supported
+            self._tiers = {"fast": fast, "slow": slow, "slow_per_sweep": per}
+            self._ch = {p: deque(maxlen=self._max) for p in fast + slow}
+            self._full = {p: [] for p in fast + slow}
+        return fast, slow, per
+
+    def _discover_supported(self, t) -> set[str]:
+        """The Mode 01 PIDs the car says it supports, from the 0100/0120/... bitmaps."""
         supported: set[str] = set()
         base = 0x00
         while base <= 0xC0 and not self._stop.is_set():
@@ -324,13 +370,7 @@ class LiveHub:
             if f"{base + 0x20:02X}" not in found:
                 break
             base += 0x20
-        extras = [p for p in EXTRA_PIDS if p in supported and p in PIDS and p not in core][:room]
-        with self._data_lock:
-            self._extras, self._supported = extras, supported
-            for p in extras:
-                self._ch[p] = deque(maxlen=self._max)
-                self._full[p] = []
-        return extras
+        return supported
 
     def _read_identity(self, t) -> dict | None:
         """Name the class of car from a partial VIN, once per run (CAN only), and load what past runs learned.
@@ -439,6 +479,7 @@ class LiveHub:
             status, message, hz, run = self.status, self.message, self.hz, self._run_id
             adapter, st, codes = dict(self._adapter), list(self._sweep_t), dict(self._codes)
             unsupported, extras, m06 = list(self._unsupported), list(self._extras), dict(self._m06)
+            tiers = None if self._tiers is None else dict(self._tiers)
             vehicle = None if self._vehicle is None else dict(self._vehicle)
             # only sweeps up to `seq`: anything newer is not complete yet
             channels = {
@@ -470,7 +511,7 @@ class LiveHub:
             "seconds_left": (max(0.0, round(deadline - self._clock(), 1))
                              if status == "running" and deadline else None),
             "adapter": adapter, "codes": codes, "unsupported": unsupported,
-            "extras": extras, "mode06": m06, "vehicle": vehicle, "replay": replay,
+            "extras": extras, "tiers": tiers, "mode06": m06, "vehicle": vehicle, "replay": replay,
             "channels": channels, "stats": stats,
         }
 

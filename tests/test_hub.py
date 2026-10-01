@@ -681,3 +681,101 @@ def test_live_stats_age_and_extreme_times_match_the_samples(tmp_path):
     mean = sum(vals) / len(vals)
     assert s0["std"] == pytest.approx((sum((v - mean) ** 2 for v in vals) / (len(vals) - 1)) ** 0.5, abs=1e-3)
     assert s0["age"] == pytest.approx(st["now"] - rows[-1][1], abs=0.1) and s0["age"] >= 0
+
+
+from obd_reader.hub import FAST_PIDS, slow_per_sweep
+
+
+def test_slow_tier_takes_enough_per_sweep_for_its_target_rate_within_a_cap():
+    assert slow_per_sweep(0, 2.5) == 0
+    assert slow_per_sweep(26, 2.5) == 3, "26 slow PIDs at 2.5 Hz: 3 a sweep, each about every 3.5 s (0.29 Hz)"
+    assert slow_per_sweep(2, 2.5) == 1
+    assert slow_per_sweep(200, 2.5) == 4, "capped so the fast tier keeps its cadence"
+
+
+def _capture_run(tmp_path, seconds=30):
+    hub, _, _ = make(tmp_path)
+    hub.start(DEFAULT_PIDS, hz=10, seconds=seconds, capture="all")
+    return hub
+
+
+def test_capture_all_polls_the_fast_tier_every_sweep_and_rotates_every_other_supported_pid(tmp_path):
+    hub = _capture_run(tmp_path)
+    assert wait_for(lambda: hub.state()["tiers"] is not None)
+    tiers = hub.state()["tiers"]
+    assert tiers["fast"] == FAST_PIDS == ["0C", "0D", "04", "11"] and tiers["slow_per_sweep"] == 1
+    assert 16 <= len(tiers["slow"]) <= 26 and not set(tiers["slow"]) & set(FAST_PIDS)
+    assert {"05", "06", "07", "42", "3C", "5C", "46"} <= set(tiers["slow"]), "every supported reading, not just the 8 defaults"
+    assert wait_for(lambda: all(hub.state()["stats"].get(p) for p in tiers["slow"]), secs=10), "every slow PID gets read"
+    hub.stop()
+    st, sweeps = hub.state(), hub.state()["seq"]
+    assert set(st["channels"]) == set(tiers["fast"]) | set(tiers["slow"])
+    n = {p: st["stats"][p]["n"] for p in st["channels"]}
+    assert all(n[p] == sweeps for p in FAST_PIDS), "fast tier: one sample per sweep"
+    per_slow = sweeps / len(tiers["slow"])
+    assert all(n[p] <= per_slow + 1 for p in tiers["slow"]), n
+    assert max(n[p] for p in tiers["slow"]) < min(n[p] for p in FAST_PIDS) / 4
+
+
+def test_default_start_is_unchanged_and_has_no_tiers(tmp_path):
+    hub, _, _ = make(tmp_path)
+    hub.start(DEFAULT_PIDS, hz=10, seconds=30)
+    assert wait_for(lambda: hub.state()["seq"] >= 3)
+    st = hub.state()
+    assert st["tiers"] is None and set(DEFAULT_PIDS) <= set(st["channels"]) and len(st["channels"]) <= 16
+    hub.stop()
+
+
+def test_a_bad_capture_mode_is_refused_before_any_traffic(tmp_path):
+    hub, _, _ = make(tmp_path)
+    for bad in ("everything", 1, None, ["all"]):
+        with pytest.raises(LiveLimitError):
+            hub.start(DEFAULT_PIDS, capture=bad)
+    assert not hub.running
+
+
+def test_capture_all_without_a_support_bitmap_falls_back_to_the_given_pids(tmp_path):
+    class _NoBitmap(SimPort):
+        def write(self, data):
+            super().write(data)
+            if data.decode().rstrip("\r") in ("0100", "0120", "0140"):
+                self._pending = "NO DATA\r"
+    hub, _, _ = make(tmp_path, sim=_NoBitmap("rich"))
+    hub.start(DEFAULT_PIDS, hz=10, seconds=30, capture="all")
+    assert wait_for(lambda: hub.state()["seq"] >= 3)
+    st = hub.state()
+    assert st["tiers"] is None and set(st["channels"]) == set(DEFAULT_PIDS)
+    hub.stop()
+
+
+def test_a_mixed_rate_capture_saves_and_replays_every_channel_at_its_own_times(tmp_path):
+    hub = _capture_run(tmp_path)
+    assert wait_for(lambda: hub.state()["seq"] >= 40, secs=10)
+    hub.stop()
+    full = {p: [(t, v) for _, t, v in rows] for p, rows in hub._full.items() if rows}
+    data = json.loads(hub.save_run("mixed").read_text())
+    saved = {p: [tuple(x) for x in s["samples"]] for p, s in data["live_sample"]["series"].items() if s["samples"]}
+    assert saved == full
+    run = load_run(data)
+    assert any(len(vals) < len(run.names) for _, vals in run.sweeps), "sparse sweeps: a slow channel is absent from most"
+    for p, rows in full.items():
+        assert [(t, vals[p]) for t, vals in run.sweeps if p in vals] == rows, p
+    hub2, _, _ = make(tmp_path)
+    hub2.start_replay(run, "mixed.json", playing=False)
+    st = hub2.state()["stats"]
+    assert {p: st[p]["n"] for p in full} == {p: len(rows) for p, rows in full.items()}
+    hub2.replay_control("seek", pos=run.duration)
+    ch = hub2.state()["channels"]
+    assert all([s[1:] for s in ch[p]["samples"]] == [list(r) for r in full[p] if r[0] >= run.duration - 60] for p in full)
+    hub2.exit_replay()
+
+
+def test_an_old_rectangular_run_file_still_loads_and_replays_every_sweep(tmp_path):
+    obj = _run_obj()  # the pre-capture format: every channel at every sweep time
+    run = load_run(obj)
+    assert len(run.sweeps) == 10 and all(set(vals) == {"0C", "AB"} for _, vals in run.sweeps)
+    hub, _, _ = make(tmp_path)
+    hub.start_replay(run, "old.json", playing=False)
+    hub.replay_control("seek", pos=run.duration)
+    assert hub.state()["seq"] == 10 and hub.state()["stats"]["0C"]["n"] == 10
+    hub.exit_replay()

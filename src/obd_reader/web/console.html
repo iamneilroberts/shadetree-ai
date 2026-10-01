@@ -291,6 +291,7 @@
     <button class="b" id="unitsBtn">Units: Metric</button>
     <button class="b" id="themeBtn">Theme: Light</button>
     <button class="b" id="replayBtn">Replay&hellip;</button>
+    <label class="chip" title="Read every reading the car supports: engine speed, speed, load and throttle every sweep, the rest a few at a time"><input type="checkbox" id="capAll"> Capture all supported</label>
     <button class="b" id="pause">Start sampling</button>
     <button class="b primary" id="save">Save run</button>
   </div>
@@ -687,7 +688,7 @@
     $('age').textContent = age === null ? '—' : age.toFixed(1) + ' s ago';
     var sl = st.seconds_left; $('autostop').textContent = sl === null || sl === undefined ? '—' : Math.floor(sl / 60) + ':' + ('0' + Math.floor(sl % 60)).slice(-2);
     $('pause').textContent = st.status === 'running' ? 'Stop sampling' : 'Start sampling';
-    $('simctl').hidden = !st.demo; $('demoBanner').hidden = !st.demo; $('demoBtn').hidden = st.status === 'running';
+    $('simctl').hidden = !st.demo; $('demoBanner').hidden = !st.demo; $('demoBtn').hidden = st.status === 'running'; $('capAll').disabled = st.status === 'running';
     renderReplay();
     if (st.message) showMsg(st.message); else if (st.status !== 'disconnected') showMsg('');
     if (st.status === 'disconnected') showMsg('Lost contact with the console server. Is shadetree-ai still running?');
@@ -840,7 +841,8 @@
   function renderReadings() {
     var st = state || {}, chs = st.channels || {}, stats = st.stats || {}, ids = Object.keys(chs).sort();
     keyed($('x_grid'), ids.map(function (p) { return { key: p, lab: chs[p].labels, s: stats[p] }; }), makeX, updX);
-    $('x_count').textContent = ids.length ? ids.length + ' readings · stats over ' + (st.status === 'running' && !st.replay ? 'this run so far' : 'the whole run') : '';
+    $('x_count').textContent = ids.length ? ids.length + ' readings · stats over ' + (st.status === 'running' && !st.replay ? 'this run so far' : 'the whole run') +
+      (st.tiers ? ' · all supported: ' + st.tiers.fast.length + ' fast every sweep, ' + st.tiers.slow.length + ' slow in rotation' : '') : '';
     $('x_note').style.display = ids.length ? 'none' : '';
     $('x_table').style.display = ids.length ? '' : 'none';
     var m = st.mode06 || { read: false }, box = $('m6'), res = m.results || [];
@@ -1131,7 +1133,10 @@
       .catch(function () { state = { status: 'disconnected' }; chips(); })
       .then(function (again) { polling = false; if (again === true) poll(); });
   }
-  function startRun() { post('/api/start', { pids: PIDS, hz: 2.5, seconds: 600 }).then(function (r) { if (!r.ok) showMsg(r.j.error || 'request failed'); poll(); }); }
+  function startRun() {
+    var body = { pids: PIDS, hz: 2.5, seconds: 600 };
+    if ($('capAll').checked) body.capture = 'all';   // every supported reading in two tiers; the default request is unchanged
+    post('/api/start', body).then(function (r) { if (!r.ok) showMsg(r.j.error || 'request failed'); poll(); }); }
   $('pause').addEventListener('click', function () {
     if (!(state && state.status === 'running')) return startRun();
     post('/api/stop', {}).then(function (r) { if (!r.ok) showMsg(r.j.error || 'request failed'); poll(); });

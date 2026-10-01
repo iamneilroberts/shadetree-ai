@@ -426,3 +426,14 @@ def test_the_page_url_may_name_an_example_and_the_get_alone_loads_nothing(srv_ex
     assert status == 200 and 'id="exNote"' in page, "the page that reads the parameter is served"
     assert call(server, "GET", "/?example=2026-09-30T21-32-56Z-drive.json", token=None)[0] == 401, "still needs the token"
     assert call(server, "GET", "/api/state")[1]["replay"] is None, "the page posts the load; the server does nothing on the GET"
+
+
+def test_start_can_capture_all_supported_and_refuses_an_unknown_mode(srv):
+    server, hub, _ = srv
+    assert call(server, "POST", "/api/start", {"pids": DEFAULT_PIDS, "capture": "everything"})[0] == 400
+    assert not hub.running
+    assert call(server, "POST", "/api/start", {"pids": DEFAULT_PIDS, "hz": 10, "seconds": 30, "capture": "all"})[0] == 200
+    assert wait_seq(server, 4)
+    st = call(server, "GET", "/api/state?after=0")[1]
+    assert st["tiers"]["fast"] == ["0C", "0D", "04", "11"] and len(st["channels"]) > 16
+    assert call(server, "POST", "/api/stop", {})[0] == 200
