@@ -21,13 +21,13 @@ function makeNode(id, handlers) {
   return n;
 }
 
-function makeEnv(states, viewId = 'v0', help = null, runs = [], store = {}, page = {}) {   // page: { search, postReply(url, body) }
+function makeEnv(states, viewId = 'v0', help = null, runs = [], store = {}, page = {}) {   // page: { search, postReply(url, body), prefersLight, storageThrows }
   const els = {}, handlers = {}, docHandlers = {}, posts = [];
   function el(id) { return els[id] || (els[id] = makeNode(id, handlers)); }
   let timer = null, i = 0, now = 0;
   const sandbox = {
     console, URLSearchParams, Promise, Math, Object, Array, Number, String, JSON, Date, parseInt, isFinite,
-    document: { getElementById: el, querySelectorAll: () => [], querySelector: () => ({ id: viewId }),
+    document: { documentElement: el('html'), getElementById: el, querySelectorAll: () => [], querySelector: () => ({ id: viewId }),
                 createElement: () => makeNode('new', handlers), addEventListener(t, fn) { docHandlers[t] = fn; } },
     window: { addEventListener() {}, devicePixelRatio: 1, innerWidth: 500, innerHeight: 800 },
     location: { search: page.search || '?t=abc', hash: '' }, history: { replaceState() {} },
@@ -47,6 +47,8 @@ function makeEnv(states, viewId = 'v0', help = null, runs = [], store = {}, page
     }
   };
   if (store !== null) sandbox.localStorage = { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); } };
+  if (page.storageThrows) sandbox.localStorage = { getItem() { throw new Error('blocked'); }, setItem() { throw new Error('blocked'); } };
+  if (page.prefersLight !== undefined) sandbox.window.matchMedia = (q) => ({ matches: /light/.test(q) === page.prefersLight });
   vm.runInNewContext(js, sandbox);
   return {
     el, handlers, docHandlers, posts, sandbox, store,
@@ -562,6 +564,25 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
   }
   const exBusy = await exEnv('?t=abc&example=' + EXN, () => ({ ok: false, status: 409, j: { error: 'the console is already sampling; stop it first' } }));
   assert.strictEqual(exBusy.el('exNote').textContent, 'Could not load the example: the console is already sampling; stop it first', 'a busy console is not "not found"');
+
+  // Theme: the stored choice beats the system preference; a bad stored value is ignored; dark when nothing is known; blocked storage is tolerated
+  const thEnv = async (store, page) => { const e = makeEnv(statesFor(2, idle), 'v0', null, [], store, page); for (let k = 0; k < 2; k++) await e.tick(); return e; };
+  const theme = (e) => e.el('html').getAttribute('data-theme');
+  const th1 = await thEnv({ 'shadetree.theme': 'light' }, { prefersLight: false });
+  assert.strictEqual(theme(th1), 'light', 'stored light beats a dark system'); assert.strictEqual(th1.el('themeBtn').textContent, 'Theme: Dark', 'the label names the mode a click switches to');
+  assert.strictEqual(theme(await thEnv({ 'shadetree.theme': 'dark' }, { prefersLight: true })), 'dark', 'stored dark beats a light system');
+  assert.strictEqual(theme(await thEnv({}, { prefersLight: true })), 'light', 'no stored choice: follow the system');
+  assert.strictEqual(theme(await thEnv({ 'shadetree.theme': 'purple' }, { prefersLight: true })), 'light', 'a bad stored value is ignored');
+  const th0 = await thEnv({}, {});
+  assert.strictEqual(theme(th0), 'dark', 'no matchMedia: dark, as the page always was'); assert.strictEqual(th0.el('themeBtn').textContent, 'Theme: Light');
+  const thStore = {}, th2 = await thEnv(thStore, { prefersLight: false });
+  th2.handlers['themeBtn:click']();
+  assert.strictEqual(theme(th2), 'light'); assert.strictEqual(thStore['shadetree.theme'], 'light', 'the choice is remembered');
+  assert.strictEqual(th2.el('themeBtn').textContent, 'Theme: Dark');
+  th2.handlers['themeBtn:click'](); assert.strictEqual(theme(th2), 'dark'); assert.strictEqual(thStore['shadetree.theme'], 'dark');
+  const th3 = await thEnv({}, { prefersLight: true, storageThrows: true });
+  assert.strictEqual(theme(th3), 'light', 'blocked storage: still follows the system');
+  th3.handlers['themeBtn:click'](); assert.strictEqual(theme(th3), 'dark', 'and still toggles');
 
   console.log('page logic OK');
 })().catch(e => { console.error('FAIL', e.message); process.exit(1); });

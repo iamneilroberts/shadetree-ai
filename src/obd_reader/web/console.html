@@ -8,12 +8,18 @@
   :root {
     --bg: #0e1113; --panel: #171b1f; --panel2: #1e2429; --line: #2c343b; --ink: #e8edf0; --muted: #93a0aa;
     --cyan: #4fc3e8; --amber: #f2a93b; --ok: #7fcf94; --bad: #f07a5a;
+    --on-accent: #06222c; --banner: #f2a93b; --msg-bg: #2a2114;   /* text on cyan/green fills; the DEMO/replay banner; the message bar */
     --cond: Bahnschrift, "DIN Alternate", "Roboto Condensed", "Arial Narrow", "Helvetica Neue", sans-serif;
     --mono: ui-monospace, "JetBrains Mono", "DejaVu Sans Mono", Menlo, Consolas, monospace;
   }
+  /* light theme: darker accents so text, borders and chart lines keep their contrast on a light page */
+  :root[data-theme="light"] {
+    --bg: #f3f5f6; --panel: #ffffff; --panel2: #e9edf0; --line: #c9d1d7; --ink: #12171a; --muted: #4f5c65;
+    --cyan: #0a7499; --amber: #9a5a00; --ok: #1d7f3a; --bad: #c0361b; --on-accent: #ffffff; --msg-bg: #fff3dc;
+  }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.45 var(--mono); }
-  .banner { background: var(--amber); color: #1a1204; font: 700 12.5px var(--cond); letter-spacing: .05em;
+  .banner { background: var(--banner); color: #1a1204; font: 700 12.5px var(--cond); letter-spacing: .05em;
             text-transform: uppercase; text-align: center; padding: 6px 12px; }
   .topbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 10px 16px;
             border-bottom: 1px solid var(--line); background: var(--bg); position: sticky; top: 0; z-index: 20; }
@@ -23,7 +29,7 @@
   .vbtn { appearance: none; border: 1px solid var(--line); background: var(--panel); color: var(--muted);
           padding: 6px 12px; border-radius: 4px; font: 600 13px var(--cond); letter-spacing: .04em; cursor: pointer; }
   .vbtn:hover { color: var(--ink); }
-  .vbtn.is-active { background: var(--cyan); border-color: var(--cyan); color: #06222c; }
+  .vbtn.is-active { background: var(--cyan); border-color: var(--cyan); color: var(--on-accent); }
   /* status bar shared by every layout */
   .status { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 8px 16px;
             background: var(--panel); border-bottom: 1px solid var(--line); font-size: 12.5px; }
@@ -37,7 +43,7 @@
   button.b, select.b { background: var(--panel2); color: var(--ink); border: 1px solid var(--line); border-radius: 4px;
                        padding: 5px 11px; font: 600 12.5px var(--cond); letter-spacing: .03em; cursor: pointer; }
   button.b:hover { border-color: var(--muted); }
-  button.b.primary { background: var(--cyan); color: #06222c; border-color: var(--cyan); }
+  button.b.primary { background: var(--cyan); color: var(--on-accent); border-color: var(--cyan); }
   .stage { padding: 16px; }
   .view { display: none; max-width: 1240px; margin: 0 auto; }
   .view.is-active { display: block; }
@@ -59,7 +65,7 @@
   #v3 .step .hd { display: flex; align-items: center; gap: 8px; font: 700 15px var(--cond); letter-spacing: .03em; }
   #v3 .step .n { width: 22px; height: 22px; border: 1px solid var(--muted); border-radius: 50%; display: grid; place-items: center;
                  font-size: 12px; }
-  #v3 .step.done .n { background: var(--ok); border-color: var(--ok); color: #05210f; }
+  #v3 .step.done .n { background: var(--ok); border-color: var(--ok); color: var(--on-accent); }
   #v3 .step.active .n { border-color: var(--cyan); color: var(--cyan); }
   #v3 .step p { margin: 6px 0; color: var(--muted); font-size: 12.5px; }
   #v3 .prog { height: 8px; background: var(--panel2); border-radius: 4px; overflow: hidden; margin: 6px 0; }
@@ -178,7 +184,7 @@
     .retro .hh-top { height: 60px; } .retro .hh-body { padding: 8px; } .retro .hh-size { display: none; }
   }
   .banner[hidden], [hidden] { display: none !important; }
-  .msgbar { padding: 8px 16px; background: #2a2114; border-bottom: 1px solid var(--amber); color: var(--amber); font-size: 13px; }
+  .msgbar { padding: 8px 16px; background: var(--msg-bg); border-bottom: 1px solid var(--amber); color: var(--amber); font-size: 13px; }
   .chip.err b::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 6px; background: var(--bad); }
   .chip.idle b::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 6px; border: 1px solid var(--muted); }
   #chipConn { color: var(--ink); font-weight: 600; }
@@ -281,6 +287,7 @@
       <button class="b" id="rev">Rev to 2500 rpm (sim)</button>
     </span>
     <button class="b" id="unitsBtn">Units: Metric</button>
+    <button class="b" id="themeBtn">Theme: Light</button>
     <button class="b" id="replayBtn">Replay&hellip;</button>
     <button class="b" id="pause">Start sampling</button>
     <button class="b primary" id="save">Save run</button>
@@ -447,7 +454,7 @@
   ];
   var PIDS = CH.map(function (c) { return c.pid; });
   var SPAN = 60;
-  var PAL = { mute: '#93a0aa', line: '#2c343b' };
+  var PALS = { dark: { mute: '#93a0aa', line: '#2c343b', band: 'rgba(127,207,148,.12)' }, light: { mute: '#4f5c65', line: '#c9d1d7', band: 'rgba(29,127,58,.14)' } }, PAL = PALS.dark;   // canvas colours per theme
   var xs = {}, buf = {}, last = {}, lastSeq = 0, runId = null, polling = false, tNow = 0, state = null, fetchedAt = 0, events = [], cap = null, results = {};
   CH.forEach(function (c) { buf[c.id] = []; last[c.id] = null; });
   function $(id) { return document.getElementById(id); }
@@ -515,7 +522,7 @@
       g.fillStyle = PAL.mute; g.textAlign = 'right'; g.fillText(Number.isInteger(val) ? String(val) : val.toFixed(1), l - 6, y);
     }
     if (lo < 0 && hi > 0) { g.strokeStyle = PAL.mute; g.beginPath(); g.moveTo(l, Y(0)); g.lineTo(l + iw, Y(0)); g.stroke(); }
-    if (opt.band) { g.fillStyle = 'rgba(127,207,148,.12)'; g.fillRect(l, Y(opt.band[1]), iw, Y(opt.band[0]) - Y(opt.band[1])); }
+    if (opt.band) { g.fillStyle = PAL.band; g.fillRect(l, Y(opt.band[1]), iw, Y(opt.band[0]) - Y(opt.band[1])); }
     events.forEach(function (e) {
       var x = X(e.t); if (x < l) return;
       g.strokeStyle = PAL.mute; g.setLineDash([2, 3]); g.beginPath(); g.moveTo(x, tp); g.lineTo(x, tp + ih); g.stroke(); g.setLineDash([]);
@@ -937,6 +944,25 @@
     $('a_ect_u').textContent = unitOf('05').toUpperCase(); $('a_map_u').textContent = unitOf('0B').toUpperCase();
     $('h_ect_u').textContent = unitOf('05').toUpperCase(); $('h_map_u').textContent = unitOf('0B').toUpperCase();
   }
+  /* ---------- theme: a stored choice, else the system preference, else dark ---------- */
+  function pickTheme(stored, prefersLight) { return stored === 'light' || stored === 'dark' ? stored : prefersLight ? 'light' : 'dark'; }
+  var THEME;
+  function setTheme(t) {
+    THEME = t; PAL = PALS[t];
+    document.documentElement.setAttribute('data-theme', t);
+    $('themeBtn').textContent = 'Theme: ' + (t === 'dark' ? 'Light' : 'Dark');
+  }
+  (function () {
+    var stored = null, light = false;
+    try { stored = localStorage.getItem('shadetree.theme'); } catch (e) { stored = null; }
+    try { light = !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches); } catch (e) { light = false; }
+    setTheme(pickTheme(stored, light));
+  })();
+  $('themeBtn').addEventListener('click', function () {
+    setTheme(THEME === 'dark' ? 'light' : 'dark');
+    try { localStorage.setItem('shadetree.theme', THEME); } catch (e) { /* storage unavailable: the choice lasts until reload */ }
+    render();
+  });
   $('unitsBtn').addEventListener('click', function () {
     US = !US;
     try { localStorage.setItem('shadetree.units', US ? 'us' : 'metric'); } catch (e) { /* storage unavailable: the choice lasts until reload */ }
