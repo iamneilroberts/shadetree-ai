@@ -57,8 +57,10 @@ def guess_lan_ip() -> str | None:
 
 class ConsoleServer:
     def __init__(self, hub: LiveHub, *, host: str = "127.0.0.1", port: int = 0,
-                 token: str | None = None, allow_lan: bool = False, allow_hosts=(), examples_dir=None):
+                 token: str | None = None, allow_lan: bool = False, allow_hosts=(), examples_dir=None,
+                 scenarios=None):
         self.examples_dir = None if examples_dir is None else Path(examples_dir)
+        self.scenarios: list[dict] = list(scenarios or [])
         self.public_hosts: set[str] = set()   # names a tunnel serves us under (https): the page is still bound to loopback
         for h in allow_hosts:
             if not isinstance(h, str) or not _HOSTNAME.fullmatch(h):
@@ -187,7 +189,7 @@ class ConsoleServer:
             # ---- routes ----
             def do_GET(self):
                 path = urlparse(self.path).path
-                if path not in ("/", "/api/state", "/api/help", "/api/runs"):
+                if path not in ("/", "/api/state", "/api/help", "/api/runs", "/api/scenarios"):
                     if path in _POST_ROUTES:
                         return self._json(405, {"error": "use POST"})
                     return self._json(404, {"error": "not found"})
@@ -199,8 +201,10 @@ class ConsoleServer:
                     return self._send(200, html, "text/html; charset=utf-8", csp)
                 if path == "/api/help":
                     return self._json(200, {"pids": HELP, "mode06": MODE06})
+                if path == "/api/scenarios":
+                    return self._json(200, {"scenarios": outer.scenarios})
                 if path == "/api/runs":
-                    ex = outer.examples_dir
+                    ex =outer.examples_dir
                     return self._json(200, {"runs": list_runs(outer.hub.runs_dir), "examples": list_runs(ex) if ex else []})
                 try:
                     after = max(0, int((q.get("after") or ["0"])[0]))
@@ -211,7 +215,7 @@ class ConsoleServer:
             def do_POST(self):
                 path = urlparse(self.path).path
                 if path not in _POST_ROUTES:
-                    if path in ("/", "/api/state", "/api/help", "/api/runs"):
+                    if path in ("/", "/api/state", "/api/help", "/api/runs", "/api/scenarios"):
                         return self._json(405, {"error": "use GET"})
                     return self._json(404, {"error": "not found"})
                 ok, _ = self._guard(post=True)
@@ -276,7 +280,9 @@ class ConsoleService:
     """Owns one hub and one server for a Session (or a private simulated one for --demo)."""
 
     def __init__(self, session: Session, *, demo: bool = False, host: str = "127.0.0.1",
-                 http_port: int = 0, allow_lan: bool = False, scenario: str = "rich", allow_hosts=(), examples_dir=None):
+                 http_port: int = 0, allow_lan: bool = False, scenario: str = "rich", allow_hosts=(), examples_dir=None,
+                 scenarios=None):
+        self._scenarios = scenarios
         self.demo, self._host, self._port, self._lan, self._scenario = demo, host, http_port, allow_lan, scenario
         self._examples = default_examples_dir() if examples_dir is None else Path(examples_dir)
         self._allow_hosts = tuple(allow_hosts)
@@ -298,7 +304,7 @@ class ConsoleService:
                 raise NoAdapterError("SHADETREE_PORT is not set; use demo=True to try the console without a car")
             self.hub = LiveHub(self._session)
         self.server = ConsoleServer(self.hub, host=self._host, port=self._port, allow_lan=self._lan, allow_hosts=self._allow_hosts,
-                                    examples_dir=self._examples)
+                                    examples_dir=self._examples, scenarios=self._scenarios)
         self.server.start()
         return self.server
 

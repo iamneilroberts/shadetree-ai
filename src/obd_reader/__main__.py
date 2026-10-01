@@ -45,10 +45,18 @@ def console_main(args, block: bool = True):
     from obd_reader.console import ConsoleService
     from obd_reader.session import Config, Session
 
+    from obd_reader.scenarios import load_scenarios
+
+    scen = None
+    if args.scenarios:   # main() prints "error: ..." and exits 1 for ValueError/OSError, as for any other bad argument
+        try:
+            scen = load_scenarios(args.scenarios)
+        except (OSError, ValueError) as exc:
+            raise ValueError(f"--scenarios {args.scenarios}: {exc}") from None
     session = Session(Config(port=args.port, home=args.out_dir))
     svc = ConsoleService(session, demo=args.demo, host=args.host, http_port=args.http_port,
                          allow_lan=args.allow_lan, scenario=args.scenario, allow_hosts=args.allow_host,
-                         examples_dir=args.examples_dir)
+                         examples_dir=args.examples_dir, scenarios=scen)
     server = svc.ensure()
     if args.host not in ("127.0.0.1", "localhost", "::1"):
         print("warning: the console is reachable from your network; anyone with the link can watch live data",
@@ -130,6 +138,8 @@ def build_parser() -> argparse.ArgumentParser:
     co.add_argument("--out-dir", type=Path, default=Path("."), help="runs/ and transcripts/ go here")
     co.add_argument("--examples-dir", type=Path, default=None,
                     help="folder of public example runs for the replay picker (default: examples/runs in the repo, if present)")
+    co.add_argument("--scenarios", type=Path, default=None, metavar="FILE",
+                    help="shared gauge scenarios (JSON); see docs/design.md 7b")
     co.set_defaults(func=lambda a: (console_main(a), 0)[1])
     ex = sub.add_parser("export-run", help="bundle the newest saved run(s) and transcripts into one .tgz to move to another machine")
     ex.add_argument("--out-dir", type=Path, default=Path("."), help="where runs/ and transcripts/ are")
