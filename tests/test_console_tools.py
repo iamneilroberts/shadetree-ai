@@ -107,3 +107,31 @@ def test_cli_console_demo_builds_a_working_service(tmp_path):
         assert svc.hub.state()["demo"] is True
     finally:
         svc.stop()
+
+
+def post_json(url, path, body):
+    host_port = url.split("//")[1].split("/")[0]
+    token = url.split("t=")[1]
+    c = http.client.HTTPConnection(host_port, timeout=5)
+    c.request("POST", f"{path}?t={token}", body=json.dumps(body), headers={"Host": host_port, "Content-Type": "application/json"})
+    r = c.getresponse()
+    r.read()
+    c.close()
+    return r.status
+
+
+def test_console_data_names_its_source(tmp_path):  # Review Focus 5
+    tl = build_tools(demo_session(tmp_path))
+    out = tl["open_console"](demo=True)
+    try:
+        assert wait_seq(out["url"], 3)
+        assert tl["console_data"](seconds=30)["source"] == "live"
+        assert post_json(out["url"], "/api/stop", {}) == 200
+        run = {"kind": "live_run", "live_sample": {"duration_s": 1.2, "rate_hz": 2.5, "series": {
+            "0C": {"name": "engine_rpm", "unit": "rpm", "samples": [[0.4, 700], [0.8, 710], [1.2, 720]]}}}}
+        assert post_json(out["url"], "/api/replay", {"run": run, "name": "drive.json"}) == 200
+        assert post_json(out["url"], "/api/replay/control", {"action": "seek", "pos": 1.2}) == 200
+        data = tl["console_data"](seconds=30)
+        assert data["source"] == "replay" and data["replay"] == "drive.json" and data["channels"]["0C"]["latest"] == 720.0
+    finally:
+        ConsoleService.shutdown_all()

@@ -230,14 +230,16 @@ def build_tools(session: Session) -> dict[str, Callable]:
         return {"url": server.url, "status": service.hub.state()["status"], "demo": bool(demo)}
 
     def console_data(seconds: float = 30) -> dict:
-        """Latest values and exact statistics over the last N seconds from the console's sampler (what the page shows)."""
+        """Latest values and exact statistics over the last N seconds from the console's sampler (what the page shows). The "source" field says whether the numbers are live from the car or a replay of a saved run; check it before drawing conclusions about the car."""
         if not (isinstance(seconds, (int, float)) and math.isfinite(seconds) and 0 < seconds <= 600):
             raise ValueError("seconds must be in (0, 600]")
         service = next((consoles[k] for k in recent_first if consoles[k] is not None and consoles[k].hub is not None), None)
         if service is None:
             return {"status": "idle", "message": "the console is not open; call open_console first", "channels": {}}
         st = service.hub.state()
+        rp = st.get("replay")
         return {"status": st["status"], "message": st["message"], "seq": st["seq"],
+                "source": "replay" if rp else "live", **({"replay": rp["name"]} if rp else {}),
                 "channels": service.hub.recent(seconds)}
 
     return {f.__name__: f for f in (

@@ -15,13 +15,15 @@ from urllib.parse import parse_qs, urlparse
 
 from obd_reader.hub import DEFAULT_PIDS, HubBusy, LiveHub
 from obd_reader.live import LiveLimitError
+from obd_reader.replay_run import MAX_FILE_BYTES, list_runs, load_run, read_run_file
 from obd_reader.session import AdapterBusy, Config, NoAdapterError, Session
 from obd_reader.simulator import SimPort
 from obd_reader.stat_help import HELP, MODE06
 
 MAX_BODY = 4096
+MAX_UPLOAD = MAX_FILE_BYTES  # the replay upload route only
 _LOOPBACK = {"127.0.0.1", "localhost", "::1"}
-_POST_ROUTES = ("/api/start", "/api/stop", "/api/save", "/api/sim")
+_POST_ROUTES = ("/api/start", "/api/stop", "/api/save", "/api/sim", "/api/replay", "/api/replay/control")
 _CSP_JSON = "default-src 'none'"
 
 
@@ -140,7 +142,7 @@ class ConsoleServer:
                     return False, {}
                 return True, q
 
-            def _body(self) -> dict | None:
+            def _body(self, limit: int = MAX_BODY) -> dict | None:
                 ctype = (self.headers.get("Content-Type") or "").split(";")[0].strip().lower()
                 if ctype != "application/json":
                     self._json(415, {"error": "send application/json"})
@@ -149,7 +151,7 @@ class ConsoleServer:
                     n = int(self.headers.get("Content-Length") or 0)
                 except ValueError:
                     n = -1
-                if n < 0 or n > MAX_BODY:
+                if n < 0 or n > limit:
                     self._json(413, {"error": "body too large"})
                     return None
                 try:
@@ -165,7 +167,7 @@ class ConsoleServer:
             # ---- routes ----
             def do_GET(self):
                 path = urlparse(self.path).path
-                if path not in ("/", "/api/state", "/api/help"):
+                if path not in ("/", "/api/state", "/api/help", "/api/runs"):
                     if path in _POST_ROUTES:
                         return self._json(405, {"error": "use POST"})
                     return self._json(404, {"error": "not found"})
@@ -177,6 +179,8 @@ class ConsoleServer:
                     return self._send(200, html, "text/html; charset=utf-8", csp)
                 if path == "/api/help":
                     return self._json(200, {"pids": HELP, "mode06": MODE06})
+                if path == "/api/runs":
+                    return self._json(200, {"runs": list_runs(outer.hub.runs_dir)})
                 try:
                     after = max(0, int((q.get("after") or ["0"])[0]))
                 except ValueError:
@@ -186,13 +190,13 @@ class ConsoleServer:
             def do_POST(self):
                 path = urlparse(self.path).path
                 if path not in _POST_ROUTES:
-                    if path in ("/", "/api/state", "/api/help"):
+                    if path in ("/", "/api/state", "/api/help", "/api/runs"):
                         return self._json(405, {"error": "use GET"})
                     return self._json(404, {"error": "not found"})
                 ok, _ = self._guard(post=True)
                 if not ok:
                     return
-                body = self._body()
+                body = self._body(MAX_UPLOAD if path == "/api/replay" else MAX_BODY)
                 if body is None:
                     return
                 try:
@@ -204,8 +208,26 @@ class ConsoleServer:
                         return self._json(200, {"ok": True})
                     if path == "/api/save":
                         return self._json(200, {"ok": True, "path": str(outer.hub.save_run(str(body.get("label", "run"))))})
+                    if path == "/api/replay":
+                        if "run" in body:
+                            label = body.get("name")
+                            name = re.sub(r"[^A-Za-z0-9._ -]", "_", label)[:80] if isinstance(label, str) and label else "upload"
+                            run = load_run(body["run"])
+                        else:
+                            name = str(body.get("name", ""))
+                            run = load_run(read_run_file(outer.hub.runs_dir, name))
+                        outer.hub.start_replay(run, name)
+                        return self._json(200, {"ok": True})
+                    if path == "/api/replay/control":
+                        if body.get("action") == "exit":
+                            outer.hub.exit_replay()
+                        else:
+                            outer.hub.replay_control(body.get("action"), pos=body.get("pos"), speed=body.get("speed"))
+                        return self._json(200, {"ok": True})
                     outer.hub.set_sim(scenario=body.get("scenario"), rev=body.get("rev"))
                     return self._json(200, {"ok": True})
+                except FileNotFoundError:
+                    return self._json(404, {"error": "no such saved run"})
                 except (HubBusy, AdapterBusy) as e:
                     return self._json(409, {"error": str(e)})
                 except (LiveLimitError, ValueError, TypeError, NoAdapterError) as e:

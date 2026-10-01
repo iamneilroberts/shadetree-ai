@@ -185,3 +185,81 @@ def test_help_carries_no_vin_shaped_text(srv):
     import re
     text = json.dumps(call(srv[0], "GET", "/api/help")[1])
     assert not re.search(r"\b[A-HJ-NPR-Z0-9]{17}\b", text)
+
+
+def _run_obj(n=10):
+    ts = [round(0.4 * k, 3) for k in range(1, n + 1)]
+    return {"kind": "live_run", "demo": False, "adapter": {"protocol": "ISO 15765-4 (CAN 29/500)"},
+            "live_sample": {"duration_s": ts[-1], "rate_hz": 2.5, "series": {
+                "0C": {"name": "engine_rpm", "unit": "rpm", "samples": [[t, 700 + i] for i, t in enumerate(ts)]}}}}
+
+
+def test_runs_are_listed_and_loaded_by_name_and_controlled(srv):
+    server, hub, _ = srv
+    hub.runs_dir.mkdir()
+    (hub.runs_dir / "a-run.json").write_text(json.dumps(_run_obj()))
+    status, body = call(server, "GET", "/api/runs")
+    assert status == 200 and [r["name"] for r in body["runs"]] == ["a-run.json"] and body["runs"][0]["duration"] == 4.0
+    assert call(server, "POST", "/api/replay", {"name": "a-run.json"}) == (200, {"ok": True})
+    st = call(server, "GET", "/api/state")[1]
+    assert st["replay"]["name"] == "a-run.json" and st["status"] == "running"
+    assert call(server, "POST", "/api/replay/control", {"action": "pause"})[0] == 200
+    assert call(server, "POST", "/api/replay/control", {"action": "seek", "pos": 2})[0] == 200
+    assert call(server, "GET", "/api/state")[1]["replay"]["pos"] == 2.0
+    assert call(server, "POST", "/api/replay/control", {"action": "speed", "speed": 3})[0] == 400
+    assert call(server, "POST", "/api/replay/control", {"action": "exit"})[0] == 200
+    assert call(server, "GET", "/api/state")[1]["replay"] is None
+    assert call(server, "POST", "/api/replay/control", {"action": "pause"})[0] == 400
+
+
+def test_replay_names_and_files_are_validated(srv):
+    server, hub, _ = srv
+    hub.runs_dir.mkdir()
+    (hub.runs_dir / "bad.json").write_text(json.dumps({"kind": "snapshot"}))
+    (hub.runs_dir / "nan.json").write_text('{"kind": "live_run", "live_sample": {"series": {"0C": {"name": "x", "unit": null, "samples": [[1, NaN]]}}}}')
+    for name in ("../x.json", "a/b.json", "x.txt", "", "bad.json", "nan.json"):
+        assert call(server, "POST", "/api/replay", {"name": name})[0] == 400, name
+    assert call(server, "POST", "/api/replay", {"name": "missing.json"})[0] == 404
+    assert call(server, "GET", "/api/state")[1]["replay"] is None
+
+
+def test_an_uploaded_run_is_replayed_from_memory_and_writes_nothing(srv):
+    server, hub, _ = srv
+    status, body = call(server, "POST", "/api/replay", {"run": _run_obj(), "name": "my<b>file.json"})
+    assert (status, body) == (200, {"ok": True})
+    st = call(server, "GET", "/api/state")[1]
+    assert st["replay"]["name"] == "my_b_file.json", "the label is reduced to safe characters"
+    assert not hub.runs_dir.exists()
+    assert call(server, "POST", "/api/replay", {"run": {"kind": "live_run"}})[0] == 400
+    assert call(server, "POST", "/api/replay", {"run": [1, 2]})[0] == 400
+
+
+def test_the_upload_route_alone_accepts_a_large_body(srv, monkeypatch):
+    server, _, _ = srv
+    big = {"run": _run_obj(), "pad": "x" * 6000}
+    assert call(server, "POST", "/api/replay", big)[0] == 200, "6 KB is over the 4 KB default and fine here"
+    assert call(server, "POST", "/api/stop", {"pad": "x" * 6000})[0] == 413, "every other route keeps the small cap"
+    monkeypatch.setattr("obd_reader.console.MAX_UPLOAD", 1000)
+    assert call(server, "POST", "/api/replay", {"run": _run_obj(), "pad": "x" * 2000})[0] == 413
+
+
+def test_replay_routes_need_the_token_and_the_origin_and_are_not_gettable(srv):
+    server, hub, _ = srv
+    hub.runs_dir.mkdir()
+    (hub.runs_dir / "a-run.json").write_text(json.dumps(_run_obj()))
+    assert call(server, "GET", "/api/runs", token=None)[0] == 401
+    assert call(server, "POST", "/api/replay", {"name": "a-run.json"}, token=None)[0] == 401
+    assert call(server, "POST", "/api/replay", {"name": "a-run.json"}, headers={"Origin": "http://evil.example"})[0] == 403
+    assert call(server, "GET", "/api/replay")[0] == 405 and call(server, "GET", "/api/replay/control")[0] == 405
+    assert call(server, "POST", "/api/runs", {})[0] == 405
+
+
+def test_replay_and_live_sampling_refuse_each_other_over_http(srv):
+    server, hub, _ = srv
+    assert call(server, "POST", "/api/replay", {"run": _run_obj()})[0] == 200
+    assert call(server, "POST", "/api/start", {"pids": DEFAULT_PIDS, "hz": 10})[0] == 409
+    assert call(server, "POST", "/api/save", {"label": "x"})[0] == 400
+    assert call(server, "POST", "/api/replay/control", {"action": "exit"})[0] == 200
+    assert call(server, "POST", "/api/start", {"pids": DEFAULT_PIDS, "hz": 10})[0] == 200
+    assert wait_seq(server, 2)
+    assert call(server, "POST", "/api/replay", {"run": _run_obj()})[0] == 409
