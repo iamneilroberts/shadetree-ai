@@ -66,3 +66,35 @@ def test_handheld_frame_has_a_fixed_size_so_switching_modes_never_resizes_it():
 def test_phone_width_hides_the_page_chrome_and_fills_the_screen_for_the_handheld_view():
     media = HTML[HTML.index("@media (max-width: 430px)"):]
     assert "#v5.is-active) .topbar" in media and "100dvh" in media
+
+
+# ---- console stage 1: the features every stage must keep (spec "Retained features") ----------------
+RETAINED = {
+    "Capture all supported": ['id="capAll"', "body.capture = 'all'"],
+    "Demo button": ['id="demoBtn"'],
+    "Save run": ['id="save"', "/api/save"],
+    "Replay picker (Examples / My runs) and ?example=": ['id="replayBtn"', 'id="replayPanel"', '<option value="examples">Examples</option>',
+                                                         '<option value="mine">My runs</option>', 'id="rp_make"', 'id="rp_model"', 'id="rp_year"',
+                                                         'id="rp_runs"', 'id="rp_load"', ".get('example')"],
+    "Mode 06 section": ['id="m6"', 'id="m6_count"'],
+    "All readings stats": ['id="x_grid"', "<th>Now</th><th>Min</th><th>Max</th><th>Avg</th><th>Std</th><th>Samples</th>",
+                           "function fmtAge", "function fmtRunT", "s.min_t", "s.max_t", "s.age"],
+    "Units": ['id="unitsBtn"'],
+    "Theme": ['id="themeBtn"'],
+    "? help popups": ['id="helpPanel"', "function qbtn", "/api/help"],
+    "Codes and lamp": ['id="chipCodes"', 'id="chipLamp"', 'id="a_codes"', 'id="h_codes"'],
+    "Guided test": ['data-view="v3"', 'id="go_idle"', 'id="go_rev"', 'id="verdict"'],
+    "Upload": ['id="rp_file"'],
+    "Transport bar": ['id="rbar"', 'id="rb_restart"', 'id="rb_play"', 'id="rb_speed"', 'id="rb_seek"', 'id="rb_time"', 'id="rb_exit"'],
+}
+
+
+@pytest.mark.parametrize("feature", sorted(RETAINED))
+def test_retained_feature_is_still_on_the_page(feature):
+    missing = [s for s in RETAINED[feature] if s not in HTML]
+    assert not missing, f"{feature}: {missing}"
+
+
+def test_page_stays_one_file_under_its_size_budget():
+    assert len(HTML.encode("utf-8")) < 112_000  # 92,165 bytes before stage 1; raise only on purpose
+    assert HTML.count("<script>") == 1 and HTML.count("<style>") == 1
