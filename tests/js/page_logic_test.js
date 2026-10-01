@@ -647,5 +647,56 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
   assert.strictEqual(card.name.textContent, '<img src=x onerror=1>'); assert.strictEqual(card.name.innerHTML, '', 'the title is text');
   assert.strictEqual(card.plate.children[0], card.name, 'callers may add controls after the name');
 
+  // Gauge: watch ranges become zones; a reading missing from the run is dimmed and says so, never a zero (Review Focus 3)
+  const gOver = (over, tweak, help = OVF, store = {}) => {
+    const e = makeEnv(statesFor(30, () => Object.assign(base(), over)).map(st => (tweak ? tweak(st) : st)), 'v0', help, [], store);
+    return (async () => { for (let k = 0; k < 32; k++) await e.tick(); return e; })();
+  };
+  const zs = (P, w, lo, hi) => Array.from(P.gaugeZones(w, lo, hi), z => [z.from, z.to, z.s]);   // Array.from: the page runs in another realm
+  const g1 = await gOver({}), P1 = g1.parts();
+  assert.deepStrictEqual(zs(P1, { ok: [-10, 10], out: [-20, 20] }, -25, 25), [[-25, -20, 'out'], [-20, -10, 'watch'], [-10, 10, 'ok'], [10, 20, 'watch'], [20, 25, 'out']], 'trim bands');
+  assert.deepStrictEqual(zs(P1, { ok: [null, 105], out: [null, 112] }, -20, 130), [[-20, 105, 'ok'], [105, 112, 'watch'], [112, 130, 'out']], 'an open low end');
+  assert.deepStrictEqual(zs(P1, { ok: [12.2, null], out: [11.5, null] }, 10, 16), [[10, 11.5, 'out'], [11.5, 12.2, 'watch'], [12.2, 16, 'ok']], 'an open high end');
+  assert.deepStrictEqual(zs(P1, null, 0, 100), [], 'no watch range: no zones');
+  assert.deepStrictEqual(zs(P1, { ok: 'x', out: [1, 2] }, 0, 100), [], 'a malformed range draws nothing');
+  const gbox = (e, specs) => { const b = e.el('gbox_' + Math.random()); e.parts().gauges(b, specs); return b; };
+  const gk = (b, key) => b.children.find(c => c.getAttribute('data-key') === key);
+  const gpart = (g, cls) => g.children.find(c => c.className.split(' ')[0] === cls);
+  const b1 = gbox(g1, [{ pid: '05', form: 'dial' }, { pid: '07', form: 'bar' }, { pid: '42', form: 'seven' }, { pid: '0D', form: 'dial' }, { pid: '0D', form: 'bar' }, { pid: '5C', form: 'dial' }, { pid: '05', form: 'dial' }]);
+  assert.deepStrictEqual(b1.children.map(c => c.getAttribute('data-key')), ['05:dial', '07:bar', '42:seven', '0D:dial', '0D:bar', '5C:seven'], 'in order, a repeat drawn once, no range: seven-segment');
+  const ect = gk(b1, '05:dial');
+  assert.strictEqual(ect.className, 'gauge dial'); assert.strictEqual(gpart(ect, 'gnote').textContent, 'normal'); assert.strictEqual(gpart(ect, 'gval').textContent, '90 °C');
+  assert(/class="z-ok"/.test(gpart(ect, 'gface').innerHTML) && /class="z-watch"/.test(gpart(ect, 'gface').innerHTML) && /class="z-out"/.test(gpart(ect, 'gface').innerHTML), 'coolant dial has its bands');
+  assert(/class="dn"/.test(gpart(ect, 'gface').innerHTML), 'and a needle');
+  assert(findQ(ect, '05'), 'every gauge has its ? help');
+  assert(/aria-label="14.2"/.test(gpart(gk(b1, '42:seven'), 'gface').innerHTML), 'battery digits');
+  for (const key of ['0D:dial', '0D:bar', '5C:seven']) {   // not in this run: dimmed, said in words, and no needle, lit cell or digit
+    const g = gk(b1, key), face = gpart(g, 'gface').innerHTML;
+    assert(g.className.split(' ').includes('dim'), key + ' dimmed'); assert.strictEqual(gpart(g, 'gnote').textContent, 'not in this run', key);
+    assert(!/class="dn"/.test(face) && !/class="[gyrn]/.test(face), key + ' has no needle and no lit cell');
+    if (key.endsWith(':seven')) assert(/aria-label="-+"/.test(face), key + ' shows dashes, not digits: ' + face.slice(0, 120));
+    assert(['', '—'].includes(gpart(g, 'gval').textContent), key + ' value is blank or a dash');
+  }
+  const g2 = await gOver({ '07': 15 }), trim = gk(gbox(g2, [{ pid: '07', form: 'bar' }]), '07:bar');
+  assert.strictEqual(trim.className, 'gauge bar watch'); assert.strictEqual(gpart(trim, 'gnote').textContent, 'watch');
+  assert(/class="g/.test(gpart(trim, 'gface').innerHTML) && /class="y/.test(gpart(trim, 'gface').innerHTML) && !/class="r/.test(gpart(trim, 'gface').innerHTML), 'lit from 0 through ok into watch');
+  const g3 = await gOver({ '0C': 0, '42': 12.6 }), off = gk(gbox(g3, [{ pid: '42', form: 'dial' }]), '42:dial');
+  assert.strictEqual(gpart(off, 'gnote').textContent, 'normal', 'engine off: judged on the engine-off range');
+  const g4 = await gOver({}, null, null), nh = gk(gbox(g4, [{ pid: '05', form: 'dial' }]), '05:dial');
+  assert(!/class="z-/.test(gpart(nh, 'gface').innerHTML) && gpart(nh, 'gnote').textContent === '', 'help not loaded: no bands, no verdict');
+  const g5 = await gOver({}, null, OVF, { 'shadetree.units': 'us' }), us = gk(gbox(g5, [{ pid: '05', form: 'dial' }]), '05:dial');
+  assert.strictEqual(gpart(us, 'gval').textContent, '194 °F', 'the value follows Units'); assert.strictEqual(gpart(us, 'gnote').textContent, 'normal', 'and is judged in metric');
+  const g6 = await gOver({}, st => { st.channels['99'] = { name: '"><img src=x onerror=1>', unit: '', samples: [[st.seq, st.now, 3]] }; return st; });
+  const gEvil = gk(gbox(g6, [{ pid: '99', form: 'dial', lo: 0, hi: 10 }]), '99:dial');
+  assert(!/<img/.test(gpart(gEvil, 'gface').innerHTML) && /&lt;img/.test(gpart(gEvil, 'gface').innerHTML), 'a channel name is escaped in the dial label');
+  const idleSt = { status: 'idle', message: null, demo: false, seq: 0, now: 0, since_last_sample: null, hz: null, hz_measured: null, seconds_left: null, adapter: {}, channels: {} };
+  const g7 = makeEnv([idleSt], 'v0', OVF); await g7.tick();
+  assert.strictEqual(gpart(gk(gbox(g7, [{ pid: '0C', form: 'dial' }]), '0C:dial'), 'gnote').textContent, 'not sampling');
+  const g8 = await gOver({}, st => { st.channels['0D'] = { name: 'vehicle_speed', unit: 'km/h', samples: [] }; return st; });
+  const wait = gk(gbox(g8, [{ pid: '0D', form: 'dial' }]), '0D:dial');
+  assert.strictEqual(gpart(wait, 'gnote').textContent, 'waiting', 'in the run, no sample yet'); assert(!wait.className.includes('dim'));
+  const anv = makeEnv(statesFor(30, () => base()), 'v4', OVF); for (let k = 0; k < 32; k++) await anv.tick();
+  assert(/class="dn"/.test(anv.el('a_vm').innerHTML) && /class="z-out"/.test(anv.el('a_vm').innerHTML), 'analyzer volts meter: needle and red zone');
+
   console.log('page logic OK');
 })().catch(e => { console.error('FAIL', e.message); process.exit(1); });

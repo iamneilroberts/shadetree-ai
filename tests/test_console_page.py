@@ -170,3 +170,15 @@ def test_every_skin_and_theme_keeps_text_readable(skin, theme):  # Review Focus 
     p = _palette(skin, theme)
     low = [(a, b, round(_contrast(p[a], p[b]), 2)) for a, b in TEXT_PAIRS if _contrast(p[a], p[b]) < 4.5]
     assert low == [], f"{skin}/{theme} text below WCAG AA 4.5:1: {low}"
+
+
+def test_shared_parts_fit_a_phone_width():  # Review Focus 5
+    css = _css()
+    rule = lambda sel: re.search(r"(?:^|[}\s])" + re.escape(sel) + r"\s*\{([^}]*)\}", css).group(1)
+    tile = int(re.search(r"minmax\((\d+)px", rule(".gauges")).group(1))
+    assert 2 * tile + 10 <= 360 - 2 * 16, "two gauges side by side on a 360 px phone inside the 16 px gutters"
+    for sel in (".panel", ".panel > .pbody", ".panel > .ptitle .pname", ".gauge", ".gauge .gname"):
+        assert "min-width: 0" in rule(sel), sel
+    for sel in (".panel > .ptitle .pname", ".gauge .gname"):
+        assert "text-overflow: ellipsis" in rule(sel), sel  # a long reading name shortens instead of widening the page
+    assert "overflow-x: auto" in rule(".rwrap"), "a wide table scrolls inside its card, not the page"

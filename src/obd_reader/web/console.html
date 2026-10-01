@@ -295,6 +295,22 @@
                      border-bottom: 1px solid var(--line); font: 700 12px var(--cond); letter-spacing: .12em; text-transform: uppercase; }
   .panel > .ptitle .pname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .panel > .pbody { padding: 12px 14px; min-width: 0; }
+  .gauges { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
+  .gauge { background: var(--panel2); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; min-width: 0; }
+  .gauge.watch { border-color: var(--amber); } .gauge.out { border-color: var(--bad); } .gauge.dim { opacity: .5; }
+  .gauge .gtop { display: flex; align-items: center; gap: 6px; font: 700 11.5px var(--cond); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  .gauge .gname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .gauge .gtop .q { width: 18px; height: 18px; font-size: 11px; flex: none; }
+  .gauge .gface { margin-top: 6px; } .gauge .gface svg { width: 100%; display: block; }
+  .gauge .gface.led { background: var(--g-win); border-radius: 4px; padding: 6px 8px; }
+  .gauge .led svg { filter: drop-shadow(0 0 var(--g-glow) var(--c)); }
+  .gauge .leds { display: grid; grid-template-columns: repeat(21, 1fr); gap: 2px; background: var(--g-win); border-radius: 4px; padding: 6px; }
+  .gauge .leds i { display: block; height: 18px; border-radius: 2px; background: var(--g-led-off); }
+  .gauge .leds i.g { background: var(--g-ok); } .gauge .leds i.y { background: var(--g-warn); } .gauge .leds i.r { background: var(--g-bad); } .gauge .leds i.n { background: var(--g-seg); }
+  .gauge .leds i.z { box-shadow: inset 0 -2px 0 var(--g-ink2); }
+  .gauge .gval { font: 700 20px var(--cond); font-variant-numeric: tabular-nums; margin-top: 4px; } .gauge .gval:empty { display: none; }
+  .gauge .gnote { color: var(--muted); font-size: 12px; min-height: 18px; }
+  .gauge.watch .gnote { color: var(--amber); } .gauge.out .gnote { color: var(--bad); }
 </style>
 </head>
 <body>
@@ -918,6 +934,65 @@
     plate.appendChild(name); root.appendChild(plate); root.appendChild(body);
     return { root: root, plate: plate, name: name, body: body };
   }
+  // gauge display ranges, metric as the data is; majors and div (scale divisor) only where 5 and 1 do not fit; a PID not listed has no range
+  var GAUGE = { '0C': { lo: 0, hi: 7000, dp: 0, majors: 7, div: 1000 }, '0D': { lo: 0, hi: 200, dp: 0 }, '05': { lo: -20, hi: 130, dp: 0 },
+    '04': { lo: 0, hi: 100, dp: 0 }, '11': { lo: 0, hi: 100, dp: 0 }, '0B': { lo: 0, hi: 120, dp: 0, majors: 6 }, '42': { lo: 10, hi: 16, dp: 1, majors: 6 },
+    '06': { lo: -25, hi: 25, dp: 1 }, '07': { lo: -25, hi: 25, dp: 1 }, '08': { lo: -25, hi: 25, dp: 1 }, '09': { lo: -25, hi: 25, dp: 1 },
+    '0E': { lo: -20, hi: 50, dp: 1, majors: 7 }, '0F': { lo: -40, hi: 80, dp: 0, majors: 6 }, '44': { lo: 0.5, hi: 1.5, dp: 2, majors: 4 } };
+  var FORMS = ['dial', 'bar', 'seven'];
+  var SEGCOL = { ok: 'var(--g-ok)', watch: 'var(--g-warn)', out: 'var(--g-bad)', neutral: 'var(--g-seg)', none: 'var(--g-seg)' };
+  function gaugeZones(w, lo, hi) {   // a watch range as bands on [lo, hi]: ok inside w.ok, watch between ok and out, out beyond out (judge's rule); null ends are open
+    if (!w || !Array.isArray(w.ok) || !Array.isArray(w.out)) return [];
+    var o0 = w.out[0] === null ? lo : w.out[0], k0 = w.ok[0] === null ? lo : w.ok[0], k1 = w.ok[1] === null ? hi : w.ok[1], o1 = w.out[1] === null ? hi : w.out[1];
+    return [[lo, o0, 'out'], [o0, k0, 'watch'], [k0, k1, 'ok'], [k1, o1, 'watch'], [o1, hi, 'out']]
+      .map(function (z) { return { from: Math.max(lo, z[0]), to: Math.min(hi, z[1]), s: z[2] }; })
+      .filter(function (z) { return z.to > z.from; });
+  }
+  function ledStrip(v, lo, hi, zones, n) {   // n LED cells over [lo, hi], lit from 0 (or the nearer end) to v, each in its zone's colour; v null lights none
+    var w = (hi - lo) / n, base = Math.max(lo, Math.min(hi, 0)), out = '', has = v !== null && v !== undefined;
+    for (var i = 0; i < n; i++) {
+      var m = lo + (i + 0.5) * w, lit = has && (v >= base ? m >= base && m <= v : m <= base && m >= v), c = 'n';
+      zones.forEach(function (z) { if (m >= z.from && m <= z.to) c = { ok: 'g', watch: 'y', out: 'r' }[z.s]; });
+      out += '<i class="' + (lit ? c : '') + (lo < 0 && hi > 0 && m - w / 2 <= 0 && m + w / 2 > 0 ? ' z' : '') + '"></i>';
+    }
+    return out;
+  }
+  function gaugeModel(spec) {   // spec { pid, form: 'dial'|'bar'|'seven', lo?, hi? } (metric) -> what the gauge shows now; values and bands in display units
+    var pid = spec.pid, d = GAUGE[pid] || {}, lo = typeof spec.lo === 'number' ? spec.lo : d.lo, hi = typeof spec.hi === 'number' ? spec.hi : d.hi,
+        ranged = typeof lo === 'number' && typeof hi === 'number' && hi > lo, form = !ranged ? 'seven' : FORMS.indexOf(spec.form) >= 0 ? spec.form : 'dial',
+        chs = (state && state.channels) || {}, present = !!chs[pid], v = present ? latest(pid) : null, has = v !== null && v !== undefined,
+        med = winMedian(pid), s = has ? judge(med === null ? v : med, watchFor(pid)) : 'none', c = chFor(pid);
+    return { key: pid + ':' + form, pid: pid, form: form, present: present, s: s, v: has ? cv(pid, v) : null,
+             dp: dpFor(pid, d.dp !== undefined ? d.dp : c ? c.dp : 1), lo: ranged ? cv(pid, lo) : null, hi: ranged ? cv(pid, hi) : null,
+             zones: ranged ? gaugeZones(watchFor(pid), lo, hi).map(function (z) { return { from: cv(pid, z.from), to: cv(pid, z.to), s: z.s }; }) : [],
+             majors: d.majors || 5, div: d.div || 1,
+             note: !present ? (Object.keys(chs).length ? 'not in this run' : 'not sampling') : !has ? 'waiting' : WORD[s] };
+  }
+  function segDigits(it) {   // enough digits for the range and the value, so the display does not clip to 9s
+    function need(x) { return x === null ? 0 : String(Math.round(Math.abs(x))).length + it.dp + (x < 0 ? 1 : 0); }
+    return Math.max(3, Math.min(7, need(it.lo), need(it.hi), need(it.v)));
+  }
+  function makeGauge(it) {   // a gauge card: name (unit) and its ?, the face, a value line and a note
+    var root = el('div', 'gauge'), top = el('div', 'gtop'), name = el('span', 'gname'), face = el('div', 'gface'), val = el('div', 'gval'), note = el('div', 'gnote');
+    root.setAttribute('data-key', it.key);
+    top.appendChild(name); top.appendChild(qbtn(it.pid));
+    [top, face, val, note].forEach(function (c) { root.appendChild(c); });
+    return { root: root, name: name, face: face, val: val, note: note };
+  }
+  function updGauge(nd, it) {
+    var u = unitOf(it.pid), name = pidName(it.pid);
+    nd.root.className = 'gauge ' + it.form + (it.present ? '' : ' dim') + (it.s === 'watch' || it.s === 'out' ? ' ' + it.s : '');
+    nd.name.textContent = name.charAt(0).toUpperCase() + name.slice(1) + (u ? ' (' + u + ')' : '');
+    nd.note.textContent = it.note;
+    nd.val.textContent = it.form === 'seven' ? '' : fmt(it.v, it.dp) + (u && it.v !== null ? ' ' + u : '');
+    if (it.form === 'dial') nd.face.innerHTML = dialSvg(it.v, it.lo, it.hi, it.majors, it.zones, name, it.div);   // numbers and fixed markup; the name is escaped
+    else if (it.form === 'bar') nd.face.innerHTML = '<div class="leds">' + ledStrip(it.v, it.lo, it.hi, it.zones, 21) + '</div>';
+    else { nd.face.className = 'gface led'; nd.face.setAttribute('style', '--c:' + SEGCOL[it.s]); seven(nd.face, it.v, segDigits(it), it.dp, SEGCOL[it.s], 72); }
+  }
+  function gauges(box, specs) {   // draw these gauges in box, in order, updated in place; a repeated pid+form is drawn once
+    var seen = {};
+    keyed(box, specs.map(gaugeModel).filter(function (m) { return seen[m.key] ? false : (seen[m.key] = true); }), makeGauge, updGauge);
+  }
   /* ---------- Overview ---------- */
   var TILES = [
     { key: 'trims', title: 'Fuel trims', pids: ['06', '07', '08', '09'], dp: 1 },
@@ -1256,7 +1331,7 @@
   }
   loadHelp();
   // the page test reaches the shared parts through this hook; a browser never defines it, so nothing is exposed
-  if (typeof window.__shadetreeParts === 'function') window.__shadetreeParts({ panel: panel });
+  if (typeof window.__shadetreeParts === 'function') window.__shadetreeParts({ panel: panel, gaugeZones: gaugeZones, gauges: gauges });
 })();
 </script>
 </body>
