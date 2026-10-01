@@ -42,13 +42,14 @@ function makeEnv(states, viewId = 'v0', help = null, runs = [], store = {}, page
         return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ ok: true, path: '/x/runs/a-run.json' }) });
       }
       if (/\/api\/runs/.test(url)) return Promise.resolve({ ok: true, json: () => Promise.resolve(Array.isArray(runs) ? { runs } : runs) });
+      if (/\/api\/scenarios(\?|$)/.test(url)) return Promise.resolve(page.scenariosFail ? { ok: false, json: () => Promise.resolve({}) } : { ok: true, json: () => Promise.resolve({ scenarios: page.scenarios || [] }) });
       if (/\/api\/help/.test(url)) return Promise.resolve(help ? { ok: true, json: () => Promise.resolve(help) } : { ok: false, json: () => Promise.resolve({}) });
       const st = states[Math.min(i++, states.length - 1)];
       return Promise.resolve({ ok: true, json: () => Promise.resolve(st) });
     }
   };
-  if (store !== null) sandbox.localStorage = { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); } };
-  if (page.storageThrows) sandbox.localStorage = { getItem() { throw new Error('blocked'); }, setItem() { throw new Error('blocked'); } };
+  if (store !== null) sandbox.localStorage = { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); }, removeItem: (k) => { delete store[k]; } };
+  if (page.storageThrows) sandbox.localStorage = { getItem() { throw new Error('blocked'); }, setItem() { throw new Error('blocked'); }, removeItem() { throw new Error('blocked'); } };
   if (page.prefersLight !== undefined || page.narrow !== undefined)   // a width query answers page.narrow, a colour-scheme query page.prefersLight
     sandbox.window.matchMedia = (q) => ({ matches: /max-width/.test(q) ? !!page.narrow : /light/.test(q) === !!page.prefersLight });
   vm.runInNewContext(js, sandbox);
@@ -727,6 +728,54 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
   let pvRows = 0; walk(pvBody.children[1], n => { if (n.className === 'xr') pvRows++; }); assert.strictEqual(pvRows, 6, 'six table rows');
   for (let k = 0; k < 3; k++) await pv.tick();
   assert.strictEqual(pv.el('vp').children.length, 1, 'built once, then updated in place');
+
+  // Scenario logic: five built-in sets, cleaning, server merge, pure edit operations
+  const J = (x) => JSON.parse(JSON.stringify(x));
+  {
+    const e = makeEnv(statesFor(5, idle), 'v0', OVF); await e.tick();
+    const P = e.parts();
+    assert.deepStrictEqual(Array.from(P.BUILTIN).map(s => s.id), ['general', 'fuel', 'cooling', 'idle', 'charging']);
+    P.BUILTIN.forEach(s => { assert.ok(s.gauges.length >= 1 && s.gauges.length <= 8); });
+    const cl = J(P.cleanSpecs([
+      { pid: '0c', form: 'bar' }, { pid: '0C', form: 'bar' }, { pid: 'constructor' }, { pid: '7' }, 5, null, { pid: '05', form: 'pie' },
+      ...Array.from({ length: 10 }, (_, i) => ({ pid: '1' + i })) ]));
+    assert.deepStrictEqual(cl.slice(0, 2), [{ pid: '0C', form: 'bar' }, { pid: '05', form: 'dial' }], 'lower-case is upper-cased, the repeat of pid+form is dropped, a bad form becomes dial');
+    assert.strictEqual(cl.length, 8, 'capped at 8');
+    assert.ok(!cl.some(g => g.pid === 'CO' || g.pid === '7'), 'non-hex and one-digit PIDs are dropped');
+    const l = P.scenarioList([{ id: 'general', name: 'Mine', gauges: [{ pid: '05', form: 'seven' }] }, { id: 'towing', name: '<img onerror=x>', gauges: [{ pid: '0C' }] }]);
+    assert.deepStrictEqual(Array.from(l).map(s => s.id), ['general', 'fuel', 'cooling', 'idle', 'charging', 'towing']);
+    assert.strictEqual(l[0].name, 'Mine');
+    assert.strictEqual(l[5].name, '<img onerror=x>', 'kept as data; the UI sets it with textContent');
+    const s3 = [{ pid: '0C', form: 'dial' }, { pid: '05', form: 'dial' }];
+    assert.deepStrictEqual(J(P.editAdd(s3, '04')).map(g => g.pid), ['0C', '05', '04']);
+    assert.strictEqual(P.editAdd(s3, '0C').length, 2, 'already shown');
+    const eight = Array.from({ length: 8 }, (_, i) => ({ pid: '0' + i, form: 'dial' }));
+    assert.strictEqual(P.editAdd(eight, '0F'), eight, 'cap: unchanged, same array');
+    assert.deepStrictEqual(J(P.editRemove(s3, 0)), [{ pid: '05', form: 'dial' }]);
+    assert.strictEqual(P.editRemove([s3[0]], 0).length, 0, 'the last gauge can go');
+    assert.deepStrictEqual(J(P.editMove(s3, 0, 1)).map(g => g.pid), ['05', '0C']);
+    assert.deepStrictEqual(J(P.editMove(s3, 0, -1)).map(g => g.pid), ['0C', '05'], 'off the end: unchanged');
+    const forms = []; let cur = [{ pid: '0C', form: 'dial' }];
+    for (let k = 0; k < 3; k++) { cur = P.editForm(cur, 0); forms.push(cur[0].form); }
+    assert.deepStrictEqual(forms, ['bar', 'seven', 'dial'], 'dial -> bar -> seven -> dial');
+    assert.strictEqual(P.editForm([{ pid: '99', form: 'seven' }], 0)[0].form, 'seven', 'no range: stays seven');
+  }
+  // Saved scenarios survive corrupt or blocked storage
+  {
+    const store = { 'shadetree.scen.general': '{not json', 'shadetree.scen.fuel': JSON.stringify([{ pid: '0C', form: 'bar' }]),
+                    'shadetree.scen.idle': JSON.stringify([{ pid: 'zz' }]) };
+    const e = makeEnv(statesFor(5, idle), 'v0', OVF, [], store); await e.tick();
+    const P = e.parts(), L = P.scenarioList([]);
+    assert.deepStrictEqual(J(P.specsFor(L[0])), J(L[0].gauges), 'corrupt -> defaults');
+    assert.deepStrictEqual(J(P.specsFor(L[1])), [{ pid: '0C', form: 'bar' }], 'valid -> used');
+    assert.deepStrictEqual(J(P.specsFor(L[3])), J(L[3].gauges), 'all-invalid -> defaults');
+    P.saveSaved('cooling', [{ pid: '05', form: 'bar' }], L[2].gauges);
+    assert.ok(store['shadetree.scen.cooling']);
+    P.saveSaved('cooling', L[2].gauges, L[2].gauges);
+    assert.strictEqual(store['shadetree.scen.cooling'], undefined, 'equal to defaults: key removed');
+    const t = makeEnv(statesFor(5, idle), 'v0', OVF, [], {}, { storageThrows: true }); await t.tick();
+    assert.doesNotThrow(() => { const Q = t.parts(); Q.specsFor(Q.scenarioList([])[0]); Q.saveSaved('x', [], [{ pid: '0C', form: 'dial' }]); }, 'blocked storage: defaults, no throw');
+  }
 
   console.log('page logic OK');
 })().catch(e => { console.error('FAIL', e.message); process.exit(1); });

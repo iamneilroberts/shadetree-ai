@@ -97,7 +97,7 @@ def test_retained_feature_is_still_on_the_page(feature):
 
 
 def test_page_stays_one_file_under_its_size_budget():
-    assert len(HTML.encode("utf-8")) < 112_000  # 92,165 bytes before stage 1; raise only on purpose
+    assert len(HTML.encode("utf-8")) < 130_000  # 92,165 bytes before stage 1; stage 2 adds the Dashboard and scenarios (about 10 KB) and removes the #vp preview; raise only on purpose
     assert HTML.count("<script>") == 1 and HTML.count("<style>") == 1
 
 

@@ -1007,6 +1007,58 @@
     hd.appendChild(tr); tb.appendChild(hd); tb.appendChild(body); root.appendChild(tb);
     return { root: root, body: body };
   }
+  var BUILTIN = [
+    { id: 'general', name: 'General', gauges: [['0C','dial'],['0D','dial'],['05','dial'],['04','bar'],['11','bar'],['0B','bar'],['42','seven'],['06','seven']] },
+    { id: 'fuel', name: 'Fuel trims', gauges: [['06','bar'],['07','bar'],['08','bar'],['09','bar'],['44','dial'],['0B','dial'],['0C','dial'],['04','seven']] },
+    { id: 'cooling', name: 'Cooling', gauges: [['05','dial'],['0F','dial'],['04','bar'],['0C','dial'],['0D','seven'],['42','seven']] },
+    { id: 'idle', name: 'Idle / misfire', gauges: [['0C','dial'],['04','bar'],['0B','bar'],['06','seven'],['0E','dial'],['11','bar'],['42','seven']] },
+    { id: 'charging', name: 'Charging / electrical', gauges: [['42','dial'],['0C','dial'],['04','bar'],['11','bar']] }
+  ].map(function (s) { return { id: s.id, name: s.name, gauges: s.gauges.map(function (g) { return { pid: g[0], form: g[1] }; }) }; });
+  var SCEN_MAX = 8, HEXPID = /^[0-9A-F]{2}$/;
+  function cleanSpecs(a) {   // any JSON -> [{pid, form}]: two-hex-digit PIDs (upper-cased), a known form, no repeated pid+form, at most 8
+    var out = [], seen = Object.create(null);
+    (Array.isArray(a) ? a : []).forEach(function (g) {
+      if (!g || typeof g !== 'object' || typeof g.pid !== 'string') return;
+      var pid = g.pid.toUpperCase(), form = FORMS.indexOf(g.form) >= 0 ? g.form : 'dial', k = pid + ':' + form;
+      if (!HEXPID.test(pid) || seen[k] || out.length >= SCEN_MAX) return;
+      seen[k] = true; out.push({ pid: pid, form: form });
+    });
+    return out;
+  }
+  function scenarioList(server) {   // the built-ins in order; a server scenario with a built-in's id replaces it, others are appended
+    var list = BUILTIN.map(function (s) { return { id: s.id, name: s.name, gauges: s.gauges.slice() }; });
+    (Array.isArray(server) ? server : []).forEach(function (s) {
+      if (!s || typeof s.id !== 'string' || typeof s.name !== 'string') return;
+      var g = cleanSpecs(s.gauges), at = -1;
+      if (!g.length) return;
+      list.forEach(function (x, i) { if (x.id === s.id) at = i; });
+      var item = { id: s.id, name: s.name, gauges: g };
+      if (at >= 0) list[at] = item; else list.push(item);
+    });
+    return list;
+  }
+  function loadSaved(id) {
+    try { var s = cleanSpecs(JSON.parse(localStorage.getItem('shadetree.scen.' + id))); return s.length ? s : null; } catch (x) { return null; }
+  }
+  function saveSaved(id, specs, defaults) {   // an edit equal to the defaults is not stored
+    try {
+      if (JSON.stringify(specs) === JSON.stringify(defaults)) localStorage.removeItem('shadetree.scen.' + id);
+      else localStorage.setItem('shadetree.scen.' + id, JSON.stringify(specs));
+    } catch (x) {}
+  }
+  function specsFor(sc) { return loadSaved(sc.id) || sc.gauges; }
+  function editAdd(specs, pid) {
+    if (specs.length >= SCEN_MAX || specs.some(function (g) { return g.pid === pid; })) return specs;
+    return specs.concat([{ pid: pid, form: GAUGE[pid] ? 'dial' : 'seven' }]);
+  }
+  function editRemove(specs, i) { return specs.filter(function (g, j) { return j !== i; }); }
+  function editMove(specs, i, d) {
+    var j = i + d; if (j < 0 || j >= specs.length) return specs;
+    var out = specs.slice(); out[i] = specs[j]; out[j] = specs[i]; return out;
+  }
+  function editForm(specs, i) {
+    return specs.map(function (g, j) { return j !== i || !GAUGE[g.pid] ? g : { pid: g.pid, form: FORMS[(FORMS.indexOf(g.form) + 1) % FORMS.length] }; });
+  }
   var PREVIEW = [{ pid: '0C', form: 'dial' }, { pid: '05', form: 'dial' }, { pid: '07', form: 'bar' }, { pid: '42', form: 'seven' }, { pid: '0D', form: 'bar' }, { pid: '0B', form: 'seven' }];
   var preview = null;
   function renderParts() {   // the #vp preview: one Panel with a gauge of each form (0D is only in a --demo or capture-all run, so in a default run its gauges show as not in this run) and their PID table rows
@@ -1358,7 +1410,8 @@
   }
   loadHelp();
   // the page test reaches the shared parts through this hook; a browser never defines it, so nothing is exposed
-  if (typeof window.__shadetreeParts === 'function') window.__shadetreeParts({ panel: panel, gaugeZones: gaugeZones, gauges: gauges, pidRows: pidRows, pidTableEl: pidTableEl });
+  if (typeof window.__shadetreeParts === 'function') window.__shadetreeParts({ panel: panel, gaugeZones: gaugeZones, gauges: gauges, pidRows: pidRows, pidTableEl: pidTableEl,
+    gaugeModel: gaugeModel, segDigits: segDigits, BUILTIN: BUILTIN, cleanSpecs: cleanSpecs, scenarioList: scenarioList, loadSaved: loadSaved, saveSaved: saveSaved, specsFor: specsFor, editAdd: editAdd, editRemove: editRemove, editMove: editMove, editForm: editForm });
 })();
 </script>
 </body>
