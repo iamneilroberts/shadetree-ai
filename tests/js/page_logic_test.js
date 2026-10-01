@@ -698,5 +698,22 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
   const anv = makeEnv(statesFor(30, () => base()), 'v4', OVF); for (let k = 0; k < 32; k++) await anv.tick();
   assert(/class="dn"/.test(anv.el('a_vm').innerHTML) && /class="z-out"/.test(anv.el('a_vm').innerHTML), 'analyzer volts meter: needle and red zone');
 
+  // PID table: today's All readings rows for any list of PIDs, in the given order (Review Focus 4)
+  const pt = makeEnv(speedStates(true), 'v6', OVF, [], {}); for (let k = 0; k < 5; k++) await pt.tick();
+  const PT = pt.parts(), tbl = PT.pidTableEl();
+  assert.strictEqual(tbl.root.className, 'rwrap'); assert.strictEqual(tbl.root.children[0].className, 'rd');
+  assert.deepStrictEqual(flat(tbl.root).trim().split(/\s+/), ['Reading', 'Now', 'Min', 'Max', 'Avg', 'Std', 'Samples'], 'the All readings header');
+  PT.pidRows(tbl.body, []); assert.strictEqual(tbl.body.children.length, 0, 'an empty list: no rows');
+  PT.pidRows(tbl.body, ['0D', '05', '0D']);
+  assert.deepStrictEqual(tbl.body.children.map(c => c.getAttribute('data-key')), ['0D', '05'], 'in the given order, a repeat listed once');
+  const tcells = (row) => row.children.map(c => flat(c).replace(/\s*\?$/, '').trim().replace(/\s+/g, ' '));
+  assert.deepStrictEqual(tcells(tbl.body.children[0]), ['Vehicle speed (km/h)', '60', '0', '112.7', '50', '—', '9'], 'the same cells as All readings');
+  const many = Array.from({ length: 64 }, (_, i) => (i + 0x20).toString(16).toUpperCase());
+  PT.pidRows(tbl.body, many);
+  assert.strictEqual(tbl.body.children.length, 64, '64 PIDs (the run-file maximum): 64 rows');
+  assert.deepStrictEqual(tcells(tbl.body.children[0]).slice(1), ['—', '—', '—', '—', '—', '—'], 'a PID not in the run: dashes, not zeros');
+  PT.pidRows(tbl.body, ['05']); assert.deepStrictEqual(tbl.body.children.map(c => c.getAttribute('data-key')), ['05'], 'shrinking drops the old rows');
+  assert.strictEqual(pt.el('x_grid').children.filter(c => c.className === 'xr').length, 11, 'All readings is unchanged beside it');
+
   console.log('page logic OK');
 })().catch(e => { console.error('FAIL', e.message); process.exit(1); });

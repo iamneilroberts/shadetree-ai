@@ -229,14 +229,14 @@
   .retro .hlive { font: 700 11px var(--sil); letter-spacing: .12em; color: var(--wait-ink); }
   .retro .hlive.on { color: var(--led-g); } .retro .hlive.off { color: var(--hlive-off); }
   #v6 .card { margin-bottom: 12px; }
-  #v6 .rwrap { overflow-x: auto; }
-  #v6 table.rd { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
-  #v6 table.rd th, #v6 table.rd td { text-align: right; padding: 3px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
-  #v6 table.rd th { font: 700 11.5px var(--cond); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
-  #v6 table.rd th:first-child, #v6 table.rd td.n { text-align: left; white-space: normal; }
-  #v6 table.rd td.n .q { width: 18px; height: 18px; font-size: 11px; margin-left: 6px; vertical-align: middle; }
-  #v6 table.rd td .at { display: block; font-size: 10.5px; color: var(--muted); }
-  @media (max-width: 430px) { #v6 table.rd th, #v6 table.rd td { padding: 3px 4px; } }
+  .rwrap { overflow-x: auto; }
+  table.rd { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+  table.rd th, table.rd td { text-align: right; padding: 3px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  table.rd th { font: 700 11.5px var(--cond); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  table.rd th:first-child, table.rd td.n { text-align: left; white-space: normal; }
+  table.rd td.n .q { width: 18px; height: 18px; font-size: 11px; margin-left: 6px; vertical-align: middle; }
+  table.rd td .at { display: block; font-size: 10.5px; color: var(--muted); }
+  @media (max-width: 430px) { table.rd th, table.rd td { padding: 3px 4px; } }
   #v6 .note { color: var(--muted); font-size: 12.5px; margin: 0 0 8px; }
   #v6 table.m6 { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-bottom: 10px; }
   #v6 table.m6 th, #v6 table.m6 td { text-align: right; padding: 3px 8px; border-bottom: 1px solid var(--line); }
@@ -899,7 +899,7 @@
   }
   function renderReadings() {
     var st = state || {}, chs = st.channels || {}, stats = st.stats || {}, ids = Object.keys(chs).sort();
-    keyed($('x_grid'), ids.map(function (p) { return { key: p, lab: chs[p].labels, s: stats[p] }; }), makeX, updX);
+    pidRows($('x_grid'), ids);
     $('x_count').textContent = ids.length ? ids.length + ' readings · stats over ' + (st.status === 'running' && !st.replay ? 'this run so far' : 'the whole run') +
       (st.tiers ? ' · all supported: ' + st.tiers.fast.length + ' fast every sweep, ' + st.tiers.slow.length + ' slow in rotation' : '') : '';
     $('x_note').style.display = ids.length ? 'none' : '';
@@ -992,6 +992,18 @@
   function gauges(box, specs) {   // draw these gauges in box, in order, updated in place; a repeated pid+form is drawn once
     var seen = {};
     keyed(box, specs.map(gaugeModel).filter(function (m) { return seen[m.key] ? false : (seen[m.key] = true); }), makeGauge, updGauge);
+  }
+  var PT_HEAD = ['Reading', 'Now', 'Min', 'Max', 'Avg', 'Std', 'Samples'];
+  function pidRows(body, pids) {   // the All readings rows for these PIDs, in this order, updated in place; a repeated PID is listed once
+    var st = state || {}, chs = st.channels || {}, stats = st.stats || {}, seen = {};
+    keyed(body, pids.filter(function (p) { return seen[p] ? false : (seen[p] = true); })
+      .map(function (p) { return { key: p, lab: chs[p] ? chs[p].labels : undefined, s: stats[p] }; }), makeX, updX);
+  }
+  function pidTableEl() {   // a new All readings table for another view: { root, body }; fill body with pidRows
+    var root = el('div', 'rwrap'), tb = el('table', 'rd'), hd = el('thead'), tr = el('tr'), body = el('tbody');
+    PT_HEAD.forEach(function (c) { tr.appendChild(el('th', '', c)); });
+    hd.appendChild(tr); tb.appendChild(hd); tb.appendChild(body); root.appendChild(tb);
+    return { root: root, body: body };
   }
   /* ---------- Overview ---------- */
   var TILES = [
@@ -1331,7 +1343,7 @@
   }
   loadHelp();
   // the page test reaches the shared parts through this hook; a browser never defines it, so nothing is exposed
-  if (typeof window.__shadetreeParts === 'function') window.__shadetreeParts({ panel: panel, gaugeZones: gaugeZones, gauges: gauges });
+  if (typeof window.__shadetreeParts === 'function') window.__shadetreeParts({ panel: panel, gaugeZones: gaugeZones, gauges: gauges, pidRows: pidRows, pidTableEl: pidTableEl });
 })();
 </script>
 </body>
