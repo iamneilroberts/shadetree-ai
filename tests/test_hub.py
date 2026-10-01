@@ -576,3 +576,24 @@ def test_saved_run_carries_codes_mode06_and_the_partial_key_and_replays_them(tmp
     assert st["codes"]["stored"] == data["codes"]["stored"] and st["codes"]["mil"] == data["codes"]["mil"]
     assert st["mode06"]["results"] == data["mode06"]["results"] and st["vehicle"]["key"] == vehicle_key(SIM_VIN)
     hub2.exit_replay()
+
+
+def test_huge_control_numbers_are_a_value_error(tmp_path):
+    hub = _replay_hub(tmp_path)
+    for kw in ({"pos": int("9" * 400)}, {"speed": int("9" * 400)}):
+        with pytest.raises(ValueError):
+            hub.replay_control("seek" if "pos" in kw else "speed", **kw)
+    hub.exit_replay()
+
+
+def test_a_seek_in_a_long_run_refills_only_the_last_minute(tmp_path):
+    ts = [float(k) for k in range(1, 201)]
+    obj = {"kind": "live_run", "live_sample": {"duration_s": 200.0, "rate_hz": 1.0, "series": {
+        "0C": {"name": "engine_rpm", "unit": "rpm", "samples": [[t, t] for t in ts]}}}}
+    hub, _, _ = make(tmp_path)
+    hub.start_replay(load_run(obj), "long.json", playing=False)
+    hub.replay_control("seek", pos=150.0)
+    first = hub.state()["channels"]["0C"]["samples"][0]
+    assert first[1] == 90.0, "the window is the 60 s before the seek point"
+    assert hub.state()["seq"] == 61
+    hub.exit_replay()

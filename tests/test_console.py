@@ -263,3 +263,11 @@ def test_replay_and_live_sampling_refuse_each_other_over_http(srv):
     assert call(server, "POST", "/api/start", {"pids": DEFAULT_PIDS, "hz": 10})[0] == 200
     assert wait_seq(server, 2)
     assert call(server, "POST", "/api/replay", {"run": _run_obj()})[0] == 409
+
+
+def test_deep_nesting_and_huge_numbers_get_a_400_not_a_dropped_connection(srv):
+    server, _, _ = srv
+    assert call(server, "POST", "/api/replay", raw='{"run": ' + "[" * 100000 + "]" * 100000 + "}")[0] == 400
+    assert call(server, "POST", "/api/replay", {"run": _run_obj()})[0] == 200
+    assert call(server, "POST", "/api/replay/control", raw='{"action": "seek", "pos": ' + "9" * 400 + "}")[0] == 400
+    assert call(server, "GET", "/api/state")[1]["replay"]["name"] == "upload"

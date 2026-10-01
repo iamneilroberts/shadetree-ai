@@ -37,9 +37,12 @@ class Run:
 
 
 def _num(x) -> float:
-    if isinstance(x, bool) or not isinstance(x, (int, float)) or not math.isfinite(x):
-        raise ValueError("samples must be finite numbers")
-    return float(x)
+    try:
+        if isinstance(x, bool) or not isinstance(x, (int, float)) or not math.isfinite(x):
+            raise ValueError("samples must be finite numbers")
+        return float(x)
+    except OverflowError:
+        raise ValueError("a number is out of range") from None
 
 
 def _text(x, allow_none: bool = False):
@@ -132,8 +135,12 @@ def load_run(obj) -> Run:
     ad = obj.get("adapter")
     proto = ad.get("protocol") if isinstance(ad, dict) else None
     rate = ls.get("rate_hz")
+    try:
+        rate = float(rate) if isinstance(rate, (int, float)) and not isinstance(rate, bool) and math.isfinite(rate) and rate > 0 else 0.0
+    except OverflowError:
+        rate = 0.0
     return Run(duration=max(sweeps[-1][0], 0.1),
-               rate_hz=float(rate) if isinstance(rate, (int, float)) and not isinstance(rate, bool) and math.isfinite(rate) and rate > 0 else 0.0,
+               rate_hz=rate,
                protocol=proto if isinstance(proto, str) and len(proto) <= MAX_TEXT else None,
                names=names, sweeps=sweeps, codes=_codes(obj.get("codes")), mode06=_mode06(obj.get("mode06")),
                vehicle=_vehicle(obj.get("vehicle")), times=[t for t, _ in sweeps])
@@ -177,7 +184,7 @@ def list_runs(runs_dir) -> list[dict]:
             dur = float(obj["live_sample"]["duration_s"])
             if not math.isfinite(dur) or dur < 0:
                 continue
-        except (OSError, ValueError, KeyError, TypeError, AttributeError):
+        except (OSError, ValueError, KeyError, TypeError, AttributeError, OverflowError, RecursionError):
             continue
         out.append({"name": p.name, "size": size, "duration": dur})
     return out

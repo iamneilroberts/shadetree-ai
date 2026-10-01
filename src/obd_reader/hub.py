@@ -215,6 +215,12 @@ class LiveHub:
             rp["playing"], rp["ended"] = False, True
 
     def replay_control(self, action: str, pos: float | None = None, speed: float | None = None) -> None:
+        try:
+            self._replay_control(action, pos, speed)
+        except OverflowError:
+            raise ValueError("a number is out of range") from None
+
+    def _replay_control(self, action: str, pos, speed) -> None:
         with self._data_lock:
             rp = self._replay
             if rp is None:

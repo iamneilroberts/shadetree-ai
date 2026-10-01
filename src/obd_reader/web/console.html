@@ -454,9 +454,12 @@
 
   /* ---------- data in ---------- */
   function resetBuffers() { CH.forEach(function (c) { buf[c.id] = []; last[c.id] = null; }); lastSeq = 0; events = []; xs = {}; }
-  function ingest(st) {
+  function ingest(st, asked) {
     // a new run (any viewer, or Claude, can start one) restarts the sequence numbers: start over
-    if (st.run !== runId || st.seq < lastSeq) { resetBuffers(); runId = st.run; }
+    if (st.run !== runId || st.seq < lastSeq) {
+      resetBuffers(); runId = st.run;
+      if (asked > 0) { state = st; return true; }   // the reply left out the new run's samples (they are older than `asked`): ask again from 0
+    }
     state = st; fetchedAt = performance.now(); tNow = st.now;
     if (cap && st.status !== 'running') cancelCap('sampling stopped');
     var rows = {};
@@ -482,6 +485,7 @@
     if (st.seq > lastSeq) lastSeq = st.seq;
     CH.forEach(function (c) { var b = buf[c.id]; while (b.length && b[0].t < tNow - SPAN - 2) b.shift(); });
     Object.keys(rows).map(Number).sort(function (a, b) { return a - b; }).forEach(function (k) { capRow(rows[k]); });
+    return false;
   }
 
   /* ---------- drawing helpers (from the reviewed mock) ---------- */
@@ -613,7 +617,7 @@
   $('rb_restart').addEventListener('click', function () { replayCtl({ action: 'restart' }); });
   $('rb_speed').addEventListener('change', function () { replayCtl({ action: 'speed', speed: Number($('rb_speed').value) }); });
   $('rb_seek').addEventListener('input', function () { seeking = true; var d = state && state.replay ? state.replay.duration : 0; $('rb_time').textContent = mmss(Number($('rb_seek').value)) + ' / ' + mmss(d); });
-  $('rb_seek').addEventListener('change', function () { var pos = Number($('rb_seek').value); replayCtl({ action: 'seek', pos: pos }).then(function () { seeking = false; }); });
+  $('rb_seek').addEventListener('change', function () { var pos = Number($('rb_seek').value); var done = function () { seeking = false; }; replayCtl({ action: 'seek', pos: pos }).then(done, done); });
   $('rb_exit').addEventListener('click', function () { replayCtl({ action: 'exit' }); });
   function chips() {
     var st = state || { status: 'disconnected' }, live = $('chipLive'), label = { running: 'LIVE', stopped: 'STOPPED', error: 'ERROR', idle: 'NOT SAMPLING', disconnected: 'DISCONNECTED' }[st.status] || 'UNKNOWN';
@@ -1005,11 +1009,12 @@
   function poll() {
     if (polling) return;                      // never let two polls race: a slow reply must not be overtaken
     polling = true;
-    fetch(api('/api/state?after=' + lastSeq))
+    var asked = lastSeq;
+    fetch(api('/api/state?after=' + asked))
       .then(function (r) { if (!r.ok) throw new Error(String(r.status)); return r.json(); })
-      .then(function (st) { ingest(st); render(); })
+      .then(function (st) { var again = ingest(st, asked); render(); return again; })
       .catch(function () { state = { status: 'disconnected' }; chips(); })
-      .then(function () { polling = false; });
+      .then(function (again) { polling = false; if (again === true) poll(); });
   }
   $('pause').addEventListener('click', function () {
     var running = state && state.status === 'running';

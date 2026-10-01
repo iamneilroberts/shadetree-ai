@@ -368,5 +368,36 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
   assert.strictEqual(pk.el('rp_err').textContent, 'not a saved run'); assert.strictEqual(pk.el('replayPanel').hidden, false, 'the panel stays open on an error');
 
 
+  // 9) after a seek (new run id, seq restarts below the page's old position) the page refetches the whole refill
+  const fullState = (run, n, v) => ({ status: 'running', run, message: null, demo: false, seq: n, now: 0.4 * n, since_last_sample: 0.1, hz: 2.5,
+    hz_measured: 2.5, seconds_left: null, adapter: {}, replay: REPLAY(),
+    channels: { '42': { name: 'control_module_voltage', unit: 'V', samples: Array.from({ length: n }, (_, i) => [i + 1, +(0.4 * (i + 1)).toFixed(3), v]) } } });
+  const urls = [];
+  const sk = makeEnv([], 'v0', OVF);
+  await new Promise(r => setImmediate(r)); await new Promise(r => setImmediate(r));
+  sk.sandbox.fetch = (url) => {
+    urls.push(url);
+    const after = +((/after=(\d+)/.exec(url) || [0, 0])[1]);
+    const st = urls.length === 1 ? fullState(1, 5, 15.4) : fullState(2, 3, 12.1);   // the server only returns samples newer than `after`
+    st.channels['42'].samples = st.channels['42'].samples.filter(s => s[0] > after);
+    return Promise.resolve({ ok: true, json: () => Promise.resolve(st) });
+  };
+  for (let k = 0; k < 5; k++) await sk.tick();
+  assert(urls.length >= 3 && /after=5/.test(urls[1]) && /after=0/.test(urls[2]), 'a run change is followed by a full refetch: ' + urls.join(' '));
+  let skVolts = null; walk(sk.el('o_tiles'), n => { if (n.getAttribute('data-key') === 'volts') skVolts = n; });
+  let skBig = null; walk(skVolts, n => { if (n.className === 'big') skBig = n; });
+  assert.strictEqual(skBig.textContent, '12.1', 'the refilled window reached the page');
+
+  // 10) a failed seek request does not leave the scrubber frozen
+  const rp2 = makeEnv(rstates(REPLAY()), 'v0');
+  for (let k = 0; k < 4; k++) await rp2.tick();
+  rp2.el('rb_seek').value = '60'; rp2.handlers['rb_seek:input']();
+  rp2.sandbox.fetch = (url, opts) => opts && opts.method === 'POST' ? Promise.reject(new Error('down'))
+    : Promise.resolve({ ok: true, json: () => Promise.resolve(Object.assign(rstates(REPLAY({ pos: 200 }))[0], { seq: 99 })) });
+  rp2.handlers['rb_seek:change']();
+  await new Promise(r => setImmediate(r)); await new Promise(r => setImmediate(r));
+  for (let k = 0; k < 3; k++) await rp2.tick();
+  assert.strictEqual(rp2.el('rb_time').textContent, '3:20 / 6:10', 'the scrubber follows playback again after a failed seek');
+
   console.log('page logic OK');
 })().catch(e => { console.error('FAIL', e.message); process.exit(1); });

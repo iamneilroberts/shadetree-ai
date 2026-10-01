@@ -134,3 +134,19 @@ def test_list_runs_is_newest_first_skips_invalid_files_and_caps_at_fifty(tmp_pat
         _put(tmp_path, f"r{i:02d}.json", run_obj(), 5000 + i)
     assert len(rr.list_runs(tmp_path)) == 50
     assert rr.list_runs(tmp_path / "nope") == []
+
+
+def test_huge_numbers_are_a_plain_value_error_not_an_overflow():
+    o = run_obj()
+    o["live_sample"]["series"]["0C"]["samples"].append([2.0, int("9" * 400)])
+    with pytest.raises(ValueError):
+        rr.load_run(o)
+    o = run_obj()
+    o["live_sample"]["rate_hz"] = int("9" * 400)
+    assert rr.load_run(o).rate_hz == 0.0
+
+
+def test_a_file_with_a_huge_number_is_skipped_by_the_list_not_fatal(tmp_path):
+    (tmp_path / "huge.json").write_text('{"kind": "live_run", "live_sample": {"duration_s": ' + "9" * 400 + "}}")
+    _put(tmp_path, "ok.json", run_obj())
+    assert [r["name"] for r in rr.list_runs(tmp_path)] == ["ok.json"]

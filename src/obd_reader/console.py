@@ -156,7 +156,7 @@ class ConsoleServer:
                     return None
                 try:
                     data = json.loads(self.rfile.read(n) or b"{}")
-                except ValueError:
+                except (ValueError, RecursionError):
                     self._json(400, {"error": "body is not valid JSON"})
                     return None
                 if not isinstance(data, dict):
