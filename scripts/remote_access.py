@@ -169,11 +169,14 @@ def _token(env_file: str) -> str:
     tok = os.environ.get("CLOUDFLARE_API_TOKEN", "")
     if not tok:
         try:
-            for line in open(os.path.expanduser(env_file), encoding="utf-8"):
-                if line.startswith("CLOUDFLARE_API_TOKEN="):
-                    tok = line.split("=", 1)[1].strip().strip('"').strip("'")
+            lines = [ln.strip() for ln in open(os.path.expanduser(env_file), encoding="utf-8") if ln.strip() and not ln.lstrip().startswith("#")]
         except OSError:
-            pass
+            lines = []
+        for line in lines:
+            if line.startswith("CLOUDFLARE_API_TOKEN="):
+                tok = line.split("=", 1)[1].strip().strip('"').strip("'")
+        if not tok and len(lines) == 1 and "=" not in lines[0]:
+            tok = lines[0]   # a file holding just the token
     if not tok:
         sys.exit("no CLOUDFLARE_API_TOKEN in the environment or in --env-file")
     return tok

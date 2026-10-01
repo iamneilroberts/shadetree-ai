@@ -163,3 +163,19 @@ def test_api_errors_carry_cloudflares_message_and_never_the_token(monkeypatch):
     with pytest.raises(RuntimeError) as e:
         api("GET", "/zones")
     assert "no permission for access" in str(e.value) and "SECRET-TOKEN-VALUE" not in str(e.value)
+
+
+def test_the_token_file_may_be_a_bare_token_or_a_name_equals_line(tmp_path, monkeypatch):
+    monkeypatch.delenv("CLOUDFLARE_API_TOKEN", raising=False)
+    bare = tmp_path / "bare.env"
+    bare.write_text("abc123TOKEN\n")
+    named = tmp_path / "named.env"
+    named.write_text("OTHER=1\nCLOUDFLARE_API_TOKEN='xyz789TOKEN'\n")
+    other = tmp_path / "other.env"
+    other.write_text("OTHER=1\n")
+    assert ra._token(str(bare)) == "abc123TOKEN"
+    assert ra._token(str(named)) == "xyz789TOKEN"
+    with pytest.raises(SystemExit):
+        ra._token(str(other))
+    monkeypatch.setenv("CLOUDFLARE_API_TOKEN", "from-env")
+    assert ra._token(str(bare)) == "from-env", "the environment wins"
