@@ -271,3 +271,55 @@ def test_deep_nesting_and_huge_numbers_get_a_400_not_a_dropped_connection(srv):
     assert call(server, "POST", "/api/replay", {"run": _run_obj()})[0] == 200
     assert call(server, "POST", "/api/replay/control", raw='{"action": "seek", "pos": ' + "9" * 400 + "}")[0] == 400
     assert call(server, "GET", "/api/state")[1]["replay"]["name"] == "upload"
+
+
+@pytest.fixture
+def public_srv(tmp_path):
+    sim = SimPort("rich")
+    session = Session(Config(port="sim", home=tmp_path, timeout=0.5), port_factory=lambda: sim)
+    hub = LiveHub(session, sim=sim)
+    server = ConsoleServer(hub, token="tok123", allow_hosts=["Shadetree.Voygent.ai"])
+    server.start()
+    yield server
+    hub.stop()
+    server.stop()
+
+
+def test_a_named_public_host_needs_its_name_https_origin_and_the_token(public_srv):
+    s, name = public_srv, "shadetree.voygent.ai"
+    assert call(s, "GET", "/api/state", host=name)[0] == 200
+    assert call(s, "GET", "/api/state", host=name, token="wrong")[0] == 401
+    assert call(s, "GET", "/api/state", host=name, token=None)[0] == 401
+    assert call(s, "POST", "/api/stop", {}, host=name, headers={"Origin": f"https://{name}"})[0] == 200
+    for origin in (f"http://{name}", "https://evil.example", f"https://{name}.evil.example", f"https://evil.example/{name}"):
+        assert call(s, "POST", "/api/stop", {}, host=name, headers={"Origin": origin})[0] == 403, origin
+    for host in ("evil.example", f"{name}.evil.example", f"{name}:8443", "voygent.ai"):
+        assert call(s, "GET", "/api/state", host=host)[0] == 403, host
+    assert call(s, "GET", "/api/state", host=f"localhost:{s.port}")[0] == 200, "loopback still works"
+    assert call(s, "POST", "/api/stop", {}, host=f"localhost:{s.port}", headers={"Origin": f"http://localhost:{s.port}"})[0] == 200
+
+
+def test_an_https_origin_is_refused_when_no_public_host_was_allowed(srv):
+    server, _, _ = srv
+    assert call(server, "POST", "/api/stop", {}, headers={"Origin": f"https://127.0.0.1:{server.port}"})[0] == 403
+    assert call(server, "GET", "/api/state", host="shadetree.voygent.ai")[0] == 403
+
+
+@pytest.mark.parametrize("bad", ["", "a b", "x/y", "https://a.b", "a.b:443", "-bad.com", "bad-.com", "a..b", "x" * 254, "über.example", "*.voygent.ai", 5, None])
+def test_bad_allow_host_values_are_refused_before_any_socket_opens(tmp_path, bad):
+    session = Session(Config(port="sim", home=tmp_path, timeout=0.5), port_factory=lambda: SimPort("rich"))
+    with pytest.raises(ValueError):
+        ConsoleServer(LiveHub(session), allow_hosts=[bad])
+
+
+def test_allow_host_reaches_the_server_from_the_command_line(tmp_path):
+    from obd_reader.__main__ import build_parser, console_main
+    args = build_parser().parse_args(["console", "--demo", "--http-port", "0", "--no-start", "--out-dir", str(tmp_path),
+                                      "--allow-host", "a.example.com", "--allow-host", "B.example.com"])
+    assert args.allow_host == ["a.example.com", "B.example.com"]
+    svc = console_main(args, block=False)
+    try:
+        assert svc.server.public_hosts == {"a.example.com", "b.example.com"}
+        assert call(svc.server, "GET", "/api/state", host="b.example.com", token=svc.server.token)[0] == 200
+    finally:
+        svc.stop()

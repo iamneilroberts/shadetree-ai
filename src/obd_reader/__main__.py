@@ -47,7 +47,7 @@ def console_main(args, block: bool = True):
 
     session = Session(Config(port=args.port, home=args.out_dir))
     svc = ConsoleService(session, demo=args.demo, host=args.host, http_port=args.http_port,
-                         allow_lan=args.allow_lan, scenario=args.scenario)
+                         allow_lan=args.allow_lan, scenario=args.scenario, allow_hosts=args.allow_host)
     server = svc.ensure()
     if args.host not in ("127.0.0.1", "localhost", "::1"):
         print("warning: the console is reachable from your network; anyone with the link can watch live data",
@@ -55,6 +55,8 @@ def console_main(args, block: bool = True):
     if not args.no_start:
         svc.start_sampling(seconds=args.seconds)
     print(f"console: {server.url}", flush=True)
+    if args.allow_host:
+        print(f"console (remote): https://{args.allow_host[0]}/?t={server.token}", flush=True)
     if args.host in ("0.0.0.0", "::"):
         from obd_reader.console import guess_lan_ip
 
@@ -112,6 +114,8 @@ def build_parser() -> argparse.ArgumentParser:
     co.add_argument("--http-port", type=int, default=8765, help="local web port (0 = any free port)")
     co.add_argument("--host", default="127.0.0.1", help="bind address (non-loopback needs --allow-lan)")
     co.add_argument("--allow-lan", action="store_true", help="allow binding a non-loopback address")
+    co.add_argument("--allow-host", action="append", default=[], metavar="NAME",
+                    help="also accept this public host name (repeatable), for a tunnel such as Cloudflare Tunnel; the console stays bound to loopback")
     co.add_argument("--seconds", type=float, default=600.0, help="auto-stop after this many seconds")
     co.add_argument("--no-start", action="store_true", help="open the page without starting sampling")
     co.add_argument("--out-dir", type=Path, default=Path("."), help="runs/ and transcripts/ go here")

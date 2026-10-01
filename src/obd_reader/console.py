@@ -21,6 +21,7 @@ from obd_reader.simulator import SimPort
 from obd_reader.stat_help import HELP, MODE06
 
 MAX_BODY = 4096
+_HOSTNAME = re.compile(r"(?=.{1,253}$)[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*")
 MAX_UPLOAD = MAX_FILE_BYTES  # the replay upload route only
 _LOOPBACK = {"127.0.0.1", "localhost", "::1"}
 _POST_ROUTES = ("/api/start", "/api/stop", "/api/save", "/api/sim", "/api/replay", "/api/replay/control")
@@ -48,7 +49,12 @@ def guess_lan_ip() -> str | None:
 
 class ConsoleServer:
     def __init__(self, hub: LiveHub, *, host: str = "127.0.0.1", port: int = 0,
-                 token: str | None = None, allow_lan: bool = False):
+                 token: str | None = None, allow_lan: bool = False, allow_hosts=()):
+        self.public_hosts: set[str] = set()   # names a tunnel serves us under (https): the page is still bound to loopback
+        for h in allow_hosts:
+            if not isinstance(h, str) or not _HOSTNAME.fullmatch(h):
+                raise ValueError(f"--allow-host needs a plain host name such as shadetree.example.com, got {h!r}")
+            self.public_hosts.add(h.lower())
         if host not in _LOOPBACK and not allow_lan:
             raise ValueError("binding to a non-loopback address needs allow_lan=True (--allow-lan)")
         self.hub, self.token = hub, token or secrets.token_urlsafe(16)
@@ -65,7 +71,7 @@ class ConsoleServer:
     def _host_ok(self, hostport: str) -> bool:
         """Loopback names, the bound address, or (wildcard bind only) any IP literal on our port.
         An IP literal cannot be DNS-rebound, so it is safe to accept; a name is not."""
-        if hostport in self.allowed_hosts:
+        if hostport in self.allowed_hosts or hostport.lower() in self.public_hosts:
             return True
         if not self._wildcard:
             return False
@@ -79,7 +85,12 @@ class ConsoleServer:
         return True
 
     def _origin_ok(self, origin: str) -> bool:
-        return origin.startswith("http://") and self._host_ok(origin[len("http://"):])
+        if origin.startswith("https://"):   # only a name we were told to serve, never an arbitrary https site
+            return origin[len("https://"):].lower() in self.public_hosts
+        if not origin.startswith("http://"):
+            return False
+        rest = origin[len("http://"):]
+        return rest.lower() not in self.public_hosts and self._host_ok(rest)   # a public name is https only
 
     def _page(self) -> tuple[bytes, str]:
         if self._page_bytes is None:
@@ -248,8 +259,9 @@ class ConsoleService:
     """Owns one hub and one server for a Session (or a private simulated one for --demo)."""
 
     def __init__(self, session: Session, *, demo: bool = False, host: str = "127.0.0.1",
-                 http_port: int = 0, allow_lan: bool = False, scenario: str = "rich"):
+                 http_port: int = 0, allow_lan: bool = False, scenario: str = "rich", allow_hosts=()):
         self.demo, self._host, self._port, self._lan, self._scenario = demo, host, http_port, allow_lan, scenario
+        self._allow_hosts = tuple(allow_hosts)
         self._session = session
         self.hub: LiveHub | None = None
         self.server: ConsoleServer | None = None
@@ -267,7 +279,7 @@ class ConsoleService:
             if not self._session.config.port:
                 raise NoAdapterError("SHADETREE_PORT is not set; use demo=True to try the console without a car")
             self.hub = LiveHub(self._session)
-        self.server = ConsoleServer(self.hub, host=self._host, port=self._port, allow_lan=self._lan)
+        self.server = ConsoleServer(self.hub, host=self._host, port=self._port, allow_lan=self._lan, allow_hosts=self._allow_hosts)
         self.server.start()
         return self.server
 
