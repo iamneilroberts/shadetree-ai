@@ -88,7 +88,7 @@ shadetree-ai console --demo
 shadetree-ai console --port /dev/serial/by-id/<your-adapter>
 ```
 
-`--demo` uses a built-in simulated car (healthy, rich or lean) so you can try it without a vehicle. The command prints a link like `http://127.0.0.1:8765/?t=<token>`; open it in a browser (`--http-port N` picks another port if 8765 is taken). From Claude, the `open_console` tool starts the same page and `console_data` reads the same numbers.
+`--demo` uses a built-in simulated car (healthy, rich or lean) so you can try it without a vehicle. A demo console comes up idle (so an `&example=<file>` link can load its replay); press **Demo** on the page to start the simulated run. With a real adapter the console starts sampling at once unless you pass `--no-start`. The command prints a link like `http://127.0.0.1:8765/?t=<token>`; open it in a browser (`--http-port N` picks another port if 8765 is taken). From Claude, the `open_console` tool starts the same page and `console_data` reads the same numbers.
 
 The console is read-only: it can only start and stop sampling and save a run to `runs/`. It binds to `127.0.0.1`, needs the token in the link, and refuses other `Host` and `Origin` values; the page's one script is pinned by hash in the Content-Security-Policy, and text from the adapter is only ever shown as text.
 

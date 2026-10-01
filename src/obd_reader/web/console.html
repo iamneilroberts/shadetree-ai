@@ -271,6 +271,7 @@
   <span class="chip">auto-stop in <b id="autostop">&mdash;</b></span>
   <div class="ctl">
     <span id="simctl" hidden>
+      <button class="b primary" id="demoBtn">Demo</button>
       <label class="chip">simulate
         <select class="b" id="scenario">
           <option value="healthy">Healthy engine</option>
@@ -677,7 +678,7 @@
     $('age').textContent = age === null ? '—' : age.toFixed(1) + ' s ago';
     var sl = st.seconds_left; $('autostop').textContent = sl === null || sl === undefined ? '—' : Math.floor(sl / 60) + ':' + ('0' + Math.floor(sl % 60)).slice(-2);
     $('pause').textContent = st.status === 'running' ? 'Stop sampling' : 'Start sampling';
-    $('simctl').hidden = !st.demo; $('demoBanner').hidden = !st.demo;
+    $('simctl').hidden = !st.demo; $('demoBanner').hidden = !st.demo; $('demoBtn').hidden = st.status === 'running';
     renderReplay();
     if (st.message) showMsg(st.message); else if (st.status !== 'disconnected') showMsg('');
     if (st.status === 'disconnected') showMsg('Lost contact with the console server. Is shadetree-ai still running?');
@@ -1094,11 +1095,12 @@
       .catch(function () { state = { status: 'disconnected' }; chips(); })
       .then(function (again) { polling = false; if (again === true) poll(); });
   }
+  function startRun() { post('/api/start', { pids: PIDS, hz: 2.5, seconds: 600 }).then(function (r) { if (!r.ok) showMsg(r.j.error || 'request failed'); poll(); }); }
   $('pause').addEventListener('click', function () {
-    var running = state && state.status === 'running';
-    post(running ? '/api/stop' : '/api/start', running ? {} : { pids: PIDS, hz: 2.5, seconds: 600 })
-      .then(function (r) { if (!r.ok) showMsg(r.j.error || 'request failed'); poll(); });
+    if (!(state && state.status === 'running')) return startRun();
+    post('/api/stop', {}).then(function (r) { if (!r.ok) showMsg(r.j.error || 'request failed'); poll(); });
   });
+  $('demoBtn').addEventListener('click', startRun);   // a --demo console comes up idle (so ?example= can load): this starts the simulated run
   $('save').addEventListener('click', function () {
     var b = $('save');
     post('/api/save', { label: 'run' }).then(function (r) {

@@ -114,7 +114,18 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
   await new Promise(r => setImmediate(r));
   const start = env3.posts.find(p => /\/api\/start/.test(p.url));
   assert(start && start.url.includes('t=abc') && start.body.pids.length === 8 && start.body.hz === 2.5, 'start request');
-  assert.strictEqual(env3.el('simctl').hidden, true, 'sim controls hidden outside demo');
+  assert.strictEqual(env3.el('simctl').hidden, true, 'sim controls (and the Demo button in them) hidden outside demo');
+  // a --demo console comes up idle: its Demo button starts the simulated run, and hides while it runs
+  const demoIdle = { status: 'idle', message: null, demo: true, seq: 0, now: 0, since_last_sample: null, hz: null, hz_measured: null, seconds_left: null, adapter: {}, channels: {} };
+  const dm = makeEnv([demoIdle, demoIdle, Object.assign({}, demoIdle, { status: 'running' })]);
+  await dm.tick();
+  assert.strictEqual(dm.el('simctl').hidden, false); assert.strictEqual(dm.el('demoBtn').hidden, false, 'Demo button shown on an idle demo console');
+  dm.handlers['demoBtn:click']();
+  await new Promise(r => setImmediate(r));
+  const dstart = dm.posts.find(p => /\/api\/start/.test(p.url));
+  assert(dstart && dstart.url.includes('t=abc') && dstart.body.pids.length === 8 && dstart.body.hz === 2.5, 'Demo starts the run like Start sampling');
+  for (let k = 0; k < 2; k++) await dm.tick();
+  assert.strictEqual(dm.el('demoBtn').hidden, true, 'hidden while the simulated run is going');
 
   // 4) a new run (seq restarts) resets the buffers instead of mixing runs
   const env4 = makeEnv(statesFor(5, idle).concat(statesFor(2, rev, 0, 0)), 'v3');
