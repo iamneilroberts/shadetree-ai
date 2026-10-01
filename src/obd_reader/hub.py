@@ -471,13 +471,15 @@ class LiveHub:
             series = {p: Series(name=PIDS[p].name, unit=PIDS[p].unit,
                                 samples=[(tt, v) for s, tt, v in d if s <= seq])
                       for p, d in self._full.items()}
+            codes, m06, key = dict(self._codes), dict(self._m06), self._key
         ls = LiveSample(duration_s=self.state()["now"], rate_hz=self.hz or 0.0, series=series)
         rdir = Path(self._s.config.home) / "runs"
         rdir.mkdir(parents=True, exist_ok=True)
         path = rdir / f"{datetime.now(timezone.utc):%Y-%m-%dT%H-%M-%SZ}-{label}.json"
         with open(path, "x", encoding="utf-8") as fh:
             json.dump({"kind": "live_run", "demo": self._sim is not None, "adapter": self._adapter,
-                       "live_sample": ls.model_dump(mode="json")}, fh, indent=2)
+                       "live_sample": ls.model_dump(mode="json"), "codes": codes, "mode06": m06,
+                       "vehicle": {"key": key} if key else None}, fh, indent=2)
         with self._data_lock:
             self._saved = (path, seq)
         return path

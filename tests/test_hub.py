@@ -557,3 +557,22 @@ def test_codes_and_key_in_the_run_reach_the_state(tmp_path):
     assert st["codes"]["stored"][0]["code"] == "P0117" and st["codes"]["mil"] is True
     assert st["vehicle"]["key"] == "9SXSMUL1-T"
     hub.exit_replay()
+
+
+def test_saved_run_carries_codes_mode06_and_the_partial_key_and_replays_them(tmp_path):
+    hub, _, _ = make(tmp_path)
+    hub.start(DEFAULT_PIDS, hz=10, seconds=30)
+    assert wait_for(lambda: hub.state()["codes"]["read"] and hub.state()["mode06"]["read"] and hub.state()["vehicle"] is not None)
+    assert wait_for(lambda: hub.state()["seq"] >= 6)
+    hub.stop()
+    path = hub.save_run("trip")
+    text = path.read_text()
+    data = json.loads(text)
+    assert data["codes"]["read"] is True and data["mode06"]["read"] is True and data["vehicle"] == {"key": vehicle_key(SIM_VIN)}
+    assert SIM_VIN not in text and SIM_VIN[-6:] not in text, "the serial and the VIN never reach the file"
+    hub2, _, _ = make(tmp_path)
+    hub2.start_replay(load_run(data), path.name, playing=False)
+    st = hub2.state()
+    assert st["codes"]["stored"] == data["codes"]["stored"] and st["codes"]["mil"] == data["codes"]["mil"]
+    assert st["mode06"]["results"] == data["mode06"]["results"] and st["vehicle"]["key"] == vehicle_key(SIM_VIN)
+    hub2.exit_replay()
