@@ -715,5 +715,13 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
   PT.pidRows(tbl.body, ['05']); assert.deepStrictEqual(tbl.body.children.map(c => c.getAttribute('data-key')), ['05'], 'shrinking drops the old rows');
   assert.strictEqual(pt.el('x_grid').children.filter(c => c.className === 'xr').length, 11, 'All readings is unchanged beside it');
 
+  // #vp preview: one Panel with a gauge of each form and their table rows, through the normal render loop
+  const pv = makeEnv(statesFor(30, () => base()), 'vp', OVF); for (let k = 0; k < 32; k++) await pv.tick();
+  const pvCard = pv.el('vp').children[0], pvBody = pvCard.children[1];
+  assert.strictEqual(pvCard.className, 'panel'); assert.strictEqual(pvBody.children[0].children.length, 6, 'six gauges');
+  let pvRows = 0; walk(pvBody.children[1], n => { if (n.className === 'xr') pvRows++; }); assert.strictEqual(pvRows, 6, 'six table rows');
+  for (let k = 0; k < 3; k++) await pv.tick();
+  assert.strictEqual(pv.el('vp').children.length, 1, 'built once, then updated in place');
+
   console.log('page logic OK');
 })().catch(e => { console.error('FAIL', e.message); process.exit(1); });

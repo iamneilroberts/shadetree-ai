@@ -495,6 +495,8 @@
       <p class="note" id="m6_note">Read once per run. Values are raw integers: the unit scaling table is not applied, so compare a value to its own limits, not to other tests. Monitor names are general knowledge, unverified.</p>
       <div id="m6"></div></div>
   </section>
+  <!-- shared-parts preview for the stage-1 screenshot pass, opened with #vp (no tab); stage 2's Dashboard replaces it -->
+  <section class="view" id="vp" role="tabpanel"></section>
 </main>
 <p class="foot">Values come from one shared sampler, so Claude and this page see the same numbers. The &plusmn;10 % trim window used for the OUTSIDE tag is general knowledge, unverified. The guided test is a draft, unreviewed playbook.</p>
 
@@ -1005,6 +1007,17 @@
     hd.appendChild(tr); tb.appendChild(hd); tb.appendChild(body); root.appendChild(tb);
     return { root: root, body: body };
   }
+  var PREVIEW = [{ pid: '0C', form: 'dial' }, { pid: '05', form: 'dial' }, { pid: '07', form: 'bar' }, { pid: '42', form: 'seven' }, { pid: '0D', form: 'bar' }, { pid: '0B', form: 'seven' }];
+  var preview = null;
+  function renderParts() {   // the #vp preview: one Panel with a gauge of each form (0D is not in a default run) and their PID table rows
+    if (!preview) {
+      var p = panel('Shared parts preview'), g = el('div', 'gauges'), t = pidTableEl();
+      p.body.appendChild(g); p.body.appendChild(t.root); $('vp').appendChild(p.root);
+      preview = { g: g, rows: t.body };
+    }
+    gauges(preview.g, PREVIEW);
+    pidRows(preview.rows, PREVIEW.map(function (s) { return s.pid; }));
+  }
   /* ---------- Overview ---------- */
   var TILES = [
     { key: 'trims', title: 'Fuel trims', pids: ['06', '07', '08', '09'], dp: 1 },
@@ -1148,6 +1161,8 @@
       renderCabinet();
     } else if (view === 'v5') {
       renderHandheld();
+    } else if (view === 'vp') {
+      renderParts();
     } else {
       var inr = last.rpm !== null && last.rpm > 2300 && last.rpm < 2700;
       $('v3band').textContent = inr ? 'in range 2300–2700' : 'target 2300–2700';
