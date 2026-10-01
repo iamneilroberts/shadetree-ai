@@ -23,7 +23,8 @@ def test_every_view_button_has_a_matching_section():
 
 
 def test_required_controls_exist_and_no_simulator_is_baked_in():
-    for element_id in ("chipLive", "chipConn", "chipCar", "chipLamp", "chipCodes", "o_tiles", "o_attn", "o_note", "helpPanel", "pause", "save", "msg", "simctl",
+    for element_id in ("replayBtn", "replayPanel", "rp_runs", "rp_load", "rp_file", "rp_err", "replayBanner", "rbar", "rb_restart", "rb_play", "rb_speed", "rb_seek", "rb_time", "rb_exit",
+                       "chipLive", "chipConn", "chipCar", "chipLamp", "chipCodes", "o_tiles", "o_attn", "o_note", "helpPanel", "pause", "save", "msg", "simctl",
                        "results", "verdict", "go_idle", "go_rev"):
         assert f'id="{element_id}"' in HTML, element_id
     assert "function tick" not in HTML  # the mock's fake data generator is gone

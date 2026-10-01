@@ -21,7 +21,7 @@ function makeNode(id, handlers) {
   return n;
 }
 
-function makeEnv(states, viewId = 'v0', help = null) {
+function makeEnv(states, viewId = 'v0', help = null, runs = []) {
   const els = {}, handlers = {}, docHandlers = {}, posts = [];
   function el(id) { return els[id] || (els[id] = makeNode(id, handlers)); }
   let timer = null, i = 0, now = 0;
@@ -35,6 +35,7 @@ function makeEnv(states, viewId = 'v0', help = null) {
     setInterval: (fn) => { timer = fn; }, encodeURIComponent,
     fetch: (url, opts) => {
       if (opts && opts.method === 'POST') { posts.push({ url, body: JSON.parse(opts.body) }); return Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true, path: '/x/runs/a-run.json' }) }); }
+      if (/\/api\/runs/.test(url)) return Promise.resolve({ ok: true, json: () => Promise.resolve({ runs }) });
       if (/\/api\/help/.test(url)) return Promise.resolve(help ? { ok: true, json: () => Promise.resolve(help) } : { ok: false, json: () => Promise.resolve({}) });
       const st = states[Math.min(i++, states.length - 1)];
       return Promise.resolve({ ok: true, json: () => Promise.resolve(st) });
@@ -306,6 +307,66 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
   for (let k = 0; k < 5; k++) await odd.tick();
   odd.docHandlers.click({ target: findQ(odd.el('x_grid'), '04') });
   assert(/No bundled help/.test(flat(odd.el('helpPanel'))), 'a non-object help entry falls back to the generic popup');
+
+  // 8) replay UI: banner, transport bar, controls, picker, upload
+  const REPLAY = (over) => Object.assign({ name: 'drive.json', duration: 370, pos: 151, speed: 1, playing: true, ended: false }, over);
+  const rstates = (r) => statesFor(3, idle).map(st => Object.assign(st, { replay: r, vehicle: { key: 'ABCDEFGH-P', known: false, runs: 0, note: null } }));
+  const RUNS = [{ name: 'a.json', size: 2048, duration: 370 }, { name: '<b>.json', size: 10, duration: 5 }];
+  const rp1 = makeEnv(rstates(REPLAY()), 'v0', null, RUNS);
+  for (let k = 0; k < 4; k++) await rp1.tick();
+  assert.strictEqual(rp1.el('rbar').hidden, false); assert.strictEqual(rp1.el('replayBanner').hidden, false);
+  assert(/Replay: drive\.json/.test(rp1.el('replayBanner').textContent), 'banner names the run');
+  assert.strictEqual(rp1.el('rb_time').textContent, '2:31 / 6:10'); assert.strictEqual(rp1.el('rb_play').textContent, 'Pause');
+  assert.strictEqual(rp1.el('rb_speed').value, '1'); assert.strictEqual(rp1.el('rb_seek').max, 370); assert.strictEqual(rp1.el('rb_seek').value, 151);
+  assert.strictEqual(rp1.el('pause').disabled, true); assert.strictEqual(rp1.el('save').disabled, true);
+  assert(/REPLAY/.test(rp1.el('chipLive').innerHTML) && !/LIVE/.test(rp1.el('chipLive').innerHTML), 'the status chip says REPLAY, not LIVE');
+  assert.strictEqual(rp1.el('chipLive').className, 'chip live');
+  assert(/replay/.test(rp1.el('chipCar').textContent) && !/new/.test(rp1.el('chipCar').textContent), 'the car chip says replay, not new');
+  const lastPost = () => rp1.posts[rp1.posts.length - 1];
+  rp1.handlers['rb_play:click'](); assert(/\/api\/replay\/control/.test(lastPost().url) && lastPost().body.action === 'pause');
+  rp1.handlers['rb_restart:click'](); assert.strictEqual(lastPost().body.action, 'restart');
+  rp1.el('rb_speed').value = '4'; rp1.handlers['rb_speed:change'](); assert.deepStrictEqual(lastPost().body, { action: 'speed', speed: 4 });
+  rp1.el('rb_seek').value = '60';
+  const beforeDrag = rp1.posts.length; rp1.handlers['rb_seek:input']();
+  assert.strictEqual(rp1.posts.length, beforeDrag, 'dragging alone sends nothing');
+  assert.strictEqual(rp1.el('rb_time').textContent, '1:00 / 6:10', 'the label follows the drag');
+  rp1.handlers['rb_seek:change'](); assert.deepStrictEqual(lastPost().body, { action: 'seek', pos: 60 });
+  rp1.handlers['rb_exit:click'](); assert.strictEqual(lastPost().body.action, 'exit');
+  const ended = makeEnv(rstates(REPLAY({ playing: false, ended: true, pos: 370 })), 'v0');
+  for (let k = 0; k < 4; k++) await ended.tick();
+  assert(/REPLAY . PAUSED/.test(ended.el('chipLive').innerHTML) && ended.el('chipLive').className === 'chip paused', 'a paused replay says so');
+  assert.strictEqual(ended.el('rb_play').textContent, 'Replay'); assert.strictEqual(ended.el('rb_time').textContent, '6:10 / 6:10');
+  const evilName = makeEnv(rstates(REPLAY({ name: '<img src=x onerror=1>' })), 'v0');
+  for (let k = 0; k < 4; k++) await evilName.tick();
+  assert(evilName.el('replayBanner').textContent.includes('<img src=x onerror=1>') && evilName.el('replayBanner').innerHTML === '', 'run name is shown as text');
+  const live = makeEnv(statesFor(3, idle), 'v0');
+  for (let k = 0; k < 4; k++) await live.tick();
+  assert.strictEqual(live.el('rbar').hidden, true); assert.strictEqual(live.el('replayBanner').hidden, true); assert.strictEqual(live.el('pause').disabled, false);
+
+  // picker and upload
+  const pk = makeEnv(statesFor(3, idle), 'v0', null, RUNS);
+  for (let k = 0; k < 3; k++) await pk.tick();
+  pk.el('replayPanel').hidden = true;   // the page's markup starts it hidden; the fake DOM does not
+  pk.handlers['replayBtn:click'](); await new Promise(r => setImmediate(r)); await new Promise(r => setImmediate(r));
+  assert.strictEqual(pk.el('replayPanel').hidden, false);
+  assert.strictEqual(pk.el('rp_runs').children.length, 2);
+  assert(/a · 6:10 · 2 KB/.test(pk.el('rp_runs').children[0].textContent), 'option label: ' + pk.el('rp_runs').children[0].textContent);
+  assert(pk.el('rp_runs').children[1].textContent.includes('<b>') && pk.el('rp_runs').children[1].innerHTML === '', 'run names are shown as text');
+  pk.el('rp_runs').value = 'a.json'; pk.handlers['rp_load:click'](); await new Promise(r => setImmediate(r));
+  assert.deepStrictEqual(pk.posts[pk.posts.length - 1].body, { name: 'a.json' }); assert.strictEqual(pk.el('replayPanel').hidden, true);
+  const upload = async (file) => { pk.handlers['rp_file:change']({ target: { files: [file], value: 'x' } }); await new Promise(r => setImmediate(r)); await new Promise(r => setImmediate(r)); };
+  await upload({ name: 'x.json', size: 100, text: () => Promise.resolve(JSON.stringify({ kind: 'live_run' })) });
+  assert.deepStrictEqual(pk.posts[pk.posts.length - 1].body, { run: { kind: 'live_run' }, name: 'x.json' });
+  const sent = pk.posts.length;
+  await upload({ name: 'big.json', size: 9 * 1024 * 1024, text: () => Promise.resolve('{}') });
+  assert.strictEqual(pk.posts.length, sent); assert(/too large/.test(pk.el('rp_err').textContent), 'oversize file refused before sending');
+  await upload({ name: 'bad.json', size: 10, text: () => Promise.resolve('nope') });
+  assert.strictEqual(pk.posts.length, sent); assert(/not a JSON file/.test(pk.el('rp_err').textContent));
+  pk.el('replayPanel').hidden = false;
+  pk.sandbox.fetch = () => Promise.resolve({ ok: false, json: () => Promise.resolve({ error: 'not a saved run' }) });
+  pk.el('rp_runs').value = 'a.json'; pk.handlers['rp_load:click'](); await new Promise(r => setImmediate(r)); await new Promise(r => setImmediate(r));
+  assert.strictEqual(pk.el('rp_err').textContent, 'not a saved run'); assert.strictEqual(pk.el('replayPanel').hidden, false, 'the panel stays open on an error');
+
 
   console.log('page logic OK');
 })().catch(e => { console.error('FAIL', e.message); process.exit(1); });
