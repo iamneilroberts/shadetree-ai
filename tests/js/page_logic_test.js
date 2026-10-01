@@ -748,7 +748,11 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
     assert.deepStrictEqual(dRows(e).filter(r => r.className.split(' ').includes('scen')).map(r => r.getAttribute('data-key')), ['04', '06', '07', '08', '09', '0B', '0C'], 'the marks follow the scenario');
     e.el('d_sel').value = 'charging'; e.handlers['d_sel:change'](); await e.tick();
     assert.strictEqual(dGauges(e).length, 4, 'the dropdown switches too'); assert.strictEqual(dStore['shadetree.scenario'], 'charging');
-    assert.strictEqual((await dash({ 'shadetree.scenario': 'cooling' })).el('d_strip').hidden, true, 'a stored scenario reopens');
+    const cool = await dash({ 'shadetree.scenario': 'cooling' });
+    assert.strictEqual(cool.el('d_strip').hidden, true, 'a stored scenario reopens'); assert.strictEqual(cool.el('d_sel').value, 'cooling', 'and the dropdown shows it');
+    const mine = await dash({}, { scenarios: [{ id: 'general', name: 'Mine', gauges: [{ pid: '05', form: 'seven' }] }] });
+    assert.strictEqual(mine.el('d_tabs').children[0].textContent, 'Mine', 'a server general replaces the built-in tab'); assert.strictEqual(mine.el('d_tabs').children.length, 5);
+    assert.strictEqual(mine.el('d_strip').hidden, false, 'and General keeps the health strip'); assert.strictEqual(dGauges(mine).length, 1);
     const bad = await dash({ 'shadetree.scenario': 'nope' });
     assert.strictEqual(bad.el('d_sel').value, 'general', 'an unknown stored scenario opens General'); assert.strictEqual(bad.el('d_strip').hidden, false);
     const srv = await dash({ 'shadetree.scenario': 'towing' }, { scenarios: [{ id: 'towing', name: '<img onerror=x>', gauges: [{ pid: '0C', form: 'dial' }] }] });
