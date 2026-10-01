@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Reach the console from a remote browser through a Cloudflare Tunnel with a Cloudflare Access email gate.
 
-  remote_access.py setup shadetree.voygent.ai --email you@example.com --email friend@example.com
-  remote_access.py add shadetree.voygent.ai friend2@example.com
-  remote_access.py remove shadetree.voygent.ai friend2@example.com
-  remote_access.py status shadetree.voygent.ai
+  remote_access.py setup shadetree.fuxed.org --email you@example.com --email friend@example.com
+  remote_access.py add shadetree.fuxed.org friend2@example.com
+  remote_access.py remove shadetree.fuxed.org friend2@example.com
+  remote_access.py status shadetree.fuxed.org
   remote_access.py token            # prints the tunnel connector token: a secret, paste it on the laptop only
-  remote_access.py teardown shadetree.voygent.ai
+  remote_access.py teardown shadetree.fuxed.org
 
 The API token comes from CLOUDFLARE_API_TOKEN or from --env-file (default ~/dev/obd-reader/.env); it is never printed.
 Every step is idempotent. The console itself stays bound to loopback: run it with `--allow-host <hostname>` and run
