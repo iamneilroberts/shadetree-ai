@@ -323,3 +323,98 @@ def test_allow_host_reaches_the_server_from_the_command_line(tmp_path):
         assert call(svc.server, "GET", "/api/state", host="b.example.com", token=svc.server.token)[0] == 200
     finally:
         svc.stop()
+
+
+# ---- two replay sources: public examples and the user's own runs ----
+@pytest.fixture
+def srv_ex(tmp_path):
+    sim = SimPort("rich")
+    session = Session(Config(port="sim", home=tmp_path / "home", timeout=0.5), port_factory=lambda: sim)
+    hub = LiveHub(session, sim=sim)
+    ex = tmp_path / "examples"
+    ex.mkdir()
+    hub.runs_dir.mkdir(parents=True)
+    labelled = _run_obj()
+    labelled["meta"] = {"make": "Honda", "model": "Ridgeline", "year": 2024, "title": "drive"}
+    (ex / "2026-09-30T21-32-56Z-drive.json").write_text(json.dumps(labelled))
+    (hub.runs_dir / "mine.json").write_text(json.dumps(_run_obj()))
+    server = ConsoleServer(hub, token="tok123", examples_dir=ex)
+    server.start()
+    yield server, hub, ex
+    hub.stop()
+    server.stop()
+
+
+def test_runs_lists_both_sources_with_labels(srv_ex):
+    server, _, _ = srv_ex
+    status, body = call(server, "GET", "/api/runs")
+    assert status == 200
+    assert [r["name"] for r in body["runs"]] == ["mine.json"] and body["runs"][0]["meta"] is None
+    assert [r["name"] for r in body["examples"]] == ["2026-09-30T21-32-56Z-drive.json"]
+    ex = body["examples"][0]
+    assert ex["meta"] == {"make": "Honda", "model": "Ridgeline", "year": 2024, "title": "drive"}
+    assert ex["time"] == "2026-09-30T21:32:56Z" and ex["duration"] == 4.0
+
+
+def test_replay_by_source_and_name(srv_ex):
+    server, _, _ = srv_ex
+    assert call(server, "POST", "/api/replay", {"source": "examples", "name": "2026-09-30T21-32-56Z-drive.json"}) == (200, {"ok": True})
+    assert call(server, "GET", "/api/state")[1]["replay"]["name"] == "2026-09-30T21-32-56Z-drive.json"
+    assert call(server, "POST", "/api/replay", {"source": "mine", "name": "mine.json"}) == (200, {"ok": True})
+    assert call(server, "POST", "/api/replay", {"name": "mine.json"}) == (200, {"ok": True}), "no source means My runs, as before"
+    assert call(server, "GET", "/api/state")[1]["replay"]["name"] == "mine.json"
+
+
+def test_a_file_is_only_found_in_the_source_asked_for(srv_ex):
+    server, _, _ = srv_ex
+    assert call(server, "POST", "/api/replay", {"source": "examples", "name": "mine.json"})[0] == 404
+    assert call(server, "POST", "/api/replay", {"source": "mine", "name": "2026-09-30T21-32-56Z-drive.json"})[0] == 404
+
+
+@pytest.mark.parametrize("source", ["Examples", "../runs", "/etc", "", "both", 5, None, ["examples"], {"x": 1}])
+def test_a_bad_source_is_refused(srv_ex, source):
+    server, _, _ = srv_ex
+    assert call(server, "POST", "/api/replay", {"source": source, "name": "mine.json"})[0] == 400
+    assert call(server, "GET", "/api/state")[1]["replay"] is None
+
+
+def test_names_cannot_escape_either_folder(srv_ex, tmp_path):
+    server, hub, ex = srv_ex
+    (tmp_path / "outside.json").write_text(json.dumps(_run_obj()))
+    (ex / "link.json").symlink_to(tmp_path / "outside.json")
+    (hub.runs_dir / "link.json").symlink_to(tmp_path / "outside.json")
+    for source in ("examples", "mine"):
+        for name in ("../outside.json", "../../outside.json", str(tmp_path / "outside.json"), "/etc/passwd",
+                     "..\\outside.json", "examples/x.json", "~/x.json", "%2e%2e/outside.json"):
+            assert call(server, "POST", "/api/replay", {"source": source, "name": name})[0] == 400, (source, name)
+        assert call(server, "POST", "/api/replay", {"source": source, "name": "link.json"})[0] == 404, source
+    assert call(server, "GET", "/api/state")[1]["replay"] is None
+    names = [r["name"] for r in call(server, "GET", "/api/runs")[1]["examples"]]
+    assert "link.json" not in names
+
+
+def test_without_an_examples_folder_the_list_is_empty_and_loads_are_not_found(srv):
+    server, _, _ = srv
+    assert call(server, "GET", "/api/runs")[1]["examples"] == []
+    assert call(server, "POST", "/api/replay", {"source": "examples", "name": "a.json"})[0] == 404
+
+
+def test_examples_dir_comes_from_the_command_line_or_defaults_to_the_repo(tmp_path):
+    from obd_reader.__main__ import build_parser, console_main
+    from obd_reader import console
+
+    repo = console.Path(console.__file__).resolve().parents[2] / "examples" / "runs"
+    assert console.default_examples_dir() == (repo if repo.is_dir() else None)
+    args = build_parser().parse_args(["console", "--demo", "--http-port", "0", "--no-start", "--out-dir", str(tmp_path),
+                                      "--examples-dir", str(tmp_path / "ex")])
+    svc = console_main(args, block=False)
+    try:
+        assert svc.server.examples_dir == tmp_path / "ex"
+    finally:
+        svc.stop()
+    args = build_parser().parse_args(["console", "--demo", "--http-port", "0", "--no-start", "--out-dir", str(tmp_path)])
+    svc = console_main(args, block=False)
+    try:
+        assert svc.server.examples_dir == console.default_examples_dir()
+    finally:
+        svc.stop()

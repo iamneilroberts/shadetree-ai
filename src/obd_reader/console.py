@@ -11,6 +11,7 @@ import threading
 import weakref
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib import resources
+from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from obd_reader.hub import DEFAULT_PIDS, HubBusy, LiveHub
@@ -26,6 +27,13 @@ MAX_UPLOAD = MAX_FILE_BYTES  # the replay upload route only
 _LOOPBACK = {"127.0.0.1", "localhost", "::1"}
 _POST_ROUTES = ("/api/start", "/api/stop", "/api/save", "/api/sim", "/api/replay", "/api/replay/control")
 _CSP_JSON = "default-src 'none'"
+_SOURCES = ("examples", "mine")   # replay sources: the public example runs, and the user's own runs/
+
+
+def default_examples_dir() -> Path | None:
+    """examples/runs at the repo root when running from a checkout (a wheel does not ship it)."""
+    d = Path(__file__).resolve().parents[2] / "examples" / "runs"
+    return d if d.is_dir() else None
 
 
 def _page_csp(page: bytes) -> str:
@@ -49,7 +57,8 @@ def guess_lan_ip() -> str | None:
 
 class ConsoleServer:
     def __init__(self, hub: LiveHub, *, host: str = "127.0.0.1", port: int = 0,
-                 token: str | None = None, allow_lan: bool = False, allow_hosts=()):
+                 token: str | None = None, allow_lan: bool = False, allow_hosts=(), examples_dir=None):
+        self.examples_dir = None if examples_dir is None else Path(examples_dir)
         self.public_hosts: set[str] = set()   # names a tunnel serves us under (https): the page is still bound to loopback
         for h in allow_hosts:
             if not isinstance(h, str) or not _HOSTNAME.fullmatch(h):
@@ -191,7 +200,8 @@ class ConsoleServer:
                 if path == "/api/help":
                     return self._json(200, {"pids": HELP, "mode06": MODE06})
                 if path == "/api/runs":
-                    return self._json(200, {"runs": list_runs(outer.hub.runs_dir)})
+                    ex = outer.examples_dir
+                    return self._json(200, {"runs": list_runs(outer.hub.runs_dir), "examples": list_runs(ex) if ex else []})
                 try:
                     after = max(0, int((q.get("after") or ["0"])[0]))
                 except ValueError:
@@ -225,8 +235,14 @@ class ConsoleServer:
                             name = re.sub(r"[^A-Za-z0-9._ -]", "_", label)[:80] if isinstance(label, str) and label else "upload"
                             run = load_run(body["run"])
                         else:
+                            source = body.get("source", "mine")
+                            if not isinstance(source, str) or source not in _SOURCES:
+                                raise ValueError("source must be examples or mine")
+                            folder = outer.hub.runs_dir if source == "mine" else outer.examples_dir
+                            if folder is None:
+                                raise FileNotFoundError(source)
                             name = str(body.get("name", ""))
-                            run = load_run(read_run_file(outer.hub.runs_dir, name))
+                            run = load_run(read_run_file(folder, name))
                         outer.hub.start_replay(run, name)
                         return self._json(200, {"ok": True})
                     if path == "/api/replay/control":
@@ -259,8 +275,9 @@ class ConsoleService:
     """Owns one hub and one server for a Session (or a private simulated one for --demo)."""
 
     def __init__(self, session: Session, *, demo: bool = False, host: str = "127.0.0.1",
-                 http_port: int = 0, allow_lan: bool = False, scenario: str = "rich", allow_hosts=()):
+                 http_port: int = 0, allow_lan: bool = False, scenario: str = "rich", allow_hosts=(), examples_dir=None):
         self.demo, self._host, self._port, self._lan, self._scenario = demo, host, http_port, allow_lan, scenario
+        self._examples = default_examples_dir() if examples_dir is None else Path(examples_dir)
         self._allow_hosts = tuple(allow_hosts)
         self._session = session
         self.hub: LiveHub | None = None
@@ -279,7 +296,8 @@ class ConsoleService:
             if not self._session.config.port:
                 raise NoAdapterError("SHADETREE_PORT is not set; use demo=True to try the console without a car")
             self.hub = LiveHub(self._session)
-        self.server = ConsoleServer(self.hub, host=self._host, port=self._port, allow_lan=self._lan, allow_hosts=self._allow_hosts)
+        self.server = ConsoleServer(self.hub, host=self._host, port=self._port, allow_lan=self._lan, allow_hosts=self._allow_hosts,
+                                    examples_dir=self._examples)
         self.server.start()
         return self.server
 
