@@ -8,7 +8,7 @@
   remote_access.py token            # prints the tunnel connector token: a secret, paste it on the laptop only
   remote_access.py teardown shadetree.voygent.ai
 
-The API token comes from CLOUDFLARE_API_TOKEN or from --env-file (default ~/dev/voygent-lite/.env); it is never printed.
+The API token comes from CLOUDFLARE_API_TOKEN or from --env-file (default ~/dev/obd-reader/.env); it is never printed.
 Every step is idempotent. The console itself stays bound to loopback: run it with `--allow-host <hostname>` and run
 `cloudflared tunnel run --token <connector token>` on the same machine."""
 import argparse
@@ -184,7 +184,7 @@ def _token(env_file: str) -> str:
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("--env-file", default="~/dev/voygent-lite/.env")
+    ap.add_argument("--env-file", default="~/dev/obd-reader/.env")
     sub = ap.add_subparsers(dest="cmd", required=True)
     s = sub.add_parser("setup")
     s.add_argument("hostname"); s.add_argument("--email", action="append", default=[]); s.add_argument("--port", type=int, default=8765)
