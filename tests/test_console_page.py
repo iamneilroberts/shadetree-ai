@@ -72,6 +72,7 @@ def test_phone_width_hides_the_page_chrome_and_fills_the_screen_for_the_handheld
 RETAINED = {
     "Capture all supported": ['id="capAll"', "body.capture = 'all'"],
     "Demo button": ['id="demoBtn"'],
+    "Dashboard": ['data-view="v0"', 'id="d_tabs"', 'id="d_table"', 'id="d_edit"'],
     "Save run": ['id="save"', "/api/save"],
     "Replay picker (Examples / My runs) and ?example=": ['id="replayBtn"', 'id="replayPanel"', '<option value="examples">Examples</option>',
                                                          '<option value="mine">My runs</option>', 'id="rp_make"', 'id="rp_model"', 'id="rp_year"',

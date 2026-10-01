@@ -45,10 +45,10 @@
   .brand { font: 700 17px var(--cond); letter-spacing: .04em; }
   .brand small { display: block; font: 400 11.5px var(--mono); color: var(--muted); letter-spacing: 0; }
   .switcher { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
-  .vbtn { appearance: none; border: 1px solid var(--line); background: var(--panel); color: var(--muted);
+  .vbtn, .stab, .qbtn { appearance: none; border: 1px solid var(--line); background: var(--panel); color: var(--muted);
           padding: 6px 12px; border-radius: 4px; font: 600 13px var(--cond); letter-spacing: .04em; cursor: pointer; }
-  .vbtn:hover { color: var(--ink); }
-  .vbtn.is-active { background: var(--cyan); border-color: var(--cyan); color: var(--on-accent); }
+  .vbtn:hover, .stab:hover, .qbtn:hover { color: var(--ink); }
+  .vbtn.is-active, .stab.is-active { background: var(--cyan); border-color: var(--cyan); color: var(--on-accent); }
   /* status bar shared by every layout */
   .status { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 8px 16px;
             background: var(--panel); border-bottom: 1px solid var(--line); font-size: 12.5px; }
@@ -296,6 +296,13 @@
   .panel > .ptitle .pname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .panel > .pbody { padding: 12px 14px; min-width: 0; }
   .gauges { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
+  @media (min-width: 601px) { .gauges { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); } }   /* wider cards where there is room, so long names fit; a phone keeps two side by side */
+  /* Dashboard: scenario tabs (a dropdown on a phone), and the scenario's PIDs marked in the table */
+  .scenbar { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
+  .stabs { display: flex; gap: 6px; flex-wrap: wrap; flex: 1; }
+  .ssel { display: none; flex: 1; }
+  @media (max-width: 600px) { .stabs { display: none; } .ssel { display: block; } }
+  #d_table tr.scen td:first-child { box-shadow: inset 3px 0 0 var(--cyan); }
   .gauge { background: var(--panel2); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; min-width: 0; }
   .gauge.watch { border-color: var(--amber); } .gauge.out { border-color: var(--bad); } .gauge.dim .gface { opacity: .4; }
   .gauge .gtop { display: flex; align-items: center; gap: 6px; font: 700 11.5px var(--cond); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
@@ -319,7 +326,7 @@
 <header class="topbar">
   <div class="brand">shadetree-ai console</div>
   <nav class="switcher" role="tablist" aria-label="Layouts">
-    <button class="vbtn is-active" data-view="v0" role="tab">Overview</button>
+    <button class="vbtn is-active" data-view="v0" role="tab">Dashboard</button>
     <button class="vbtn" data-view="v3" role="tab">Guided test</button>
     <button class="vbtn" data-view="v4" role="tab">Analyzer</button>
     <button class="vbtn" data-view="v5" role="tab">Handheld</button>
@@ -378,12 +385,21 @@
 
 <main class="stage">
   <section class="view is-active" id="v0" role="tabpanel">
-    <h3 class="sec">Health</h3>
-    <div class="tiles" id="o_tiles"></div>
-    <h3 class="sec">Needs attention</h3>
-    <div class="attn" id="o_attn"></div>
-    <p class="note" id="o_note"></p>
-    <a class="more" href="#v6" id="o_more">All readings and on-board tests &rarr;</a>
+    <div class="scenbar">
+      <div class="stabs" id="d_tabs" role="tablist" aria-label="Scenarios"></div>
+      <select class="ssel" id="d_sel" aria-label="Scenario"></select>
+      <button class="qbtn" id="d_edit" type="button" aria-pressed="false" title="Edit this scenario's gauges">&#9998;</button>
+    </div>
+    <div id="d_panel"></div>
+    <div id="d_strip">
+      <h3 class="sec">Health</h3>
+      <div class="tiles" id="o_tiles"></div>
+      <h3 class="sec">Needs attention</h3>
+      <div class="attn" id="o_attn"></div>
+      <p class="note" id="o_note"></p>
+    </div>
+    <div id="d_table"></div>
+    <a class="more" href="#v6" id="o_more">Mode 06 results, capture options and the full readings view &rarr;</a>
   </section>
 
   <!-- C: GUIDED TEST -->
@@ -495,8 +511,6 @@
       <p class="note" id="m6_note">Read once per run. Values are raw integers: the unit scaling table is not applied, so compare a value to its own limits, not to other tests. Monitor names are general knowledge, unverified.</p>
       <div id="m6"></div></div>
   </section>
-  <!-- shared-parts preview for the stage-1 screenshot pass, opened with #vp (no tab); stage 2's Dashboard replaces it -->
-  <section class="view" id="vp" role="tabpanel"></section>
 </main>
 <p class="foot">Values come from one shared sampler, so Claude and this page see the same numbers. The &plusmn;10 % trim window used for the OUTSIDE tag is general knowledge, unverified. The guided test is a draft, unreviewed playbook.</p>
 
@@ -1059,16 +1073,44 @@
   function editForm(specs, i) {
     return specs.map(function (g, j) { return j !== i || !GAUGE[g.pid] ? g : { pid: g.pid, form: FORMS[(FORMS.indexOf(g.form) + 1) % FORMS.length] }; });
   }
-  var PREVIEW = [{ pid: '0C', form: 'dial' }, { pid: '05', form: 'dial' }, { pid: '07', form: 'bar' }, { pid: '42', form: 'seven' }, { pid: '0D', form: 'bar' }, { pid: '0B', form: 'seven' }];
-  var preview = null;
-  function renderParts() {   // the #vp preview: one Panel with a gauge of each form (0D is only in a --demo or capture-all run, so in a default run its gauges show as not in this run) and their PID table rows
-    if (!preview) {
-      var p = panel('Shared parts preview'), g = el('div', 'gauges'), t = pidTableEl();
-      p.body.appendChild(g); p.body.appendChild(t.root); $('vp').appendChild(p.root);
-      preview = { g: g, rows: t.body };
+  /* ---------- Dashboard: the chosen scenario's gauges, every PID in the run below, the health strip in General ---------- */
+  var SC = { list: scenarioList([]), id: 'general', want: null }, DB = null;   // want: a stored id that may name a server scenario not loaded yet
+  function hasScen(id) { return SC.list.some(function (s) { return s.id === id; }); }
+  try { SC.want = localStorage.getItem('shadetree.scenario'); if (SC.want && hasScen(SC.want)) SC.id = SC.want; } catch (x) {}
+  function curScenario() { return SC.list.filter(function (s) { return s.id === SC.id; })[0] || SC.list[0]; }
+  function setScenario(id) {
+    SC.id = id; SC.want = null;
+    try { localStorage.setItem('shadetree.scenario', id); } catch (x) {}
+    drawTabs(); render();
+  }
+  function drawTabs() {   // scenario names come from a file or the page: textContent only
+    var tabs = $('d_tabs'), sel = $('d_sel');
+    tabs.textContent = ''; sel.textContent = '';
+    SC.list.forEach(function (s) {
+      var b = el('button', 'stab' + (s.id === SC.id ? ' is-active' : ''), s.name), o = el('option', '', s.name);
+      b.setAttribute('type', 'button'); b.setAttribute('data-scen', s.id); b.setAttribute('role', 'tab'); b.setAttribute('aria-selected', String(s.id === SC.id));
+      b.addEventListener('click', function () { setScenario(s.id); });
+      o.value = s.id; if (s.id === SC.id) o.selected = true;
+      tabs.appendChild(b); sel.appendChild(o);
+    });
+    sel.value = SC.id;
+  }
+  $('d_sel').addEventListener('change', function () { setScenario($('d_sel').value); });
+  function renderDashboard() {
+    if (!DB) {
+      var p = panel(''), t = pidTableEl(), g = el('div', 'gauges');
+      p.body.appendChild(g); $('d_panel').appendChild(p.root); $('d_table').appendChild(t.root);
+      DB = { p: p, g: g, rows: t.body };
+      drawTabs();
     }
-    gauges(preview.g, PREVIEW);
-    pidRows(preview.rows, PREVIEW.map(function (s) { return s.pid; }));
+    var sc = curScenario(), specs = specsFor(sc), chs = (state && state.channels) || {}, ids = Object.keys(chs).sort(), mine = {};
+    DB.p.name.textContent = sc.name;
+    gauges(DB.g, specs);
+    specs.forEach(function (s) { mine[s.pid] = true; });   // keys are two-hex-digit PIDs (cleanSpecs), so a plain object is safe
+    pidRows(DB.rows, ids);
+    Array.prototype.forEach.call(DB.rows.children, function (r) { r.classList.toggle('scen', mine[r.getAttribute('data-key')] === true); });
+    $('d_strip').hidden = sc.id !== 'general';
+    if (sc.id === 'general') renderOverview();
   }
   /* ---------- Overview ---------- */
   var TILES = [
@@ -1208,14 +1250,12 @@
     var view = active();
     if (view === 'v6') renderReadings();
     if (view === 'v0') {
-      renderOverview();
+      renderDashboard();
     } else if (view === 'v4') {
       renderCabinet();
     } else if (view === 'v5') {
       renderHandheld();
-    } else if (view === 'vp') {
-      renderParts();
-    } else {
+    } else if (view === 'v3') {
       var inr = last.rpm !== null && last.rpm > 2300 && last.rpm < 2700;
       $('v3band').textContent = inr ? 'in range 2300–2700' : 'target 2300–2700';
       $('v3band').className = 'tag ' + (inr ? 'ok' : '');
@@ -1409,6 +1449,16 @@
     }, function () {});
   }
   loadHelp();
+  fetch(api('/api/scenarios'))   // the --scenarios file, merged over the built-ins; on failure the built-ins stay
+    .then(function (r) { if (!r.ok) throw new Error(String(r.status)); return r.json(); })
+    .then(function (j) {
+      SC.list = scenarioList(j && j.scenarios);
+      if (SC.want && hasScen(SC.want)) SC.id = SC.want;
+      if (!hasScen(SC.id)) SC.id = 'general';
+      if (DB) drawTabs();
+      render();
+    })
+    .catch(function () {});
   // the page test reaches the shared parts through this hook; a browser never defines it, so nothing is exposed
   if (typeof window.__shadetreeParts === 'function') window.__shadetreeParts({ panel: panel, gaugeZones: gaugeZones, gauges: gauges, pidRows: pidRows, pidTableEl: pidTableEl,
     gaugeModel: gaugeModel, segDigits: segDigits, BUILTIN: BUILTIN, cleanSpecs: cleanSpecs, scenarioList: scenarioList, loadSaved: loadSaved, saveSaved: saveSaved, specsFor: specsFor, editAdd: editAdd, editRemove: editRemove, editMove: editMove, editForm: editForm });

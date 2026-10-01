@@ -6,8 +6,8 @@ const js = html.match(/<script>([\s\S]*?)<\/script>/)[1];
 function makeNode(id, handlers) {
   const n = {
     id, style: {}, className: '', innerHTML: '', hidden: false, dataset: {}, disabled: false, type: '',
-    clientWidth: 0, clientHeight: 0, offsetWidth: 0, offsetHeight: 0, children: [], attrs: {}, _t: '',
-    classList: { toggle() {} },
+    clientWidth: 0, clientHeight: 0, offsetWidth: 0, offsetHeight: 0, children: [], attrs: {}, _t: '', on: {},   // on: this node's listeners (created nodes all share the id 'new')
+    classList: { toggle(c, want) { const cs = n.className.split(' ').filter(x => x && x !== c); if (want === undefined ? !n.className.split(' ').includes(c) : want) cs.push(c); n.className = cs.join(' '); } },
     setAttribute(k, v) { this.attrs[k] = String(v); },
     getAttribute(k) { return k in this.attrs ? this.attrs[k] : null; },
     appendChild(c) { this.children = this.children.filter(x => x !== c); this.children.push(c); return c; },
@@ -15,7 +15,7 @@ function makeNode(id, handlers) {
     contains(t) { return t === this || this.children.some(c => c.contains(t)); },
     closest(sel) { return sel[0] === '.' && this.className.split(' ').includes(sel.slice(1)) ? this : null; },
     getBoundingClientRect() { return { left: 0, top: 0, bottom: 0, right: 0 }; },
-    addEventListener(t, fn) { handlers[id + ':' + t] = fn; }, querySelector() { return null; }
+    addEventListener(t, fn) { handlers[id + ':' + t] = fn; this.on[t] = fn; }, querySelector() { return null; }
   };
   Object.defineProperty(n, 'textContent', { get() { return this._t; }, set(v) { this._t = v; this.children = []; } });
   return n;
@@ -721,13 +721,58 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
   PT.pidRows(tbl.body, ['05']); assert.deepStrictEqual(tbl.body.children.map(c => c.getAttribute('data-key')), ['05'], 'shrinking drops the old rows');
   assert.strictEqual(pt.el('x_grid').children.filter(c => c.className === 'xr').length, 11, 'All readings is unchanged beside it');
 
-  // #vp preview: one Panel with a gauge of each form and their table rows, through the normal render loop
-  const pv = makeEnv(statesFor(30, () => base()), 'vp', OVF); for (let k = 0; k < 32; k++) await pv.tick();
-  const pvCard = pv.el('vp').children[0], pvBody = pvCard.children[1];
-  assert.strictEqual(pvCard.className, 'panel'); assert.strictEqual(pvBody.children[0].children.length, 6, 'six gauges');
-  let pvRows = 0; walk(pvBody.children[1], n => { if (n.className === 'xr') pvRows++; }); assert.strictEqual(pvRows, 6, 'six table rows');
-  for (let k = 0; k < 3; k++) await pv.tick();
-  assert.strictEqual(pv.el('vp').children.length, 1, 'built once, then updated in place');
+  // Dashboard: scenario tabs (and the phone dropdown), up to 8 gauges, the run's PID table with the scenario's PIDs marked, the health strip only in General
+  const dash = async (store = {}, page = {}, states = statesFor(30, base)) => {
+    const e = makeEnv(states, 'v0', OVF, [], store, page); for (let k = 0; k < 32; k++) await e.tick(); return e;
+  };
+  const dGauges = (e) => { let g = null; walk(e.el('d_panel'), n => { if (n.className === 'gauges') g = n; }); return g.children; };
+  const dRows = (e) => e.el('d_table').children[0].children[0].children[1].children;   // .rwrap > table > tbody > rows
+  {
+    const dStore = {}, e = await dash(dStore);
+    const tabs = e.el('d_tabs').children;
+    assert.deepStrictEqual(tabs.map(t => t.textContent), ['General', 'Fuel trims', 'Cooling', 'Idle / misfire', 'Charging / electrical']);
+    assert.deepStrictEqual(tabs.map(t => t.getAttribute('data-scen')), ['general', 'fuel', 'cooling', 'idle', 'charging']);
+    assert.strictEqual(tabs[0].className, 'stab is-active', 'General is the default');
+    assert.strictEqual(e.el('d_sel').children.length, 5, 'the phone dropdown lists the same five');
+    assert.strictEqual(e.el('d_sel').value, 'general');
+    assert.strictEqual(dGauges(e).length, 8, 'General: 8 gauges');
+    assert.strictEqual(flat(e.el('d_panel').children[0].children[0]).trim(), 'General', 'the panel is titled with the scenario');
+    assert.deepStrictEqual(dRows(e).map(r => r.getAttribute('data-key')), Object.keys(base()).sort(), 'the table lists every PID in the run');
+    assert.deepStrictEqual(dRows(e).filter(r => r.className.split(' ').includes('scen')).map(r => r.getAttribute('data-key')), ['04', '05', '06', '0B', '0C', '42'], "General's PIDs are marked");
+    assert.strictEqual(e.el('d_strip').hidden, false, 'General shows the health strip');
+    tabs[1].on.click(); await e.tick();
+    assert.strictEqual(e.el('d_strip').hidden, true, 'Fuel trims hides the health strip');
+    assert.strictEqual(dStore['shadetree.scenario'], 'fuel', 'the choice is remembered');
+    assert.strictEqual(dGauges(e).length, 8, 'Fuel trims: 8 gauges');
+    assert.strictEqual(e.el('d_tabs').children[1].className, 'stab is-active'); assert.strictEqual(e.el('d_sel').value, 'fuel');
+    assert.deepStrictEqual(dRows(e).filter(r => r.className.split(' ').includes('scen')).map(r => r.getAttribute('data-key')), ['04', '06', '07', '08', '09', '0B', '0C'], 'the marks follow the scenario');
+    e.el('d_sel').value = 'charging'; e.handlers['d_sel:change'](); await e.tick();
+    assert.strictEqual(dGauges(e).length, 4, 'the dropdown switches too'); assert.strictEqual(dStore['shadetree.scenario'], 'charging');
+    assert.strictEqual((await dash({ 'shadetree.scenario': 'cooling' })).el('d_strip').hidden, true, 'a stored scenario reopens');
+    const bad = await dash({ 'shadetree.scenario': 'nope' });
+    assert.strictEqual(bad.el('d_sel').value, 'general', 'an unknown stored scenario opens General'); assert.strictEqual(bad.el('d_strip').hidden, false);
+    const srv = await dash({ 'shadetree.scenario': 'towing' }, { scenarios: [{ id: 'towing', name: '<img onerror=x>', gauges: [{ pid: '0C', form: 'dial' }] }] });
+    const evil = srv.el('d_tabs').children[5];
+    assert.strictEqual(evil.textContent, '<img onerror=x>', 'a server scenario name is text'); assert.strictEqual(evil.children.length, 0, 'and makes no elements');
+    assert.strictEqual(srv.el('d_sel').value, 'towing', 'a stored server scenario reopens once the server list arrives'); assert.strictEqual(dGauges(srv).length, 1);
+    const off = await dash({ 'shadetree.scenario': 'towing' }, { scenariosFail: true });
+    assert.strictEqual(off.el('d_tabs').children.length, 5, 'no server list: the built-ins'); assert.strictEqual(off.el('d_sel').value, 'general');
+  }
+  // Dashboard honesty: a PID not in the run is dimmed, never a zero; a run with no channels says so
+  {
+    const e = await dash();   // base() has no 0D, so General's speed gauge is dim and says why
+    const dim = dGauges(e).filter(g => g.className.split(' ').includes('dim'));
+    assert.ok(dim.length >= 1 && dim.some(g => g.getAttribute('data-key') === '0D:dial'));
+    assert.ok(dim.every(g => g.children.some(c => c.className === 'gnote' && c.textContent === 'not in this run')));
+    const idleD = makeEnv([{ status: 'idle', channels: {}, stats: {}, extras: {}, seq: 1 }], 'v0', OVF); await idleD.tick();
+    assert.ok(dGauges(idleD).every(g => g.children.some(c => c.className === 'gnote' && c.textContent === 'not sampling')), 'no channels: not sampling');
+  }
+  // The #vp preview is gone and Guided test still updates
+  {
+    assert.ok(!/id="vp"/.test(html) && !/renderParts/.test(html), 'the #vp preview is removed');
+    const e = makeEnv(statesFor(5, base), 'v3', OVF); await e.tick();
+    assert.ok(/target|in range/.test(e.el('v3band').textContent));
+  }
 
   // Scenario logic: five built-in sets, cleaning, server merge, pure edit operations
   const J = (x) => JSON.parse(JSON.stringify(x));
