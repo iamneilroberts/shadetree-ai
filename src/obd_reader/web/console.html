@@ -303,6 +303,9 @@
   .ssel { display: none; flex: 1; }
   @media (max-width: 600px) { .stabs { display: none; } .ssel { display: block; } }
   #d_table tr.scen td:first-child { box-shadow: inset 3px 0 0 var(--cyan); }
+  .edbox { margin-bottom: 10px; }
+  .edrow { display: flex; gap: 6px; align-items: center; margin-bottom: 4px; }
+  .edrow span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
   .gauge { background: var(--panel2); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; min-width: 0; }
   .gauge.watch { border-color: var(--amber); } .gauge.out { border-color: var(--bad); } .gauge.dim .gface { opacity: .4; }
   .gauge .gtop { display: flex; align-items: center; gap: 6px; font: 700 11.5px var(--cond); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
@@ -1052,7 +1055,11 @@
     return list;
   }
   function loadSaved(id) {
-    try { var s = cleanSpecs(JSON.parse(localStorage.getItem('shadetree.scen.' + id))); return s.length ? s : null; } catch (x) { return null; }
+    try {   // a stored empty list is a deliberate "no gauges"; corrupt, non-array or all-invalid storage means the defaults
+      var raw = JSON.parse(localStorage.getItem('shadetree.scen.' + id));
+      if (Array.isArray(raw) && !raw.length) return [];
+      var s = cleanSpecs(raw); return s.length ? s : null;
+    } catch (x) { return null; }
   }
   function saveSaved(id, specs, defaults) {   // an edit equal to the defaults is not stored
     try {
@@ -1074,12 +1081,12 @@
     return specs.map(function (g, j) { return j !== i || !GAUGE[g.pid] ? g : { pid: g.pid, form: FORMS[(FORMS.indexOf(g.form) + 1) % FORMS.length] }; });
   }
   /* ---------- Dashboard: the chosen scenario's gauges, every PID in the run below, the health strip in General ---------- */
-  var SC = { list: scenarioList([]), id: 'general', want: null }, DB = null;   // want: a stored id that may name a server scenario not loaded yet
+  var SC = { list: scenarioList([]), id: 'general', want: null }, DB = null, ED = { on: false, draft: [], sig: '', box: null };   // want: a stored id that may name a server scenario not loaded yet
   function hasScen(id) { return SC.list.some(function (s) { return s.id === id; }); }
   try { SC.want = localStorage.getItem('shadetree.scenario'); if (SC.want && hasScen(SC.want)) SC.id = SC.want; } catch (x) {}
   function curScenario() { return SC.list.filter(function (s) { return s.id === SC.id; })[0] || SC.list[0]; }
   function setScenario(id) {
-    SC.id = id; SC.want = null;
+    SC.id = id; SC.want = null; ED.on = false; $('d_edit').setAttribute('aria-pressed', 'false'); if (ED.box) drawEditor();
     try { localStorage.setItem('shadetree.scenario', id); } catch (x) {}
     drawTabs(); render();
   }
@@ -1096,15 +1103,49 @@
     sel.value = SC.id;
   }
   $('d_sel').addEventListener('change', function () { setScenario($('d_sel').value); });
+  /* edit mode: every action saves the draft in the browser and redraws, so there is nothing unsaved to lose */
+  function edit(next) { var sc = curScenario(); ED.draft = next; saveSaved(sc.id, next, sc.gauges); drawEditor(); render(); }
+  function drawEditor() {
+    var box = ED.box, sc = curScenario();
+    if (!box) { box = ED.box = el('div', 'edbox'); box.id = 'd_editor'; DB.p.body.insertBefore(box, DB.g); }
+    box.textContent = ''; box.hidden = !ED.on; if (!ED.on) return;
+    ED.draft.forEach(function (g, i) {
+      var row = el('div', 'edrow');
+      row.appendChild(el('span', '', pidName(g.pid) + ' (' + g.pid + ', ' + g.form + ')'));
+      [['Up', function () { edit(editMove(ED.draft, i, -1)); }], ['Down', function () { edit(editMove(ED.draft, i, 1)); }],
+       ['Form', function () { edit(editForm(ED.draft, i)); }], ['Remove', function () { edit(editRemove(ED.draft, i)); }]]
+        .forEach(function (b) { var x = el('button', 'qbtn', b[0]); x.setAttribute('type', 'button'); x.addEventListener('click', b[1]); row.appendChild(x); });
+      box.appendChild(row);
+    });
+    var chs = (state && state.channels) || {}, shown = {}, full = ED.draft.length >= SCEN_MAX;
+    ED.sig = Object.keys(chs).sort().join();
+    ED.draft.forEach(function (g) { shown[g.pid] = true; });
+    var sel = el('select'), add = el('button', 'qbtn', 'Add'), reset = el('button', 'qbtn', 'Reset'), done = el('button', 'qbtn', 'Done');
+    sel.id = 'd_add'; add.id = 'd_addbtn';
+    [add, reset, done].forEach(function (b) { b.setAttribute('type', 'button'); });
+    Object.keys(chs).sort().filter(function (p) { return !shown[p] && HEXPID.test(p); }).forEach(function (p) { var o = el('option', '', pidName(p) + ' (' + p + ')'); o.value = p; sel.appendChild(o); });
+    add.disabled = full || !sel.children.length;
+    add.addEventListener('click', function () { if (sel.value) edit(editAdd(ED.draft, sel.value)); });
+    reset.addEventListener('click', function () { edit(sc.gauges.slice()); });
+    done.addEventListener('click', function () { ED.on = false; $('d_edit').setAttribute('aria-pressed', 'false'); drawEditor(); render(); });
+    [sel, add, reset, done].forEach(function (c) { box.appendChild(c); });
+  }
+  $('d_edit').addEventListener('click', function () {
+    ED.on = !ED.on; ED.draft = specsFor(curScenario()).slice(); ED.sig = null;
+    $('d_edit').setAttribute('aria-pressed', ED.on ? 'true' : 'false');
+    render();
+  });
   function renderDashboard() {
     if (!DB) {
       var p = panel(''), t = pidTableEl(), g = el('div', 'gauges');
       p.body.appendChild(g); $('d_panel').appendChild(p.root); $('d_table').appendChild(t.root);
-      DB = { p: p, g: g, rows: t.body };
+      DB = { p: p, g: g, rows: t.body, none: el('p', 'note') };
+      p.body.insertBefore(DB.none, g);
       drawTabs();
     }
-    var sc = curScenario(), specs = specsFor(sc), chs = (state && state.channels) || {}, ids = Object.keys(chs).sort(), mine = {};
-    DB.p.name.textContent = sc.name;
+    var sc = curScenario(), specs = ED.on ? ED.draft : specsFor(sc), chs = (state && state.channels) || {}, ids = Object.keys(chs).sort(), mine = {};
+    if (ED.on && (!ED.box || ED.sig !== ids.join())) drawEditor();   // the editor is rebuilt on actions and when the PIDs in the run change, not every poll
+    DB.p.name.textContent = sc.name; DB.none.textContent = specs.length ? '' : 'No gauges. Add one or Reset.'; DB.none.hidden = specs.length > 0;
     gauges(DB.g, specs);
     specs.forEach(function (s) { mine[s.pid] = true; });   // keys are two-hex-digit PIDs (cleanSpecs), so a plain object is safe
     pidRows(DB.rows, ids);

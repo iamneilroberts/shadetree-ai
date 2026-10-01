@@ -11,6 +11,7 @@ function makeNode(id, handlers) {
     setAttribute(k, v) { this.attrs[k] = String(v); },
     getAttribute(k) { return k in this.attrs ? this.attrs[k] : null; },
     appendChild(c) { this.children = this.children.filter(x => x !== c); this.children.push(c); return c; },
+    insertBefore(c, ref) { const cs = this.children.filter(x => x !== c), at = cs.indexOf(ref); cs.splice(at < 0 ? cs.length : at, 0, c); this.children = cs; return c; },
     removeChild(c) { this.children = this.children.filter(x => x !== c); return c; },
     contains(t) { return t === this || this.children.some(c => c.contains(t)); },
     closest(sel) { return sel[0] === '.' && this.className.split(' ').includes(sel.slice(1)) ? this : null; },
@@ -822,8 +823,93 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
     assert.ok(store['shadetree.scen.cooling']);
     P.saveSaved('cooling', L[2].gauges, L[2].gauges);
     assert.strictEqual(store['shadetree.scen.cooling'], undefined, 'equal to defaults: key removed');
+    store['shadetree.scen.charging'] = '[]'; assert.deepStrictEqual(J(P.specsFor(L[4])), [], 'a saved empty list means no gauges');
+    P.saveSaved('charging', [], L[4].gauges); assert.strictEqual(store['shadetree.scen.charging'], '[]', 'saving an empty edit stores it');
+    store['shadetree.scen.charging'] = '{"a":1}'; assert.deepStrictEqual(J(P.specsFor(L[4])), J(L[4].gauges), 'a stored non-array -> defaults');
     const t = makeEnv(statesFor(5, idle), 'v0', OVF, [], {}, { storageThrows: true }); await t.tick();
     assert.doesNotThrow(() => { const Q = t.parts(); Q.specsFor(Q.scenarioList([])[0]); Q.saveSaved('x', [], [{ pid: '0C', form: 'dial' }]); }, 'blocked storage: defaults, no throw');
+  }
+
+  // 13) Edit mode (pencil): add from the PIDs in the run, remove, reorder, change form, Reset; saved per scenario
+  {
+    const mkEd = async (store, states = statesFor(30, base), ticks = 32) => {
+      const e = makeEnv(states, 'v0', OVF, [], store); for (let k = 0; k < ticks; k++) await e.tick();
+      const ed = () => { let b = null; walk(e.el('d_panel'), n => { if (n.id === 'd_editor') b = n; }); return b; };
+      const rows = () => ed().children.filter(c => c.className === 'edrow');
+      const ctl = (id) => { let r = null; walk(ed(), n => { if (n.id === id) r = n; }); return r; };
+      const btn = (row, name) => row.children.filter(c => c.textContent === name)[0];
+      const named = (name) => ed().children.filter(c => c.textContent === name)[0];
+      const press = async (n) => { assert.ok(n && !n.disabled, 'a pressable control'); n.on.click(); await e.tick(); };
+      const saved = () => JSON.parse(store['shadetree.scen.general']);
+      return { e, ed, rows, ctl, btn, named, press, saved, opts: () => ctl('d_add').children.map(o => o.value) };
+    };
+    const store = {}, E = await mkEd(store), e = E.e;
+    assert.strictEqual(E.ed(), null, 'no editor before the pencil');
+    // press the pencil: editor appears, aria-pressed true, one row per gauge, Add offers only PIDs in the run and not shown
+    e.el('d_edit').on.click();
+    assert.strictEqual(e.el('d_edit').getAttribute('aria-pressed'), 'true');
+    assert.strictEqual(E.ed().hidden, false); assert.strictEqual(E.ed().id, 'd_editor');
+    assert.strictEqual(E.rows().length, 8, 'one row per gauge');
+    assert.ok(E.rows()[0].children[0].textContent.includes('(0C, dial)'), 'a row names the gauge: pid and form');
+    assert.deepStrictEqual(E.rows()[0].children.slice(1).map(c => c.textContent), ['Up', 'Down', 'Form', 'Remove']);
+    assert.deepStrictEqual(E.opts(), ['07', '08', '09'], 'Add offers PIDs in the run that are not shown (not 0D or 11: not in this run)');
+    assert.strictEqual(E.ctl('d_addbtn').disabled, true, 'General already shows 8 gauges: Add is disabled');
+    const row0 = E.rows()[0]; await e.tick(); await e.tick();
+    assert.strictEqual(E.rows()[0], row0, 'the poll does not rebuild the editor');
+    // press Remove on row 1: 7 gauges, store holds 7 specs
+    await E.press(E.btn(E.rows()[0], 'Remove'));
+    assert.strictEqual(dGauges(e).length, 7); assert.strictEqual(E.saved().length, 7); assert.strictEqual(E.rows().length, 7);
+    assert.ok(!E.saved().some(g => g.pid === '0C'), 'the removed gauge is gone from the stored specs');
+    assert.deepStrictEqual(E.opts(), ['07', '08', '09', '0C'], 'a removed PID in the run can be added back');
+    // press Form on row 1: its form changed in the stored specs
+    assert.deepStrictEqual(E.saved()[0], { pid: '0D', form: 'dial' });
+    await E.press(E.btn(E.rows()[0], 'Form'));
+    assert.deepStrictEqual(E.saved()[0], { pid: '0D', form: 'bar' }, 'dial -> bar'); assert.ok(E.rows()[0].children[0].textContent.includes('bar'));
+    // press Up on row 2: order changed in the stored specs
+    assert.deepStrictEqual(E.saved().map(g => g.pid).slice(0, 2), ['0D', '05']);
+    await E.press(E.btn(E.rows()[1], 'Up'));
+    assert.deepStrictEqual(E.saved().map(g => g.pid).slice(0, 2), ['05', '0D'], 'moved up');
+    assert.deepStrictEqual(Array.from(dGauges(e)).map(g => g.getAttribute('data-key')).slice(0, 2), ['05:dial', '0D:bar'], 'the gauges follow the order');
+    await E.press(E.btn(E.rows()[0], 'Down'));
+    assert.deepStrictEqual(E.saved().map(g => g.pid).slice(0, 2), ['0D', '05'], 'moved down');
+    // choose a PID in d_add and press Add: 8 gauges again; with 8 gauges the Add button is disabled and d_add empty
+    E.ctl('d_add').value = '07'; await E.press(E.ctl('d_addbtn'));
+    assert.strictEqual(dGauges(e).length, 8); assert.strictEqual(E.saved().length, 8); assert.strictEqual(E.saved()[7].pid, '07', 'added at the end');
+    assert.strictEqual(E.ctl('d_addbtn').disabled, true, 'at 8 gauges Add is disabled');
+    E.ctl('d_add').value = '08'; E.ctl('d_addbtn').on.click(); await e.tick(); assert.strictEqual(dGauges(e).length, 8, 'and a click adds nothing'); assert.strictEqual(E.saved().length, 8);
+    // press Reset: store key removed, 8 default gauges
+    await E.press(E.named('Reset'));
+    assert.strictEqual(store['shadetree.scen.general'], undefined, 'Reset removes the saved key');
+    assert.strictEqual(dGauges(e).length, 8); assert.strictEqual(E.rows().length, 8);
+    assert.deepStrictEqual(Array.from(dGauges(e)).map(g => g.getAttribute('data-key')).slice(0, 3), ['0C:dial', '0D:dial', '05:dial'], 'the defaults are back');
+    // remove all gauges: the panel body says 'No gauges. Add one or Reset.' and Add and Reset still work
+    for (let k = 0; k < 8; k++) await E.press(E.btn(E.rows()[0], 'Remove'));
+    assert.strictEqual(dGauges(e).length, 0); assert.strictEqual(store['shadetree.scen.general'], '[]', 'an empty set is stored');
+    assert.ok(flat(e.el('d_panel')).includes('No gauges. Add one or Reset.'));
+    assert.strictEqual(E.rows().length, 0); assert.strictEqual(E.opts().length, 9, 'all nine PIDs in the run can be added');
+    E.ctl('d_add').value = '0C'; await E.press(E.ctl('d_addbtn'));
+    assert.strictEqual(dGauges(e).length, 1); assert.ok(!flat(e.el('d_panel')).includes('No gauges.'), 'the message goes once there is a gauge');
+    await E.press(E.btn(E.rows()[0], 'Remove')); assert.ok(flat(e.el('d_panel')).includes('No gauges.'));
+    await E.press(E.named('Reset'));
+    assert.strictEqual(dGauges(e).length, 8); assert.strictEqual(store['shadetree.scen.general'], undefined);
+    // press Done: editor gone, aria-pressed false; reload (new makeEnv with the same store) shows the saved set
+    await E.press(E.btn(E.rows()[0], 'Remove')); await E.press(E.named('Done'));
+    assert.strictEqual(E.ed().hidden, true, 'the editor is gone'); assert.strictEqual(E.ed().children.length, 0);
+    assert.strictEqual(e.el('d_edit').getAttribute('aria-pressed'), 'false'); assert.strictEqual(dGauges(e).length, 7, 'Done keeps the edit');
+    const E2 = await mkEd(store); assert.strictEqual(dGauges(E2.e).length, 7, 'reload shows the saved set'); assert.ok(!flat(E2.e.el('d_panel')).includes('No gauges.'));
+    E2.e.el('d_edit').on.click();   // remove the rest, reload: still empty
+    for (let k = 0; k < 7; k++) await E2.press(E2.btn(E2.rows()[0], 'Remove'));
+    const E3 = await mkEd(store); assert.strictEqual(dGauges(E3.e).length, 0, 'an emptied scenario reloads empty'); assert.ok(flat(E3.e.el('d_panel')).includes('No gauges. Add one or Reset.'));
+    E3.e.el('d_edit').on.click(); await E3.press(E3.named('Reset')); assert.strictEqual(dGauges(E3.e).length, 8); assert.strictEqual(store['shadetree.scen.general'], undefined);
+    // switch scenario while editing: editor closes
+    E3.e.el('d_tabs').children[1].on.click(); await E3.e.tick();
+    assert.strictEqual(E3.ed().hidden, true, 'switching ends edit mode'); assert.strictEqual(E3.e.el('d_edit').getAttribute('aria-pressed'), 'false');
+    E3.e.el('d_edit').on.click(); assert.strictEqual(E3.rows().length, 8, "the next edit starts from the new scenario's gauges"); assert.ok(E3.rows()[0].children[0].textContent.includes('(06, bar)'));
+    // the editor follows the PIDs in the run when they change
+    const more = statesFor(20, base).concat(statesFor(30, () => Object.assign(base(), { '10': 5 }), 20, 8));
+    const E4 = await mkEd({}, more, 10); E4.e.el('d_edit').on.click();
+    assert.ok(!E4.opts().includes('10')); for (let k = 0; k < 20; k++) await E4.e.tick();
+    assert.ok(E4.opts().includes('10'), 'a PID that appears in the run is offered');
   }
 
   console.log('page logic OK');
