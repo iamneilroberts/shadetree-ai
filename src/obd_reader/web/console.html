@@ -11,11 +11,30 @@
     --on-accent: #06222c; --banner: #f2a93b; --banner-ink: #1a1204; --msg-bg: #2a2114;   /* text on cyan/green fills; the DEMO/replay banner; the message bar */
     --cond: Bahnschrift, "DIN Alternate", "Roboto Condensed", "Arial Narrow", "Helvetica Neue", sans-serif;
     --mono: ui-monospace, "JetBrains Mono", "DejaVu Sans Mono", Menlo, Consolas, monospace;
+    /* shared parts (panel plate, gauges) read these; each skin sets them */
+    --pn-plate-bg: transparent; --pn-plate-ink: var(--muted);
+    --g-face: var(--panel2); --g-rim: var(--line); --g-ink: var(--ink); --g-ink2: var(--muted); --g-needle: var(--ink);
+    --g-z-ok: var(--ok); --g-z-watch: var(--amber); --g-z-out: var(--bad); --g-seg: var(--cyan); --g-ok: var(--ok); --g-warn: var(--amber); --g-bad: var(--bad);
+    --g-win: var(--bg); --g-led-off: var(--line); --g-glow: 0px;
   }
   /* light theme: darker accents so text, borders and chart lines keep their contrast on a light page */
   :root[data-theme="light"] {
     --bg: #f3f5f6; --panel: #ffffff; --panel2: #e9edf0; --line: #c9d1d7; --ink: #12171a; --muted: #4f5c65;
     --cyan: #0a7499; --amber: #9a5a00; --ok: #1d7f3a; --bad: #c0361b; --on-accent: #ffffff; --msg-bg: #fff3dc;
+  }
+  /* Retro skin (oxblood): the same tokens with the device palette's colours, so any view can wear it; the device faces keep their own colours */
+  :root[data-skin="retro"] {
+    --bg: #1a0f0e; --panel: #2a1715; --panel2: #3a1f1c; --line: #5a2c27; --ink: #ece6d6; --muted: #b9ae94;
+    --cyan: #e3b04b; --amber: #ffc233; --ok: #3fe06a; --bad: #ff6a5a; --on-accent: #241a06; --banner: #e3b04b; --msg-bg: #2a1c10;
+    --cond: "Helvetica Neue", Helvetica, Arial, "Liberation Sans", sans-serif;
+    --pn-plate-bg: var(--plate-bg); --pn-plate-ink: var(--plate-ink);
+    --g-face: var(--meter-face); --g-rim: var(--meter-rim); --g-ink: var(--meter-ink); --g-ink2: var(--meter-ink2); --g-needle: var(--meter-needle);
+    --g-z-ok: #2f8f4a; --g-z-watch: #d99a1e; --g-z-out: var(--meter-zone); --g-seg: var(--code-amber); --g-ok: var(--led-g); --g-warn: var(--led-y); --g-bad: var(--led-r);
+    --g-win: var(--win-bg); --g-led-off: var(--led-off); --g-glow: var(--glow);
+  }
+  :root[data-skin="retro"][data-theme="light"] {
+    --bg: #efe9dc; --panel: #f8f4ea; --panel2: #e6dfcf; --line: #c9bca3; --ink: #1d1410; --muted: #5b4e3f;
+    --cyan: #8e2a24; --amber: #8a5a00; --ok: #186b31; --bad: #b3170b; --on-accent: #fff6e6; --banner: #e3b04b; --msg-bg: #fbeed0;
   }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.45 var(--mono); }
@@ -307,6 +326,7 @@
     </span>
     <button class="b" id="unitsBtn">Units: Metric</button>
     <button class="b" id="themeBtn">Theme: Light</button>
+    <button class="b" id="skinBtn">Skin: Retro</button>
     <button class="b" id="replayBtn">Replay&hellip;</button>
     <label class="chip" title="Read every reading the car supports: engine speed, speed, load and throttle every sweep, the rest a few at a time"><input type="checkbox" id="capAll"> Capture all supported</label>
     <button class="b" id="pause">Start sampling</button>
@@ -474,7 +494,7 @@
   ];
   var PIDS = CH.map(function (c) { return c.pid; });
   var SPAN = 60;
-  var PALS = { dark: { mute: '#93a0aa', line: '#2c343b', band: 'rgba(127,207,148,.12)' }, light: { mute: '#4f5c65', line: '#c9d1d7', band: 'rgba(29,127,58,.14)' } }, PAL = PALS.dark;   // canvas colours per theme
+  var PALS = { 'plain-dark': { mute: '#93a0aa', line: '#2c343b', band: 'rgba(127,207,148,.12)' }, 'plain-light': { mute: '#4f5c65', line: '#c9d1d7', band: 'rgba(29,127,58,.14)' }, 'retro-dark': { mute: '#b9ae94', line: '#5a2c27', band: 'rgba(63,224,106,.12)' }, 'retro-light': { mute: '#5b4e3f', line: '#c9bca3', band: 'rgba(24,107,49,.14)' } }, PAL = PALS['plain-dark'];   // canvas colours per skin and theme (a canvas cannot read CSS variables)
   var xs = {}, buf = {}, last = {}, lastSeq = 0, runId = null, polling = false, tNow = 0, state = null, fetchedAt = 0, events = [], cap = null, results = {};
   CH.forEach(function (c) { buf[c.id] = []; last[c.id] = null; });
   function $(id) { return document.getElementById(id); }
@@ -977,7 +997,7 @@
   function pickTheme(stored, prefersLight) { return stored === 'light' || stored === 'dark' ? stored : prefersLight ? 'light' : 'dark'; }
   var THEME;
   function setTheme(t) {
-    THEME = t; PAL = PALS[t];
+    THEME = t; setPal();
     document.documentElement.setAttribute('data-theme', t);
     $('themeBtn').textContent = 'Theme: ' + (t === 'dark' ? 'Light' : 'Dark');
   }
@@ -990,6 +1010,26 @@
   $('themeBtn').addEventListener('click', function () {
     setTheme(THEME === 'dark' ? 'light' : 'dark');
     try { localStorage.setItem('shadetree.theme', THEME); } catch (e) { /* storage unavailable: the choice lasts until reload */ }
+    render();
+  });
+  /* ---------- skin: a stored choice, else Retro on a phone-width screen, else Plain ---------- */
+  function pickSkin(stored, narrow) { return stored === 'plain' || stored === 'retro' ? stored : narrow ? 'retro' : 'plain'; }
+  var SKIN;
+  function setPal() { PAL = PALS[(SKIN || 'plain') + '-' + (THEME || 'dark')]; }
+  function setSkin(s) {
+    SKIN = s; setPal();
+    document.documentElement.setAttribute('data-skin', s);
+    $('skinBtn').textContent = 'Skin: ' + (s === 'plain' ? 'Retro' : 'Plain');
+  }
+  (function () {
+    var stored = null, narrow = false;
+    try { stored = localStorage.getItem('shadetree.skin'); } catch (e) { stored = null; }
+    try { narrow = !!(window.matchMedia && window.matchMedia('(max-width: 600px)').matches); } catch (e) { narrow = false; }
+    setSkin(pickSkin(stored, narrow));
+  })();
+  $('skinBtn').addEventListener('click', function () {
+    setSkin(SKIN === 'plain' ? 'retro' : 'plain');
+    try { localStorage.setItem('shadetree.skin', SKIN); } catch (e) { /* storage unavailable: the choice lasts until reload */ }
     render();
   });
   $('unitsBtn').addEventListener('click', function () {

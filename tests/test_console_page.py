@@ -81,6 +81,7 @@ RETAINED = {
                            "function fmtAge", "function fmtRunT", "s.min_t", "s.max_t", "s.age"],
     "Units": ['id="unitsBtn"'],
     "Theme": ['id="themeBtn"'],
+    "Skin": ['id="skinBtn"', "shadetree.skin"],
     "? help popups": ['id="helpPanel"', "function qbtn", "/api/help"],
     "Codes and lamp": ['id="chipCodes"', 'id="chipLamp"', 'id="a_codes"', 'id="h_codes"'],
     "Guided test": ['data-view="v3"', 'id="go_idle"', 'id="go_rev"', 'id="verdict"'],
@@ -135,3 +136,37 @@ def test_colours_live_only_in_the_token_blocks():
     js = re.search(r"<script>(.*?)</script>", HTML, re.S).group(1)
     js = re.sub(r"\n\s*var PALS = [^\n]*", "", js)  # canvas colours: a canvas cannot read CSS variables
     assert re.findall(r"#[0-9a-fA-F]{6}\b", js) == []
+
+
+def _lum(hexs):
+    c = [int(hexs.lstrip("#")[i:i + 2], 16) / 255 for i in (0, 2, 4)]
+    c = [x / 12.92 if x <= 0.03928 else ((x + 0.055) / 1.055) ** 2.4 for x in c]
+    return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
+
+
+def _contrast(a, b):
+    hi, lo = sorted((_lum(a), _lum(b)), reverse=True)
+    return (hi + 0.05) / (lo + 0.05)
+
+
+def _palette(skin, theme):
+    """The general tokens as the cascade gives them for <html data-skin=skin data-theme=theme> (later, more specific blocks win)."""
+    sels = [":root"] + ([':root[data-theme="light"]'] if theme == "light" else []) + \
+           ([':root[data-skin="retro"]'] if skin == "retro" else []) + \
+           ([':root[data-skin="retro"][data-theme="light"]'] if skin == "retro" and theme == "light" else [])
+    p = {}
+    for s in sels:
+        p.update(_block(s))
+    return p
+
+
+TEXT_PAIRS = [("--ink", "--bg"), ("--ink", "--panel"), ("--ink", "--panel2"), ("--muted", "--bg"), ("--muted", "--panel"), ("--muted", "--panel2"),
+              ("--cyan", "--panel"), ("--amber", "--panel"), ("--ok", "--panel"), ("--bad", "--panel"), ("--on-accent", "--cyan"),
+              ("--amber", "--msg-bg"), ("--banner-ink", "--banner")]
+
+
+@pytest.mark.parametrize("skin,theme", [("plain", "dark"), ("plain", "light"), ("retro", "dark"), ("retro", "light")])
+def test_every_skin_and_theme_keeps_text_readable(skin, theme):  # Review Focus 2
+    p = _palette(skin, theme)
+    low = [(a, b, round(_contrast(p[a], p[b]), 2)) for a, b in TEXT_PAIRS if _contrast(p[a], p[b]) < 4.5]
+    assert low == [], f"{skin}/{theme} text below WCAG AA 4.5:1: {low}"

@@ -21,7 +21,7 @@ function makeNode(id, handlers) {
   return n;
 }
 
-function makeEnv(states, viewId = 'v0', help = null, runs = [], store = {}, page = {}) {   // page: { search, postReply(url, body), prefersLight, storageThrows }
+function makeEnv(states, viewId = 'v0', help = null, runs = [], store = {}, page = {}) {   // page: { search, postReply(url, body), prefersLight, narrow, storageThrows }
   const els = {}, handlers = {}, docHandlers = {}, posts = [];
   function el(id) { return els[id] || (els[id] = makeNode(id, handlers)); }
   let timer = null, i = 0, now = 0;
@@ -48,7 +48,8 @@ function makeEnv(states, viewId = 'v0', help = null, runs = [], store = {}, page
   };
   if (store !== null) sandbox.localStorage = { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); } };
   if (page.storageThrows) sandbox.localStorage = { getItem() { throw new Error('blocked'); }, setItem() { throw new Error('blocked'); } };
-  if (page.prefersLight !== undefined) sandbox.window.matchMedia = (q) => ({ matches: /light/.test(q) === page.prefersLight });
+  if (page.prefersLight !== undefined || page.narrow !== undefined)   // a width query answers page.narrow, a colour-scheme query page.prefersLight
+    sandbox.window.matchMedia = (q) => ({ matches: /max-width/.test(q) ? !!page.narrow : /light/.test(q) === !!page.prefersLight });
   vm.runInNewContext(js, sandbox);
   return {
     el, handlers, docHandlers, posts, sandbox, store,
@@ -609,5 +610,34 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
   assert.strictEqual(theme(th3), 'light', 'blocked storage: still follows the system');
   th3.handlers['themeBtn:click'](); assert.strictEqual(theme(th3), 'dark', 'and still toggles');
 
+  // Skin: a stored choice beats the viewport; a bad stored value is ignored; Plain on a desktop, Retro on a phone; blocked storage is tolerated (Review Focus 1)
+  const skin = (e) => e.el('html').getAttribute('data-skin');
+  assert.strictEqual(skin(await thEnv({}, {})), 'plain', 'no matchMedia: Plain, as the page always was');
+  assert.strictEqual(skin(await thEnv({}, { narrow: false })), 'plain', 'desktop width: Plain');
+  assert.strictEqual(skin(await thEnv({}, { narrow: true })), 'retro', 'phone width: Retro');
+  assert.strictEqual(skin(await thEnv({ 'shadetree.skin': 'plain' }, { narrow: true })), 'plain', 'a stored Plain beats a phone');
+  assert.strictEqual(skin(await thEnv({ 'shadetree.skin': 'retro' }, { narrow: false })), 'retro', 'a stored Retro beats a desktop');
+  for (const bad of ['Retro', 'oxblood', '', 'null', '{"skin":"retro"}']) {
+    assert.strictEqual(skin(await thEnv({ 'shadetree.skin': bad }, { narrow: false })), 'plain', 'a bad stored value is ignored: ' + bad);
+    assert.strictEqual(skin(await thEnv({ 'shadetree.skin': bad }, { narrow: true })), 'retro', 'and the viewport decides: ' + bad);
+  }
+  const skStore = {}, sk1 = await thEnv(skStore, { narrow: false });
+  assert.strictEqual(sk1.el('skinBtn').textContent, 'Skin: Retro', 'the label names the skin a click switches to, as Theme does');
+  sk1.handlers['skinBtn:click']();
+  assert.strictEqual(skin(sk1), 'retro'); assert.strictEqual(skStore['shadetree.skin'], 'retro', 'the choice is remembered');
+  assert.strictEqual(sk1.el('skinBtn').textContent, 'Skin: Plain');
+  assert.strictEqual(sk1.el('html').getAttribute('data-theme'), 'dark', 'the skin leaves the theme alone');
+  sk1.handlers['skinBtn:click'](); assert.strictEqual(skin(sk1), 'plain'); assert.strictEqual(skStore['shadetree.skin'], 'plain');
+  const sk2 = await thEnv({}, { narrow: true, storageThrows: true });
+  assert.strictEqual(skin(sk2), 'retro', 'blocked storage: still follows the viewport');
+  sk2.handlers['skinBtn:click'](); assert.strictEqual(skin(sk2), 'plain', 'and still toggles');
+  const sk3 = await thEnv({ 'shadetree.theme': 'light', 'shadetree.skin': 'retro' }, { narrow: false });
+  assert.strictEqual(skin(sk3) + '/' + sk3.el('html').getAttribute('data-theme'), 'retro/light', 'skin and theme are independent');
+  sk3.handlers['themeBtn:click'](); assert.strictEqual(skin(sk3), 'retro', 'the theme leaves the skin alone');
+  for (const v of ['v0', 'v3', 'v4', 'v5', 'v6']) {   // a render error would surface as DISCONNECTED (poll's catch)
+    const e = makeEnv(statesFor(3, idle), v, OVF, [], { 'shadetree.skin': 'retro', 'shadetree.theme': 'light' });
+    for (let k = 0; k < 3; k++) await e.tick();
+    assert(/LIVE/.test(e.el('chipLive').innerHTML), 'Retro light renders ' + v);
+  }
   console.log('page logic OK');
 })().catch(e => { console.error('FAIL', e.message); process.exit(1); });
