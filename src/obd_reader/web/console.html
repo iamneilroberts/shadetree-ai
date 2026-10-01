@@ -289,6 +289,12 @@
   #rp_err { color: var(--bad); flex: 1 1 100%; margin: 0; }
   #rp_err:empty { display: none; }
   button.b:disabled { opacity: .45; cursor: not-allowed; }
+  /* shared parts: Panel (card with a title plate), Gauge (dial, bar, seven-segment), PID table (table.rd above) */
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; margin-bottom: 12px; overflow: hidden; min-width: 0; }
+  .panel > .ptitle { display: flex; align-items: center; gap: 8px; padding: 6px 12px; background: var(--pn-plate-bg); color: var(--pn-plate-ink);
+                     border-bottom: 1px solid var(--line); font: 700 12px var(--cond); letter-spacing: .12em; text-transform: uppercase; }
+  .panel > .ptitle .pname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .panel > .pbody { padding: 12px 14px; min-width: 0; }
 </style>
 </head>
 <body>
@@ -906,6 +912,12 @@
       box.appendChild(tb);
     });
   }
+  /* ---------- shared parts: Panel, Gauge, PID table ---------- */
+  function panel(title) {   // a card with a title plate: { root, plate, name, body }; callers fill body and may add controls to plate
+    var root = el('section', 'panel'), plate = el('div', 'ptitle'), name = el('span', 'pname', title), body = el('div', 'pbody');
+    plate.appendChild(name); root.appendChild(plate); root.appendChild(body);
+    return { root: root, plate: plate, name: name, body: body };
+  }
   /* ---------- Overview ---------- */
   var TILES = [
     { key: 'trims', title: 'Fuel trims', pids: ['06', '07', '08', '09'], dp: 1 },
@@ -1243,6 +1255,8 @@
     }, function () {});
   }
   loadHelp();
+  // the page test reaches the shared parts through this hook; a browser never defines it, so nothing is exposed
+  if (typeof window.__shadetreeParts === 'function') window.__shadetreeParts({ panel: panel });
 })();
 </script>
 </body>

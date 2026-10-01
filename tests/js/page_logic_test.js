@@ -23,13 +23,14 @@ function makeNode(id, handlers) {
 
 function makeEnv(states, viewId = 'v0', help = null, runs = [], store = {}, page = {}) {   // page: { search, postReply(url, body), prefersLight, narrow, storageThrows }
   const els = {}, handlers = {}, docHandlers = {}, posts = [];
+  let parts = null;   // the page hands its shared parts to window.__shadetreeParts
   function el(id) { return els[id] || (els[id] = makeNode(id, handlers)); }
   let timer = null, i = 0, now = 0;
   const sandbox = {
     console, URLSearchParams, Promise, Math, Object, Array, Number, String, JSON, Date, parseInt, isFinite,
     document: { documentElement: el('html'), getElementById: el, querySelectorAll: () => [], querySelector: () => ({ id: viewId }),
                 createElement: () => makeNode('new', handlers), addEventListener(t, fn) { docHandlers[t] = fn; } },
-    window: { addEventListener() {}, devicePixelRatio: 1, innerWidth: 500, innerHeight: 800 },
+    window: { addEventListener() {}, devicePixelRatio: 1, innerWidth: 500, innerHeight: 800, __shadetreeParts: (p) => { parts = p; } },
     location: { search: page.search || '?t=abc', hash: '' }, history: { replaceState() {} },
     performance: { now: () => now },
     setInterval: (fn) => { timer = fn; }, encodeURIComponent,
@@ -52,7 +53,7 @@ function makeEnv(states, viewId = 'v0', help = null, runs = [], store = {}, page
     sandbox.window.matchMedia = (q) => ({ matches: /max-width/.test(q) ? !!page.narrow : /light/.test(q) === !!page.prefersLight });
   vm.runInNewContext(js, sandbox);
   return {
-    el, handlers, docHandlers, posts, sandbox, store,
+    el, handlers, docHandlers, posts, sandbox, store, parts: () => parts,
     timer() { timer(); }, setHelp(h) { help = h; }, advance(ms) { now += ms; },
     async tick() { timer(); await new Promise(r => setImmediate(r)); await new Promise(r => setImmediate(r)); }
   };
@@ -639,5 +640,12 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
     for (let k = 0; k < 3; k++) await e.tick();
     assert(/LIVE/.test(e.el('chipLive').innerHTML), 'Retro light renders ' + v);
   }
+  // Panel: a card with a title plate; the title is text, never markup
+  const pn = makeEnv(statesFor(2, idle)); await pn.tick();
+  const card = pn.parts().panel('<img src=x onerror=1>');
+  assert.strictEqual(card.root.className, 'panel'); assert.deepStrictEqual(card.root.children.map(c => c.className), ['ptitle', 'pbody']);
+  assert.strictEqual(card.name.textContent, '<img src=x onerror=1>'); assert.strictEqual(card.name.innerHTML, '', 'the title is text');
+  assert.strictEqual(card.plate.children[0], card.name, 'callers may add controls after the name');
+
   console.log('page logic OK');
 })().catch(e => { console.error('FAIL', e.message); process.exit(1); });
