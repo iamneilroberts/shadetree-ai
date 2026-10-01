@@ -418,3 +418,11 @@ def test_examples_dir_comes_from_the_command_line_or_defaults_to_the_repo(tmp_pa
         assert svc.server.examples_dir == console.default_examples_dir()
     finally:
         svc.stop()
+
+
+def test_the_page_url_may_name_an_example_and_the_get_alone_loads_nothing(srv_ex):
+    server, _, _ = srv_ex
+    status, page = call(server, "GET", "/?example=2026-09-30T21-32-56Z-drive.json")
+    assert status == 200 and 'id="exNote"' in page, "the page that reads the parameter is served"
+    assert call(server, "GET", "/?example=2026-09-30T21-32-56Z-drive.json", token=None)[0] == 401, "still needs the token"
+    assert call(server, "GET", "/api/state")[1]["replay"] is None, "the page posts the load; the server does nothing on the GET"

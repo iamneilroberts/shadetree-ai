@@ -286,6 +286,7 @@
   </div>
 </div>
 <div class="msgbar" id="msg" hidden></div>
+<div class="msgbar" id="exNote" hidden></div>
 <div id="replayPanel" hidden>
   <label>Source <select class="b" id="rp_src"><option value="examples">Examples</option><option value="mine">My runs</option></select></label>
   <label>Make <select class="b" id="rp_make"></select></label>
@@ -1081,7 +1082,7 @@
   /* ---------- talking to the server ---------- */
   function post(path, body) {
     return fetch(api(path), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) })
-      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); });
+      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, status: r.status, j: j }; }); });
   }
   function poll() {
     if (polling) return;                      // never let two polls race: a slow reply must not be overtaken
@@ -1129,6 +1130,16 @@
   window.addEventListener('resize', render);
   setInterval(poll, 400);
   poll();
+  // ?example=<file> replays that public example on load, as picking it under Examples does (same name rule as the server)
+  var EXAMPLE = new URLSearchParams(location.search).get('example');
+  function exNote(text) { $('exNote').textContent = text; $('exNote').hidden = false; }
+  if (EXAMPLE !== null) {
+    if (!/^[A-Za-z0-9T:_.-]{1,100}\.json$/.test(EXAMPLE)) exNote('Example not found: ' + EXAMPLE);
+    else post('/api/replay', { source: 'examples', name: EXAMPLE }).then(function (r) {
+      if (!r.ok) exNote(r.status === 404 || r.status === 400 ? 'Example not found: ' + EXAMPLE : 'Could not load the example: ' + ((r.j && r.j.error) || r.status));
+      poll();
+    }, function () {});
+  }
   loadHelp();
 })();
 </script>

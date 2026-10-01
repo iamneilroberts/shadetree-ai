@@ -21,7 +21,7 @@ function makeNode(id, handlers) {
   return n;
 }
 
-function makeEnv(states, viewId = 'v0', help = null, runs = [], store = {}) {
+function makeEnv(states, viewId = 'v0', help = null, runs = [], store = {}, page = {}) {   // page: { search, postReply(url, body) }
   const els = {}, handlers = {}, docHandlers = {}, posts = [];
   function el(id) { return els[id] || (els[id] = makeNode(id, handlers)); }
   let timer = null, i = 0, now = 0;
@@ -30,11 +30,16 @@ function makeEnv(states, viewId = 'v0', help = null, runs = [], store = {}) {
     document: { getElementById: el, querySelectorAll: () => [], querySelector: () => ({ id: viewId }),
                 createElement: () => makeNode('new', handlers), addEventListener(t, fn) { docHandlers[t] = fn; } },
     window: { addEventListener() {}, devicePixelRatio: 1, innerWidth: 500, innerHeight: 800 },
-    location: { search: '?t=abc', hash: '' }, history: { replaceState() {} },
+    location: { search: page.search || '?t=abc', hash: '' }, history: { replaceState() {} },
     performance: { now: () => now },
     setInterval: (fn) => { timer = fn; }, encodeURIComponent,
     fetch: (url, opts) => {
-      if (opts && opts.method === 'POST') { posts.push({ url, body: JSON.parse(opts.body) }); return Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true, path: '/x/runs/a-run.json' }) }); }
+      if (opts && opts.method === 'POST') {
+        const body = JSON.parse(opts.body), r = page.postReply && page.postReply(url, body);
+        posts.push({ url, body });
+        if (r) return Promise.resolve({ ok: r.ok, status: r.status, json: () => Promise.resolve(r.j) });
+        return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ ok: true, path: '/x/runs/a-run.json' }) });
+      }
       if (/\/api\/runs/.test(url)) return Promise.resolve({ ok: true, json: () => Promise.resolve(Array.isArray(runs) ? { runs } : runs) });
       if (/\/api\/help/.test(url)) return Promise.resolve(help ? { ok: true, json: () => Promise.resolve(help) } : { ok: false, json: () => Promise.resolve({}) });
       const st = states[Math.min(i++, states.length - 1)];
@@ -524,6 +529,28 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
   assert.strictEqual(hh2.el('h_ect_u').textContent, '°F'); assert.strictEqual(hh2.el('h_map_u').textContent, 'INHG');
   const gt = await uEnv({ '05': 41 }, 'v3', { 'shadetree.units': 'us' });
   assert.strictEqual(gt.el('v3ect').textContent, '106'); assert.strictEqual(gt.el('v3ect_u').textContent, '°F'); assert.strictEqual(gt.el('v3map_u').textContent, 'inHg');
+
+  // ?example=<file>: the page replays that example run on load, as picking it under Examples does; only examples, strict names
+  const EXN = '2026-09-30T21-32-56Z-drive-rebuilt.json';
+  const exEnv = async (search, postReply) => { const e = makeEnv(statesFor(3, idle), 'v0', null, [], {}, { search, postReply }); for (let k = 0; k < 3; k++) await e.tick(); return e; };
+  const replays = (e) => e.posts.filter(p => /^\/api\/replay\?/.test(p.url));
+  const exOk = await exEnv('?t=abc&example=' + EXN);
+  assert.deepStrictEqual(replays(exOk).map(p => p.body), [{ source: 'examples', name: EXN }], 'loads the example by name from Examples only');
+  assert.strictEqual(replays(exOk)[0].url, '/api/replay?t=abc', 'the token still goes only in the request URL');
+  assert.strictEqual(exOk.el('exNote').textContent, '', 'no notice when it loads (the fake DOM ignores the hidden attribute)');
+  const exNone = await exEnv('?t=abc');
+  assert.strictEqual(replays(exNone).length, 0, 'no parameter, no replay'); assert.strictEqual(exNone.el('exNote').textContent, '');
+  const exMissing = await exEnv('?t=abc&example=missing.json', () => ({ ok: false, status: 404, j: { error: 'no such saved run' } }));
+  assert.strictEqual(exMissing.el('exNote').hidden, false); assert.strictEqual(exMissing.el('exNote').textContent, 'Example not found: missing.json');
+  for (const bad of ['../runs/mine.json', '%2e%2e%2fmine.json', 'runs/mine.json', 'mine', '', 'a b.json', '<img src=x onerror=1>.json']) {
+    const e = await exEnv('?t=abc&example=' + bad);
+    assert.strictEqual(replays(e).length, 0, 'an invalid name is never sent: ' + bad);
+    assert.strictEqual(e.el('exNote').hidden, false, 'and says so: ' + bad);
+    assert(/^Example not found/.test(e.el('exNote').textContent) && e.el('exNote').innerHTML === '', 'as text: ' + bad);
+    assert(!e.el('exNote').textContent.includes('abc'), 'the token never reaches the notice');
+  }
+  const exBusy = await exEnv('?t=abc&example=' + EXN, () => ({ ok: false, status: 409, j: { error: 'the console is already sampling; stop it first' } }));
+  assert.strictEqual(exBusy.el('exNote').textContent, 'Could not load the example: the console is already sampling; stop it first', 'a busy console is not "not found"');
 
   console.log('page logic OK');
 })().catch(e => { console.error('FAIL', e.message); process.exit(1); });
