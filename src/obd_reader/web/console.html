@@ -199,6 +199,8 @@
   #v6 table.rd th { font: 700 11.5px var(--cond); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
   #v6 table.rd th:first-child, #v6 table.rd td.n { text-align: left; white-space: normal; }
   #v6 table.rd td.n .q { width: 18px; height: 18px; font-size: 11px; margin-left: 6px; vertical-align: middle; }
+  #v6 table.rd td .at { display: block; font-size: 10.5px; color: var(--muted); }
+  @media (max-width: 430px) { #v6 table.rd th, #v6 table.rd td { padding: 3px 4px; } }
   #v6 .note { color: var(--muted); font-size: 12.5px; margin: 0 0 8px; }
   #v6 table.m6 { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-bottom: 10px; }
   #v6 table.m6 th, #v6 table.m6 td { text-align: right; padding: 3px 8px; border-bottom: 1px solid var(--line); }
@@ -426,8 +428,8 @@
   <!-- F: READINGS (extra PIDs the car supports + Mode 06 test results) -->
   <section class="view" id="v6" role="tabpanel">
     <div class="card"><h3>All readings <span class="tag" id="x_count"></span></h3>
-      <p class="note" id="x_note">Start sampling or load a replay: every reading in the run is listed here with its minimum, maximum and average (the main channels are read every sweep, the extras the car supports rotate a few at a time).</p>
-      <div class="rwrap" id="x_table"><table class="rd"><thead><tr><th>Reading</th><th>Now</th><th>Min</th><th>Max</th><th>Avg</th></tr></thead>
+      <p class="note" id="x_note">Start sampling or load a replay: every reading in the run is listed here with its minimum and maximum (and when they happened, m:ss into the run), average, standard deviation, sample count and how long ago it was last read (the main channels are read every sweep, the extras the car supports rotate a few at a time).</p>
+      <div class="rwrap" id="x_table"><table class="rd"><thead><tr><th>Reading</th><th>Now</th><th>Min</th><th>Max</th><th>Avg</th><th>Std</th><th>Samples</th></tr></thead>
         <tbody id="x_grid"></tbody></table></div></div>
     <div class="card"><h3>Mode 06 &middot; on-board test results <span class="tag" id="m6_count"></span></h3>
       <p class="note" id="m6_note">Read once per run. Values are raw integers: the unit scaling table is not applied, so compare a value to its own limits, not to other tests. Monitor names are general knowledge, unverified.</p>
@@ -814,18 +816,26 @@
     if (convFor(pid)) return fmtPid(pid, v);
     return c ? fmt(v, c.dp) : Math.abs(v) >= 100 || v % 1 === 0 ? String(Math.round(v * 10) / 10) : v.toFixed(2);
   }
-  function makeX(it) {   // one table row per reading: name (unit) and ?, now, min, max, average
-    var root = el('tr', 'xr'), n = el('td', 'n'), nm = el('span'), v = [el('td'), el('td'), el('td'), el('td')];
-    root.setAttribute('data-key', it.key); n.appendChild(nm); n.appendChild(qbtn(it.key));
-    [n].concat(v).forEach(function (c) { root.appendChild(c); });
-    return { root: root, nm: nm, v: v };
+  function fmtStd(pid, v) {   // a spread converts by the unit's scale only (no +32 for °F), one decimal finer than the value
+    if (v === null || v === undefined) return '—';
+    var c = convFor(pid), ch = chFor(pid);
+    return c ? (c[1](v) - c[1](0)).toFixed(c[2] + 1) : v.toFixed(ch ? ch.dp + 1 : 2);
+  }
+  function fmtRunT(t) { if (t === null || t === undefined) return ''; t = Math.floor(t); return Math.floor(t / 60) + ':' + ('0' + t % 60).slice(-2); }   // m:ss into the run
+  function fmtAge(a) { return a === null || a === undefined ? '' : (a < 10 ? a.toFixed(1) + ' s' : a < 60 ? Math.round(a) + ' s' : fmtRunT(a)) + ' ago'; }
+  function makeX(it) {   // one table row per reading: name (unit) and ?, now, min, max, average, std, samples; min, max and samples carry a small second line
+    var root = el('tr', 'xr'), n = el('td', 'n'), nm = el('span'), v = [], at = [];
+    root.setAttribute('data-key', it.key); n.appendChild(nm); n.appendChild(qbtn(it.key)); root.appendChild(n);
+    for (var i = 0; i < 6; i++) { var td = el('td'); v.push(td.appendChild(el('span'))); at.push(td.appendChild(el('span', 'at'))); root.appendChild(td); }
+    return { root: root, nm: nm, v: v, at: at };
   }
   function updX(nd, it) {
-    var p = it.key, u = unitOf(p), name = pidName(p), now = latest(p), s = it.lab ? null : it.s,   // a status reading has no min/max/average
-        lab = it.lab && now !== null && now !== undefined ? it.lab[String(Math.round(now))] : null;
+    var p = it.key, u = unitOf(p), name = pidName(p), now = latest(p), s = it.lab ? null : it.s,   // a status reading has no statistics
+        lab = it.lab && now !== null && now !== undefined ? it.lab[String(Math.round(now))] : null, d = '—';
     nd.nm.textContent = name.charAt(0).toUpperCase() + name.slice(1) + (u ? ' (' + u + ')' : '');
-    [lab || fmtStat(p, now), s ? fmtStat(p, s.min) : '—', s ? fmtStat(p, s.max) : '—', s ? fmtStat(p, s.avg) : '—']
-      .forEach(function (t, i) { nd.v[i].textContent = t; });
+    [lab || fmtStat(p, now), s ? fmtStat(p, s.min) : d, s ? fmtStat(p, s.max) : d, s ? fmtStat(p, s.avg) : d, s ? fmtStd(p, s.std) : d,
+     s && s.n !== undefined ? String(s.n) : d].forEach(function (t, i) { nd.v[i].textContent = t; });
+    [null, s && fmtRunT(s.min_t), s && fmtRunT(s.max_t), null, null, s && fmtAge(s.age)].forEach(function (t, i) { nd.at[i].textContent = t || ''; });
   }
   function renderReadings() {
     var st = state || {}, chs = st.channels || {}, stats = st.stats || {}, ids = Object.keys(chs).sort();

@@ -514,21 +514,32 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
   const cells = (e, key) => rrow(e, key).children.map(c => flat(c).replace(/\s*\?$/, '').trim().replace(/\s+/g, ' '));   // the name cell ends with its ? button
   const sp = makeEnv(speedStates(true), 'v6', OVF, [], { 'shadetree.units': 'us' });
   for (let k = 0; k < 5; k++) await sp.tick();
-  assert.deepStrictEqual(cells(sp, '0D'), ['Vehicle speed (mph)', '37', '0', '70', '31'], 'speed row converts every column: ' + cells(sp, '0D'));
-  assert.deepStrictEqual(cells(sp, '05'), ['Coolant temp (°F)', '106', '68', '194', '158'], 'a main channel is a row too');
-  assert.deepStrictEqual(cells(sp, '0B'), ['MAP (inHg)', '10.6', '8.9', '29.8', '11.8'], 'manifold pressure in inHg');
-  assert.deepStrictEqual(cells(sp, '0C'), ['Engine speed (rpm)', '700', '650', '3200', '1500']);
-  assert.deepStrictEqual(cells(sp, '06'), ['STFT bank 1 (%)', '-12.0', '—', '—', '—'], 'no stats from the server: dashes, not made-up numbers');
-  assert.deepStrictEqual(cells(sp, '03'), ['Fuel system status', 'closed loop', '—', '—', '—'], 'a status reading shows its label and no statistics');
+  assert.deepStrictEqual(cells(sp, '0D'), ['Vehicle speed (mph)', '37', '0', '70', '31', '—', '9'], 'speed row converts every column: ' + cells(sp, '0D'));
+  assert.deepStrictEqual(cells(sp, '05'), ['Coolant temp (°F)', '106', '68', '194', '158', '—', '9'], 'a main channel is a row too');
+  assert.deepStrictEqual(cells(sp, '0B'), ['MAP (inHg)', '10.6', '8.9', '29.8', '11.8', '—', '9'], 'manifold pressure in inHg');
+  assert.deepStrictEqual(cells(sp, '0C'), ['Engine speed (rpm)', '700', '650', '3200', '1500', '—', '9']);
+  assert.deepStrictEqual(cells(sp, '06'), ['STFT bank 1 (%)', '-12.0', '—', '—', '—', '—', '—'], 'no stats from the server: dashes, not made-up numbers');
+  assert.deepStrictEqual(cells(sp, '03'), ['Fuel system status', 'closed loop', '—', '—', '—', '—', '—'], 'a status reading shows its label and no statistics');
   assert(findQ(rrow(sp, '0D'), '0D'), 'every row keeps its ? help button');
   assert.strictEqual(sp.el('x_grid').children.filter(c => c.className === 'xr').length, 11, 'all 11 channels on one table, in pid order');
   assert.strictEqual(sp.el('x_grid').children[0].getAttribute('data-key'), '03');
   assert(/11 readings · stats over the whole run/.test(sp.el('x_count').textContent), sp.el('x_count').textContent);
   await toggle(sp);
-  assert.deepStrictEqual(cells(sp, '0D'), ['Vehicle speed (km/h)', '60', '0', '112.7', '50'], 'metric after the toggle');
+  assert.deepStrictEqual(cells(sp, '0D'), ['Vehicle speed (km/h)', '60', '0', '112.7', '50', '—', '9'], 'metric after the toggle');
   const spl = makeEnv(speedStates(false), 'v6', OVF, [], {});
   for (let k = 0; k < 5; k++) await spl.tick();
   assert(/stats over this run so far/.test(spl.el('x_count').textContent), 'live says the stats are over the run so far');
+  // the extra stats: std (scaled by the Units toggle without the offset), sample count and last-seen age, and when min and max happened (m:ss)
+  const FSTATS = { '0D': { n: 9, min: 0, max: 112.65, avg: 50, std: 10, min_t: 12.4, max_t: 75.2, age: 1.24 },
+                   '05': { n: 120, min: 20, max: 90, avg: 70, std: 2, min_t: 0.4, max_t: 3725, age: 75 } };
+  const fullStates = speedStates(true).map(st => Object.assign(st, { stats: FSTATS }));
+  const fs1 = makeEnv(fullStates, 'v6', OVF, [], { 'shadetree.units': 'us' });
+  for (let k = 0; k < 5; k++) await fs1.tick();
+  assert.deepStrictEqual(cells(fs1, '0D'), ['Vehicle speed (mph)', '37', '0 0:12', '70 1:15', '31', '6.2', '9 1.2 s ago'], 'speed row: ' + cells(fs1, '0D'));
+  assert.deepStrictEqual(cells(fs1, '05'), ['Coolant temp (°F)', '106', '68 0:00', '194 62:05', '158', '3.6', '120 1:15 ago'], 'a spread in °F has no +32: ' + cells(fs1, '05'));
+  await toggle(fs1);
+  assert.deepStrictEqual(cells(fs1, '05'), ['Coolant temp (°C)', '41', '20 0:00', '90 62:05', '70', '2.0', '120 1:15 ago'], 'times do not change with units');
+  assert.deepStrictEqual(cells(fs1, '0C'), ['Engine speed (rpm)', '700', '—', '—', '—', '—', '—'], 'a channel without stats stays dashes');
 
   // Analyzer, Handheld and Guided test: labels and digits
   const an = await uEnv({ '05': 41 }, 'v4', {});

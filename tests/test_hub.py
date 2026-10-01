@@ -615,9 +615,69 @@ def test_live_stats_cover_every_sample_of_the_run_not_just_the_chart_buffer(tmp_
 def test_replay_stats_cover_the_whole_run_from_the_start_and_after_a_seek(tmp_path):
     hub = _replay_hub(tmp_path)
     want = {"0C": {"n": 10, "min": 700.0, "max": 790.0, "avg": 745.0}, "AB": {"n": 10, "min": 0.0, "max": 9.0, "avg": 4.5}}
-    assert hub.state()["seq"] == 0 and hub.state()["stats"] == want
+    core = lambda st: {p: {k: v[k] for k in ("n", "min", "max", "avg")} for p, v in st.items()}  # the original fields, unchanged
+    assert hub.state()["seq"] == 0 and core(hub.state()["stats"]) == want
     hub._replay_advance(1.0)
     hub.replay_control("seek", pos=0.5)
-    assert hub.state()["stats"] == want
+    assert core(hub.state()["stats"]) == want
     hub.exit_replay()
     assert hub.state()["stats"] == {}
+
+
+def _stat_obj():
+    return {"kind": "live_run", "live_sample": {"duration_s": 5.0, "rate_hz": 1.0, "series": {
+        "0C": {"name": "engine_rpm", "unit": "rpm", "samples": [[1.0, 10], [2.0, 30], [3.0, 20], [4.0, 30], [5.0, 10]]},
+        "05": {"name": "coolant_temp", "unit": "C", "samples": [[2.0, 80], [4.0, 90]]},
+        "0B": {"name": "intake_manifold_pressure", "unit": "kPa",
+               "samples": [[1.0, 1e9 + 4], [2.0, 1e9 + 7], [3.0, 1e9 + 13], [4.0, 1e9 + 16]]}}}}
+
+
+def test_stats_carry_std_sample_count_and_the_times_of_min_and_max(tmp_path):
+    hub, _, _ = make(tmp_path)
+    hub.start_replay(load_run(_stat_obj()), "s.json", playing=False)
+    st = hub.state()["stats"]
+    assert {k: st["0C"][k] for k in ("n", "min", "max", "avg", "std", "min_t", "max_t")} == \
+        {"n": 5, "min": 10.0, "max": 30.0, "avg": 20.0, "std": 10.0, "min_t": 1.0, "max_t": 2.0}, "first time each extreme is reached"
+    assert st["05"]["n"] == 2 and st["05"]["std"] == pytest.approx(7.0711, abs=1e-4)
+    assert st["0B"]["std"] == pytest.approx(30 ** 0.5, abs=1e-4), "Welford: no cancellation on large values"
+    hub.exit_replay()
+
+
+def test_a_single_sample_has_zero_std(tmp_path):
+    obj = {"kind": "live_run", "live_sample": {"duration_s": 1.0, "rate_hz": 1.0, "series": {
+        "0C": {"name": "engine_rpm", "unit": "rpm", "samples": [[1.0, 700]]}}}}
+    hub, _, _ = make(tmp_path)
+    hub.start_replay(load_run(obj), "one.json", playing=False)
+    assert hub.state()["stats"]["0C"]["std"] == 0.0
+    hub.exit_replay()
+
+
+def test_replay_last_seen_age_follows_the_replay_clock_per_channel(tmp_path):
+    hub, _, _ = make(tmp_path)
+    hub.start_replay(load_run(_stat_obj()), "s.json", playing=False)
+    assert hub.state()["stats"]["0C"]["age"] is None, "nothing published yet"
+    hub.replay_control("seek", pos=3.0)
+    st = hub.state()["stats"]
+    assert st["0C"]["age"] == 0.0 and st["05"]["age"] == 1.0, "the slow channel was last seen at 2.0 s"
+    hub.replay_control("seek", pos=5.0)
+    st = hub.state()["stats"]
+    assert st["0C"]["age"] == 0.0 and st["05"]["age"] == 1.0 and st["0B"]["age"] == 1.0
+    assert st["0C"]["n"] == 5 and st["0C"]["min_t"] == 1.0, "whole-run stats are not moved by a seek"
+    hub.exit_replay()
+
+
+def test_live_stats_age_and_extreme_times_match_the_samples(tmp_path):
+    sim = SimPort("rich")
+    s = Session(Config(port="sim", home=tmp_path, timeout=0.5), port_factory=lambda: sim)
+    hub = LiveHub(s, sim=sim, max_buffer=5, autosave=False)
+    hub.start(DEFAULT_PIDS, hz=10, seconds=30)
+    assert wait_for(lambda: hub.state()["seq"] >= 8)
+    hub.stop()
+    rows = hub._full["0C"]
+    st = hub.state()
+    s0 = st["stats"]["0C"]
+    vals = [v for _, _, v in rows]
+    assert s0["min_t"] == next(t for _, t, v in rows if v == min(vals)) and s0["max_t"] == next(t for _, t, v in rows if v == max(vals))
+    mean = sum(vals) / len(vals)
+    assert s0["std"] == pytest.approx((sum((v - mean) ** 2 for v in vals) / (len(vals) - 1)) ** 0.5, abs=1e-3)
+    assert s0["age"] == pytest.approx(st["now"] - rows[-1][1], abs=0.1) and s0["age"] >= 0

@@ -1,6 +1,7 @@
 """One sampler, many viewers: a background thread reads a fixed set of Mode 01 PIDs
 through the Session (lock + gated transport + transcript) into ring buffers that the
 console page and Claude's tools both read."""
+import bisect
 import json
 import math
 import re
@@ -63,7 +64,8 @@ class LiveHub:
         self.status, self.message, self.seq, self.hz = "idle", None, 0, None
         self._ch: dict[str, deque] = {}      # the newest max_buffer samples per channel: what the page and tools read
         self._full: dict[str, list] = {}     # every sample of the run: what a saved run is written from
-        self._stats: dict[str, list] = {}    # [n, sum, min, max] per channel over the run (a replay: the whole file)
+        self._stats: dict[str, list] = {}    # [n, mean, m2, min, max, t_min, t_max, t_last] per channel over the run (a replay: the whole file)
+        self._ptimes: dict[str, list] = {}   # a replay: every sample time per channel, for the last-seen age at the replay clock
         self._sweep_t: deque = deque(maxlen=12)
         self._t0 = self._last_at = self._deadline = None
         self._adapter: dict = {"chip": None, "ati": None, "protocol": None}
@@ -146,9 +148,10 @@ class LiveHub:
                 self._m06 = run.mode06 or {"read": False, "note": "not stored in this run", "mids": [], "results": []}
                 self._vehicle = run.vehicle
                 self._ch = {p: deque(maxlen=self._max) for p in run.names}
-                for _, vals in run.sweeps:
+                for t, vals in run.sweeps:
                     for p, v in vals.items():
-                        self._add_stat(p, v)
+                        self._add_stat(p, v, t)
+                        self._ptimes.setdefault(p, []).append(t)
                 self._replay = {"name": name, "run": run, "pos": 0.0, "speed": 1.0, "playing": bool(playing), "ended": False, "i": 0}
             self._stop.clear()
             self._thread = threading.Thread(target=self._replay_loop, daemon=True)
@@ -410,18 +413,25 @@ class LiveHub:
             for p, v in rows:
                 self._ch[p].append((seq, round(now, 3), v))
                 self._full[p].append((seq, round(now, 3), v))
-                self._add_stat(p, v)
+                self._add_stat(p, v, round(now, 3))
             self.seq = seq
             self._last_at = self._clock()
             self._sweep_t.append(now)
         return True
 
-    def _add_stat(self, p: str, v: float) -> None:
+    def _add_stat(self, p: str, v: float, t: float) -> None:
+        """Welford's running mean and sum of squared deviations (stable on large values), extremes and when they first happened."""
         a = self._stats.get(p)
         if a is None:
-            self._stats[p] = [1, v, v, v]
-        else:
-            a[:] = [a[0] + 1, a[1] + v, min(a[2], v), max(a[3], v)]
+            self._stats[p] = [1, float(v), 0.0, v, v, t, t, t]
+            return
+        n, mean = a[0] + 1, a[1] + (v - a[1]) / (a[0] + 1)
+        a[2] += (v - a[1]) * (v - mean)
+        a[0], a[1], a[7] = n, mean, t
+        if v < a[3]:
+            a[3], a[5] = v, t
+        if v > a[4]:
+            a[4], a[6] = v, t
 
     def state(self, after: int = 0) -> dict:
         with self._data_lock:
@@ -436,11 +446,21 @@ class LiveHub:
                     "samples": [[s, tt, v] for s, tt, v in d if after < s <= seq]}
                 for p, d in self._ch.items()
             }
-            stats = {p: {"n": n, "min": lo, "max": hi, "avg": round(tot / n, 4)} for p, (n, tot, lo, hi) in self._stats.items()}
+            stats = {p: {"n": n, "min": lo, "max": hi, "avg": round(mean, 4), "std": round((m2 / (n - 1)) ** 0.5, 4) if n > 1 else 0.0,
+                         "min_t": tlo, "max_t": thi, "age": tlast}
+                     for p, (n, mean, m2, lo, hi, tlo, thi, tlast) in self._stats.items()}
+            ptimes = self._ptimes
             rp = self._replay
             replay = None if rp is None else {"name": rp["name"], "duration": rp["run"].duration, "pos": round(rp["pos"], 3),
                                               "speed": rp["speed"], "playing": rp["playing"], "ended": rp["ended"]}
         now = replay["pos"] if replay else (self._clock() - t0) if t0 is not None else 0.0
+        for p, sp in stats.items():  # last-seen age: a replay looks up the newest sample at or before the replay clock
+            last = sp["age"]
+            if replay:
+                ts = ptimes.get(p, [])
+                i = bisect.bisect_right(ts, now)
+                last = ts[i - 1] if i else None
+            sp["age"] = None if last is None else round(max(0.0, now - last), 2)
         measured = (len(st) - 1) / (st[-1] - st[0]) if len(st) >= 2 and st[-1] > st[0] else None
         return {
             "status": status, "message": message, "demo": self._sim is not None and replay is None, "run": run,
