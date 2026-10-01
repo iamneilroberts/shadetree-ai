@@ -63,6 +63,7 @@ class LiveHub:
         self.status, self.message, self.seq, self.hz = "idle", None, 0, None
         self._ch: dict[str, deque] = {}      # the newest max_buffer samples per channel: what the page and tools read
         self._full: dict[str, list] = {}     # every sample of the run: what a saved run is written from
+        self._stats: dict[str, list] = {}    # [n, sum, min, max] per channel over the run (a replay: the whole file)
         self._sweep_t: deque = deque(maxlen=12)
         self._t0 = self._last_at = self._deadline = None
         self._adapter: dict = {"chip": None, "ati": None, "protocol": None}
@@ -145,6 +146,9 @@ class LiveHub:
                 self._m06 = run.mode06 or {"read": False, "note": "not stored in this run", "mids": [], "results": []}
                 self._vehicle = run.vehicle
                 self._ch = {p: deque(maxlen=self._max) for p in run.names}
+                for _, vals in run.sweeps:
+                    for p, v in vals.items():
+                        self._add_stat(p, v)
                 self._replay = {"name": name, "run": run, "pos": 0.0, "speed": 1.0, "playing": bool(playing), "ended": False, "i": 0}
             self._stop.clear()
             self._thread = threading.Thread(target=self._replay_loop, daemon=True)
@@ -406,10 +410,18 @@ class LiveHub:
             for p, v in rows:
                 self._ch[p].append((seq, round(now, 3), v))
                 self._full[p].append((seq, round(now, 3), v))
+                self._add_stat(p, v)
             self.seq = seq
             self._last_at = self._clock()
             self._sweep_t.append(now)
         return True
+
+    def _add_stat(self, p: str, v: float) -> None:
+        a = self._stats.get(p)
+        if a is None:
+            self._stats[p] = [1, v, v, v]
+        else:
+            a[:] = [a[0] + 1, a[1] + v, min(a[2], v), max(a[3], v)]
 
     def state(self, after: int = 0) -> dict:
         with self._data_lock:
@@ -424,6 +436,7 @@ class LiveHub:
                     "samples": [[s, tt, v] for s, tt, v in d if after < s <= seq]}
                 for p, d in self._ch.items()
             }
+            stats = {p: {"n": n, "min": lo, "max": hi, "avg": round(tot / n, 4)} for p, (n, tot, lo, hi) in self._stats.items()}
             rp = self._replay
             replay = None if rp is None else {"name": rp["name"], "duration": rp["run"].duration, "pos": round(rp["pos"], 3),
                                               "speed": rp["speed"], "playing": rp["playing"], "ended": rp["ended"]}
@@ -438,7 +451,7 @@ class LiveHub:
                              if status == "running" and deadline else None),
             "adapter": adapter, "codes": codes, "unsupported": unsupported,
             "extras": extras, "mode06": m06, "vehicle": vehicle, "replay": replay,
-            "channels": channels,
+            "channels": channels, "stats": stats,
         }
 
     def recent(self, seconds: float) -> dict:

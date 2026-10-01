@@ -187,12 +187,12 @@
   .retro .hlive { font: 700 11px var(--sil); letter-spacing: .12em; color: #a9aaad; }
   .retro .hlive.on { color: #3fe06a; } .retro .hlive.off { color: #ff8a7a; }
   #v6 .card { margin-bottom: 12px; }
-  #v6 .xgrid { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
-  #v6 .xt { background: var(--panel2); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; }
-  #v6 .xt .n { font: 700 11.5px var(--cond); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
-  #v6 .xt .v { font: 700 28px/1.1 var(--cond); font-variant-numeric: tabular-nums; }
-  #v6 .xt .v small { font: 600 13px var(--cond); color: var(--muted); margin-left: 4px; }
-  #v6 .xt .r { font-size: 11.5px; color: var(--muted); }
+  #v6 .rwrap { overflow-x: auto; }
+  #v6 table.rd { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+  #v6 table.rd th, #v6 table.rd td { text-align: right; padding: 3px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  #v6 table.rd th { font: 700 11.5px var(--cond); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  #v6 table.rd th:first-child, #v6 table.rd td.n { text-align: left; white-space: normal; }
+  #v6 table.rd td.n .q { width: 18px; height: 18px; font-size: 11px; margin-left: 6px; vertical-align: middle; }
   #v6 .note { color: var(--muted); font-size: 12.5px; margin: 0 0 8px; }
   #v6 table.m6 { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-bottom: 10px; }
   #v6 table.m6 th, #v6 table.m6 td { text-align: right; padding: 3px 8px; border-bottom: 1px solid var(--line); }
@@ -202,9 +202,6 @@
   .q { width: 22px; height: 22px; border-radius: 50%; border: 1px solid var(--line); background: var(--panel2); color: var(--muted);
        font: 700 12px/1 var(--cond); cursor: pointer; padding: 0; }
   .q:hover, .q:focus-visible { color: var(--ink); border-color: var(--muted); }
-  #v6 .xt { position: relative; }
-  #v6 .xt .q { position: absolute; top: 6px; right: 6px; }
-  #v6 .xt .n { padding-right: 26px; }
   #v6 .m6h .q { margin-left: 8px; vertical-align: middle; }
   #helpPanel { position: fixed; z-index: 50; width: min(360px, calc(100vw - 24px)); background: var(--panel2); border: 1px solid var(--muted);
                border-radius: 8px; padding: 12px 14px; box-shadow: 0 10px 30px rgba(0,0,0,.55); display: none; font-size: 12.5px; }
@@ -419,9 +416,10 @@
   </div></section>
   <!-- F: READINGS (extra PIDs the car supports + Mode 06 test results) -->
   <section class="view" id="v6" role="tabpanel">
-    <div class="card"><h3>More readings <span class="tag" id="x_count"></span></h3>
-      <p class="note" id="x_note">Start sampling: the console asks the car which readings it supports and adds them here (the main channels are read every sweep, these rotate a few at a time).</p>
-      <div class="xgrid" id="x_grid"></div></div>
+    <div class="card"><h3>All readings <span class="tag" id="x_count"></span></h3>
+      <p class="note" id="x_note">Start sampling or load a replay: every reading in the run is listed here with its minimum, maximum and average (the main channels are read every sweep, the extras the car supports rotate a few at a time).</p>
+      <div class="rwrap" id="x_table"><table class="rd"><thead><tr><th>Reading</th><th>Now</th><th>Min</th><th>Max</th><th>Avg</th></tr></thead>
+        <tbody id="x_grid"></tbody></table></div></div>
     <div class="card"><h3>Mode 06 &middot; on-board test results <span class="tag" id="m6_count"></span></h3>
       <p class="note" id="m6_note">Read once per run. Values are raw integers: the unit scaling table is not applied, so compare a value to its own limits, not to other tests. Monitor names are general knowledge, unverified.</p>
       <div id="m6"></div></div>
@@ -476,13 +474,13 @@
         (rows[s[0]] = rows[s[0]] || { t: s[1] })[c.id] = s[2];
       });
     });
-    Object.keys(st.channels).forEach(function (pid) {     // readings outside the fixed channels: keep latest, min, max and the last minute
+    Object.keys(st.channels).forEach(function (pid) {     // readings outside the fixed channels: keep latest and the last minute
       if (PIDS.indexOf(pid) >= 0) return;
-      var ch = st.channels[pid], x = xs[pid] = xs[pid] || { pid: pid, v: null, min: null, max: null, hist: [] };
-      x.name = ch.name; x.unit = ch.unit; x.labels = ch.labels;
+      var ch = st.channels[pid], x = xs[pid] = xs[pid] || { pid: pid, v: null, hist: [] };
+      x.name = ch.name; x.unit = ch.unit;
       ch.samples.forEach(function (sm) {
         if (sm[0] <= lastSeq) return;
-        x.v = sm[2]; x.min = x.min === null ? sm[2] : Math.min(x.min, sm[2]); x.max = x.max === null ? sm[2] : Math.max(x.max, sm[2]);
+        x.v = sm[2];
         x.hist.push({ t: sm[1], v: sm[2] });
       });
       while (x.hist.length && x.hist[0].t < tNow - SPAN - 2) x.hist.shift();
@@ -801,25 +799,31 @@
       .then(function (j) { if (j && j.pids && typeof j.pids === 'object' && j.mode06 && typeof j.mode06 === 'object') { HELP = j; render(); } })
       .catch(function () {});
   }
-  function makeX(it) {
-    var root = el('div', 'xt'), n = el('div', 'n'), v = el('div', 'v'), r = el('div', 'r');
-    root.appendChild(qbtn(it.key)); root.appendChild(n); root.appendChild(v); root.appendChild(r);
-    return { root: root, n: n, v: v, r: r };
+  function fmtStat(pid, v) {   // main channels at their own precision, extras to 2 decimals (an equivalence ratio needs them)
+    var c = chFor(pid);
+    if (v === null || v === undefined) return '—';
+    if (convFor(pid)) return fmtPid(pid, v);
+    return c ? fmt(v, c.dp) : Math.abs(v) >= 100 || v % 1 === 0 ? String(Math.round(v * 10) / 10) : v.toFixed(2);
+  }
+  function makeX(it) {   // one table row per reading: name (unit) and ?, now, min, max, average
+    var root = el('tr', 'xr'), n = el('td', 'n'), nm = el('span'), v = [el('td'), el('td'), el('td'), el('td')];
+    root.setAttribute('data-key', it.key); n.appendChild(nm); n.appendChild(qbtn(it.key));
+    [n].concat(v).forEach(function (c) { root.appendChild(c); });
+    return { root: root, nm: nm, v: v };
   }
   function updX(nd, it) {
-    var x = it.x, c = convFor(it.key), f = function (v) { return c ? c[1](v) : v; };
-    var rnd = function (v) { return c ? f(v).toFixed(c[2]) : String(Math.round(v * 100) / 100); };
-    var lab = x.labels && x.v !== null ? x.labels[String(Math.round(x.v))] : null;
-    nd.n.textContent = x.name.replace(/_/g, ' ') + ' · ' + it.key;
-    nd.v.textContent = lab ? lab : (x.v === null ? '—' : c ? f(x.v).toFixed(c[2]) : (Math.abs(x.v) >= 100 || x.v % 1 === 0 ? String(Math.round(x.v * 10) / 10) : x.v.toFixed(2)));
-    if (!lab && x.unit) nd.v.appendChild(el('small', '', c ? c[0] : x.unit === 'C' ? '°C' : x.unit));
-    nd.r.textContent = !x.labels && x.min !== null ? 'min ' + rnd(x.min) + ' · max ' + rnd(x.max) : '';
+    var p = it.key, u = unitOf(p), name = pidName(p), now = latest(p), s = it.lab ? null : it.s,   // a status reading has no min/max/average
+        lab = it.lab && now !== null && now !== undefined ? it.lab[String(Math.round(now))] : null;
+    nd.nm.textContent = name.charAt(0).toUpperCase() + name.slice(1) + (u ? ' (' + u + ')' : '');
+    [lab || fmtStat(p, now), s ? fmtStat(p, s.min) : '—', s ? fmtStat(p, s.max) : '—', s ? fmtStat(p, s.avg) : '—']
+      .forEach(function (t, i) { nd.v[i].textContent = t; });
   }
   function renderReadings() {
-    var st = state || {}, ids = Object.keys(xs).sort();
-    keyed($('x_grid'), ids.map(function (p) { return { key: p, x: xs[p] }; }), makeX, updX);
-    $('x_count').textContent = ids.length ? ids.length + ' readings' : '';
+    var st = state || {}, chs = st.channels || {}, stats = st.stats || {}, ids = Object.keys(chs).sort();
+    keyed($('x_grid'), ids.map(function (p) { return { key: p, lab: chs[p].labels, s: stats[p] }; }), makeX, updX);
+    $('x_count').textContent = ids.length ? ids.length + ' readings · stats over ' + (st.status === 'running' && !st.replay ? 'this run so far' : 'the whole run') : '';
     $('x_note').style.display = ids.length ? 'none' : '';
+    $('x_table').style.display = ids.length ? '' : 'none';
     var m = st.mode06 || { read: false }, box = $('m6'), res = m.results || [];
     var msig = JSON.stringify(m); if (box._msig === msig) return; box._msig = msig;   // results do not change after the read; rebuilding would drop clicks
     box.textContent = '';

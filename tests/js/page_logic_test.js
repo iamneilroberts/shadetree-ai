@@ -230,7 +230,7 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
   assert(/No bundled help/.test(flat(panel)), 'a reading with no entry gets the generic popup');
   hp.docHandlers.click({ target: findQ(hp.el('m6'), 'm06:evap') });
   assert(/EVAP leak test/.test(flat(panel)) && panel.className === 'open', 'Mode 06 lines have help, and opening another replaces the first');
-  assert.strictEqual(hp.el('x_grid').children.filter(c => c.className === 'xt').length, 3, 'cards (0x04, 0x10, 0x99) are updated in place, not duplicated');
+  assert.strictEqual(hp.el('x_grid').children.filter(c => c.className === 'xr').length, 10, 'rows (7 main channels, 0x04, 0x10, 0x99) are updated in place, not duplicated');
   hp.docHandlers.keydown({ key: 'Escape' });
   panel.offsetWidth = 360; q04.getBoundingClientRect = () => ({ left: 480, top: 100, bottom: 120, right: 500 });
   hp.docHandlers.click({ target: q04 });
@@ -482,12 +482,35 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
   assert.strictEqual(big(noStore, 'ect'), '90', 'without storage it starts metric');
   await toggle(noStore); assert.strictEqual(big(noStore, 'ect'), '194', 'and still toggles');
 
-  // All readings: speed, plus the min and max line
-  const speedStates = statesFor(4, idle).map(st => { st.channels['0D'] = { name: 'vehicle_speed', unit: 'km/h', samples: [[st.seq, st.now, 60]] }; return st; });
-  const sp = makeEnv(speedStates, 'v6', OVF, [], { 'shadetree.units': 'us' });
+  // All readings: one table row per channel (main channels and extras, speed included): name (unit), now, min, max, average
+  const RSTATS = { '0D': { n: 9, min: 0, max: 112.65, avg: 50 }, '05': { n: 9, min: 20, max: 90, avg: 70 }, '0C': { n: 9, min: 650, max: 3200, avg: 1500.4 },
+                   '0B': { n: 9, min: 30, max: 101, avg: 40 } };
+  const speedStates = (replay) => statesFor(4, idle).map(st => {
+    st.channels['0D'] = { name: 'vehicle_speed', unit: 'km/h', samples: [[st.seq, st.now, 60]] };
+    st.channels['0B'] = { name: 'intake_manifold_pressure', unit: 'kPa', samples: [[st.seq, st.now, 36]] };
+    st.channels['03'] = { name: 'fuel_system_status', unit: null, labels: { '2': 'closed loop' }, samples: [[st.seq, st.now, 2]] };
+    st.stats = RSTATS; if (replay) st.replay = { name: 'r.json', duration: 300, pos: st.now, speed: 1, playing: true, ended: false };
+    return st;
+  });
+  const rrow = (e, key) => { let r = null; walk(e.el('x_grid'), n => { if (n.className === 'xr' && n.getAttribute('data-key') === key) r = n; }); return r; };
+  const cells = (e, key) => rrow(e, key).children.map(c => flat(c).replace(/\s*\?$/, '').trim().replace(/\s+/g, ' '));   // the name cell ends with its ? button
+  const sp = makeEnv(speedStates(true), 'v6', OVF, [], { 'shadetree.units': 'us' });
   for (let k = 0; k < 5; k++) await sp.tick();
-  let spCard = null; walk(sp.el('x_grid'), n => { if (n.className === 'xt' && n.children[0].getAttribute('data-help') === '0D') spCard = n; });
-  assert(/37 mph/.test(flat(spCard)) && /min 37 · max 37/.test(flat(spCard)), 'extra readings convert too: ' + flat(spCard));
+  assert.deepStrictEqual(cells(sp, '0D'), ['Vehicle speed (mph)', '37', '0', '70', '31'], 'speed row converts every column: ' + cells(sp, '0D'));
+  assert.deepStrictEqual(cells(sp, '05'), ['Coolant temp (°F)', '106', '68', '194', '158'], 'a main channel is a row too');
+  assert.deepStrictEqual(cells(sp, '0B'), ['MAP (inHg)', '10.6', '8.9', '29.8', '11.8'], 'manifold pressure in inHg');
+  assert.deepStrictEqual(cells(sp, '0C'), ['Engine speed (rpm)', '700', '650', '3200', '1500']);
+  assert.deepStrictEqual(cells(sp, '06'), ['STFT bank 1 (%)', '-12.0', '—', '—', '—'], 'no stats from the server: dashes, not made-up numbers');
+  assert.deepStrictEqual(cells(sp, '03'), ['Fuel system status', 'closed loop', '—', '—', '—'], 'a status reading shows its label and no statistics');
+  assert(findQ(rrow(sp, '0D'), '0D'), 'every row keeps its ? help button');
+  assert.strictEqual(sp.el('x_grid').children.filter(c => c.className === 'xr').length, 11, 'all 11 channels on one table, in pid order');
+  assert.strictEqual(sp.el('x_grid').children[0].getAttribute('data-key'), '03');
+  assert(/11 readings · stats over the whole run/.test(sp.el('x_count').textContent), sp.el('x_count').textContent);
+  await toggle(sp);
+  assert.deepStrictEqual(cells(sp, '0D'), ['Vehicle speed (km/h)', '60', '0', '112.7', '50'], 'metric after the toggle');
+  const spl = makeEnv(speedStates(false), 'v6', OVF, [], {});
+  for (let k = 0; k < 5; k++) await spl.tick();
+  assert(/stats over this run so far/.test(spl.el('x_count').textContent), 'live says the stats are over the run so far');
 
   // Analyzer, Handheld and Guided test: labels and digits
   const an = await uEnv({ '05': 41 }, 'v4', {});
