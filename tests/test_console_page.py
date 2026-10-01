@@ -98,3 +98,40 @@ def test_retained_feature_is_still_on_the_page(feature):
 def test_page_stays_one_file_under_its_size_budget():
     assert len(HTML.encode("utf-8")) < 112_000  # 92,165 bytes before stage 1; raise only on purpose
     assert HTML.count("<script>") == 1 and HTML.count("<style>") == 1
+
+
+# ---- console stage 1: colours live in CSS variables; the Plain palette is today's ------------------
+def _css():
+    return re.sub(r"/\*.*?\*/", "", re.search(r"<style>(.*?)</style>", HTML, re.S).group(1), flags=re.S)
+
+
+def _block(selector):
+    """The custom properties of the first rule whose selector is exactly `selector`."""
+    body = re.search(r"(?:^|[}\s])" + re.escape(selector) + r"\s*\{([^}]*)\}", _css()).group(1)
+    return dict((k, " ".join(v.split())) for k, v in re.findall(r"(--[\w-]+):\s*([^;]+);", body))
+
+
+PLAIN_DARK = {"--bg": "#0e1113", "--panel": "#171b1f", "--panel2": "#1e2429", "--line": "#2c343b", "--ink": "#e8edf0", "--muted": "#93a0aa",
+              "--cyan": "#4fc3e8", "--amber": "#f2a93b", "--ok": "#7fcf94", "--bad": "#f07a5a", "--on-accent": "#06222c", "--banner": "#f2a93b",
+              "--msg-bg": "#2a2114", "--banner-ink": "#1a1204"}
+PLAIN_LIGHT = {"--bg": "#f3f5f6", "--panel": "#ffffff", "--panel2": "#e9edf0", "--line": "#c9d1d7", "--ink": "#12171a", "--muted": "#4f5c65",
+               "--cyan": "#0a7499", "--amber": "#9a5a00", "--ok": "#1d7f3a", "--bad": "#c0361b", "--on-accent": "#ffffff", "--msg-bg": "#fff3dc"}
+
+
+def test_the_plain_palette_is_todays():
+    dark, light = _block(":root"), _block(':root[data-theme="light"]')
+    assert {k: dark.get(k) for k in PLAIN_DARK} == PLAIN_DARK
+    assert {k: light.get(k) for k in PLAIN_LIGHT} == PLAIN_LIGHT
+
+
+NEUTRAL = re.compile(r"rgba\((?:0,0,0|255,255,255),[.\d]+\)|#000\b")  # black/white shading in shadows and highlights
+
+
+def test_colours_live_only_in_the_token_blocks():
+    rules = re.sub(r":root(?:\[[^\]]*\])*\s*\{[^}]*\}", "", _css())
+    assert re.findall(r"#[0-9a-fA-F]{3,8}\b|rgba?\(", NEUTRAL.sub("", rules)) == []
+    markup = HTML[HTML.index("</style>"):HTML.index("<script>")]
+    assert re.findall(r"#[0-9a-fA-F]{3,8}\b", " ".join(re.findall(r'style="([^"]*)"', markup))) == []
+    js = re.search(r"<script>(.*?)</script>", HTML, re.S).group(1)
+    js = re.sub(r"\n\s*var PALS = [^\n]*", "", js)  # canvas colours: a canvas cannot read CSS variables
+    assert re.findall(r"#[0-9a-fA-F]{6}\b", js) == []
