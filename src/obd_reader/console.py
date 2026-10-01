@@ -204,7 +204,7 @@ class ConsoleServer:
                 if path == "/api/scenarios":
                     return self._json(200, {"scenarios": outer.scenarios})
                 if path == "/api/runs":
-                    ex =outer.examples_dir
+                    ex = outer.examples_dir
                     return self._json(200, {"runs": list_runs(outer.hub.runs_dir), "examples": list_runs(ex) if ex else []})
                 try:
                     after = max(0, int((q.get("after") or ["0"])[0]))
