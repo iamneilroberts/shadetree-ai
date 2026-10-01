@@ -43,7 +43,7 @@ function makeEnv(states, viewId = 'v0', help = null) {
   vm.runInNewContext(js, sandbox);
   return {
     el, handlers, docHandlers, posts, sandbox,
-    timer() { timer(); },
+    timer() { timer(); }, setHelp(h) { help = h; }, advance(ms) { now += ms; },
     async tick() { timer(); await new Promise(r => setImmediate(r)); await new Promise(r => setImmediate(r)); }
   };
 }
@@ -287,6 +287,25 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
   assert.strictEqual(chipsNone.el('chipLamp').textContent, 'lamp ?'); assert.strictEqual(chipsNone.el('chipCodes').textContent, 'codes not read');
   const qTrim = findQ(wEnv.el('o_attn'), '06'); assert(qTrim, 'attention rows have a ? button');
   wEnv.docHandlers.click({ target: qTrim }); assert(/Short-term trim, bank 1/.test(flat(wEnv.el('helpPanel'))) && /now 13/.test(flat(wEnv.el('helpPanel'))), 'row help shows the catalog and the live value');
+
+  // 7) Overview honesty: help ranges not loaded (and a retry), last-seen age, spike vs median, odd help entries
+  const noHelp = makeEnv(statesFor(30, base), 'v0', null);
+  for (let k = 0; k < 32; k++) await noHelp.tick();
+  assert.strictEqual(noHelp.el('o_note').textContent, 'Health ranges not loaded, so nothing is checked');
+  noHelp.setHelp(OVF); noHelp.advance(6000);
+  for (let k = 0; k < 4; k++) await noHelp.tick();
+  assert.strictEqual(noHelp.el('o_note').textContent, 'Nothing out of range', 'the page retries loading the ranges');
+  const gone = await ovEnv((s) => { const b = base(); if (s > 3) delete b['04']; return b; });
+  assert.strictEqual(tile(gone, 'load').className, 'tile neutral', 'an extra not seen for over 10 s keeps its last value');
+  assert.strictEqual(part(tile(gone, 'load'), 'sub'), 'last seen 11 s ago');
+  const slow = await ovEnv((s) => { const b = base(); if (s > 20) delete b['04']; return b; }, st => Object.assign(st, { hz_measured: 0.5 }));
+  assert.strictEqual(part(tile(slow, 'load'), 'sub'), 'live', 'on a slow bus 4 s is under three sweeps, so still live');
+  const spike = await ovEnv((s) => Object.assign(base(), s === 30 ? { '06': 40 } : {}));
+  assert.strictEqual(tile(spike, 'trims').className, 'tile', 'a one-sweep spike does not flip the tile');
+  const odd = makeEnv(extraStates, 'v6', { pids: { '04': 'not an object' }, mode06: {} });
+  for (let k = 0; k < 5; k++) await odd.tick();
+  odd.docHandlers.click({ target: findQ(odd.el('x_grid'), '04') });
+  assert(/No bundled help/.test(flat(odd.el('helpPanel'))), 'a non-object help entry falls back to the generic popup');
 
   console.log('page logic OK');
 })().catch(e => { console.error('FAIL', e.message); process.exit(1); });

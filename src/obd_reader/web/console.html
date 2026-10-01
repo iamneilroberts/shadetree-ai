@@ -417,7 +417,7 @@
   ];
   var PIDS = CH.map(function (c) { return c.pid; });
   var SPAN = 60;
-  var PAL = { cyan: '#4fc3e8', amber: '#f2a93b', mute: '#93a0aa', line: '#2c343b' };
+  var PAL = { mute: '#93a0aa', line: '#2c343b' };
   var xs = {}, buf = {}, last = {}, lastSeq = 0, runId = null, polling = false, tNow = 0, state = null, fetchedAt = 0, events = [], cap = null, results = {};
   CH.forEach(function (c) { buf[c.id] = []; last[c.id] = null; });
   function $(id) { return document.getElementById(id); }
@@ -586,7 +586,8 @@
   }
   function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; }
   /* ---------- reading lookups, tile state and help popups ---------- */
-  var HELP = { pids: {}, mode06: {} }, helpKey = null;
+  var HELP = { pids: {}, mode06: {} }, helpKey = null, helpTried = -1e9;
+  function helpLoaded() { return Object.keys(HELP.pids).length > 0; }
   function chFor(pid) { for (var i = 0; i < CH.length; i++) if (CH[i].pid === pid) return CH[i]; return null; }
   function latest(pid) { var c = chFor(pid); if (c) return last[c.id]; return xs[pid] ? xs[pid].v : null; }
   function series(pid) { var c = chFor(pid); return c ? buf[c.id] : (xs[pid] && xs[pid].hist) || []; }
@@ -654,6 +655,7 @@
   });
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeHelp(); });
   function loadHelp() {
+    helpTried = performance.now();
     fetch(api('/api/help'))
       .then(function (r) { if (!r.ok) throw new Error(String(r.status)); return r.json(); })
       .then(function (j) { if (j && j.pids && typeof j.pids === 'object' && j.mode06 && typeof j.mode06 === 'object') { HELP = j; render(); } })
@@ -726,6 +728,7 @@
     var main = null, mv = null, worst = 'none';
     t.pids.forEach(function (p) {
       var v = run ? winMedian(p) : latest(p);
+      if ((v === null || v === undefined) && run && !chFor(p)) v = latest(p);   // a rotating extra not seen for over 10 s keeps its last value
       if (v === null || v === undefined) return;
       var s = run ? judge(v, watchFor(p)) : 'none';
       if (RANK[s] > RANK[worst]) worst = s;
@@ -734,7 +737,10 @@
     var cls = !run || main === null ? 'idle' : worst === 'ok' ? '' : worst, sub;
     if (!run) sub = 'not sampling';
     else if (main === null) sub = 'not reported';
-    else if (t.key === 'load') { var s2 = series('04'), age = tNow - s2[s2.length - 1].t; sub = age < 2 ? 'live' : 'last seen ' + Math.round(age) + ' s ago'; }
+    else if (t.key === 'load') {
+      var s2 = series('04'), age = s2.length ? tNow - s2[s2.length - 1].t : null, per = state && state.hz_measured ? 1 / state.hz_measured : 1;
+      sub = age === null ? 'last seen over a minute ago' : age < Math.max(2, 3 * per) ? 'live' : 'last seen ' + Math.round(age) + ' s ago';
+    }
     else if (t.key === 'trims') sub = TRIM_NAME[main] + (worst !== 'ok' && WORD[worst] ? ' · ' + WORD[worst] : '');
     else sub = WORD[worst];
     return { key: t.key, title: t.title, cls: cls, help: main || t.pids[0], value: mv === null ? '—' : fmt(mv, t.dp), unit: unitOf(t.pids[0]),
@@ -774,10 +780,11 @@
       .sort(function (a, b) { return RANK[b.s] - RANK[a.s] || ATTN.indexOf(a.key) - ATTN.indexOf(b.key); });
     keyed($('o_attn'), rows, makeRow, updRow);
     var have = models.some(function (m) { return m.cls !== 'idle'; });
-    $('o_note').textContent = rows.length ? '' : !run ? 'Not sampling' : have ? 'Nothing out of range' : 'Waiting for readings';
+    $('o_note').textContent = rows.length ? '' : !run ? 'Not sampling' : !helpLoaded() ? 'Health ranges not loaded, so nothing is checked' : have ? 'Nothing out of range' : 'Waiting for readings';
   }
   $('o_more').addEventListener('click', function (e) { if (e.preventDefault) e.preventDefault(); show('v6'); });
   function render() {
+    if (!helpLoaded() && performance.now() - helpTried > 5000) loadHelp();   // the first fetch failed or is slow: try again
     chips();
     var view = active();
     if (view === 'v6') renderReadings();
