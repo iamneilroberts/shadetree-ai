@@ -297,7 +297,7 @@
   .panel > .pbody { padding: 12px 14px; min-width: 0; }
   .gauges { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
   .gauge { background: var(--panel2); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; min-width: 0; }
-  .gauge.watch { border-color: var(--amber); } .gauge.out { border-color: var(--bad); } .gauge.dim { opacity: .5; }
+  .gauge.watch { border-color: var(--amber); } .gauge.out { border-color: var(--bad); } .gauge.dim .gface { opacity: .4; }
   .gauge .gtop { display: flex; align-items: center; gap: 6px; font: 700 11.5px var(--cond); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
   .gauge .gname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .gauge .gtop .q { width: 18px; height: 18px; font-size: 11px; flex: none; }
@@ -900,7 +900,7 @@
     [null, s && fmtRunT(s.min_t), s && fmtRunT(s.max_t), null, null, s && fmtAge(s.age)].forEach(function (t, i) { nd.at[i].textContent = t || ''; });
   }
   function renderReadings() {
-    var st = state || {}, chs = st.channels || {}, stats = st.stats || {}, ids = Object.keys(chs).sort();
+    var st = state || {}, chs = st.channels || {}, ids = Object.keys(chs).sort();
     pidRows($('x_grid'), ids);
     $('x_count').textContent = ids.length ? ids.length + ' readings · stats over ' + (st.status === 'running' && !st.replay ? 'this run so far' : 'the whole run') +
       (st.tiers ? ' · all supported: ' + st.tiers.fast.length + ' fast every sweep, ' + st.tiers.slow.length + ' slow in rotation' : '') : '';
@@ -940,7 +940,7 @@
   var GAUGE = { '0C': { lo: 0, hi: 7000, dp: 0, majors: 7, div: 1000 }, '0D': { lo: 0, hi: 200, dp: 0 }, '05': { lo: -20, hi: 130, dp: 0 },
     '04': { lo: 0, hi: 100, dp: 0 }, '11': { lo: 0, hi: 100, dp: 0 }, '0B': { lo: 0, hi: 120, dp: 0, majors: 6 }, '42': { lo: 10, hi: 16, dp: 1, majors: 6 },
     '06': { lo: -25, hi: 25, dp: 1 }, '07': { lo: -25, hi: 25, dp: 1 }, '08': { lo: -25, hi: 25, dp: 1 }, '09': { lo: -25, hi: 25, dp: 1 },
-    '0E': { lo: -20, hi: 50, dp: 1, majors: 7 }, '0F': { lo: -40, hi: 80, dp: 0, majors: 6 }, '44': { lo: 0.5, hi: 1.5, dp: 2, majors: 4 } };
+    '0E': { lo: -20, hi: 50, dp: 1, majors: 7 }, '0F': { lo: -40, hi: 80, dp: 0, majors: 6 }, '44': { lo: 0.5, hi: 1.5, dp: 2, majors: 5 } };
   var FORMS = ['dial', 'bar', 'seven'];
   var SEGCOL = { ok: 'var(--g-ok)', watch: 'var(--g-warn)', out: 'var(--g-bad)', neutral: 'var(--g-seg)', none: 'var(--g-seg)' };
   function gaugeZones(w, lo, hi) {   // a watch range as bands on [lo, hi]: ok inside w.ok, watch between ok and out, out beyond out (judge's rule); null ends are open
@@ -972,7 +972,7 @@
   }
   function segDigits(it) {   // enough digits for the range and the value, so the display does not clip to 9s
     function need(x) { return x === null ? 0 : String(Math.round(Math.abs(x))).length + it.dp + (x < 0 ? 1 : 0); }
-    return Math.max(3, Math.min(7, need(it.lo), need(it.hi), need(it.v)));
+    return Math.max(3, Math.min(7, Math.max(need(it.lo), need(it.hi), need(it.v))));
   }
   function makeGauge(it) {   // a gauge card: name (unit) and its ?, the face, a value line and a note
     var root = el('div', 'gauge'), top = el('div', 'gtop'), name = el('span', 'gname'), face = el('div', 'gface'), val = el('div', 'gval'), note = el('div', 'gnote');
@@ -1009,7 +1009,7 @@
   }
   var PREVIEW = [{ pid: '0C', form: 'dial' }, { pid: '05', form: 'dial' }, { pid: '07', form: 'bar' }, { pid: '42', form: 'seven' }, { pid: '0D', form: 'bar' }, { pid: '0B', form: 'seven' }];
   var preview = null;
-  function renderParts() {   // the #vp preview: one Panel with a gauge of each form (0D is not in a default run) and their PID table rows
+  function renderParts() {   // the #vp preview: one Panel with a gauge of each form (0D is only in a --demo or capture-all run, so in a default run its gauges show as not in this run) and their PID table rows
     if (!preview) {
       var p = panel('Shared parts preview'), g = el('div', 'gauges'), t = pidTableEl();
       p.body.appendChild(g); p.body.appendChild(t.root); $('vp').appendChild(p.root);

@@ -670,6 +670,10 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
   assert(/class="dn"/.test(gpart(ect, 'gface').innerHTML), 'and a needle');
   assert(findQ(ect, '05'), 'every gauge has its ? help');
   assert(/aria-label="14.2"/.test(gpart(gk(b1, '42:seven'), 'gface').innerHTML), 'battery digits');
+  const gs = await gOver({ '0C': 2500, '99': 123.4 }, st => { st.channels['99'] = { name: 'x', unit: '', samples: [[st.seq, st.now, 123.4]] }; return st; });   // Review Focus 3: digits fit the reading, never 9s
+  const bs = gbox(gs, [{ pid: '0C', form: 'seven' }, { pid: '99', form: 'seven' }]);
+  assert(/aria-label="2500"/.test(gpart(gk(bs, '0C:seven'), 'gface').innerHTML), 'rpm 2500 shown in full: ' + gpart(gk(bs, '0C:seven'), 'gface').innerHTML.slice(0, 80));
+  assert(/aria-label="123.4"/.test(gpart(gk(bs, '99:seven'), 'gface').innerHTML), 'no-range 123.4 shown in full');
   for (const key of ['0D:dial', '0D:bar', '5C:seven']) {   // not in this run: dimmed, said in words, and no needle, lit cell or digit
     const g = gk(b1, key), face = gpart(g, 'gface').innerHTML;
     assert(g.className.split(' ').includes('dim'), key + ' dimmed'); assert.strictEqual(gpart(g, 'gnote').textContent, 'not in this run', key);
@@ -677,6 +681,7 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
     if (key.endsWith(':seven')) assert(/aria-label="-+"/.test(face), key + ' shows dashes, not digits: ' + face.slice(0, 120));
     assert(['', '—'].includes(gpart(g, 'gval').textContent), key + ' value is blank or a dash');
   }
+  assert(/\.gauge\.dim \.gface\s*\{/.test(html) && !/\.gauge\.dim\s*\{/.test(html), 'only the face is dimmed, so the note keeps full contrast');
   const g2 = await gOver({ '07': 15 }), trim = gk(gbox(g2, [{ pid: '07', form: 'bar' }]), '07:bar');
   assert.strictEqual(trim.className, 'gauge bar watch'); assert.strictEqual(gpart(trim, 'gnote').textContent, 'watch');
   assert(/class="g/.test(gpart(trim, 'gface').innerHTML) && /class="y/.test(gpart(trim, 'gface').innerHTML) && !/class="r/.test(gpart(trim, 'gface').innerHTML), 'lit from 0 through ok into watch');
