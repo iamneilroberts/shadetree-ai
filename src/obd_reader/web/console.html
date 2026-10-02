@@ -183,7 +183,9 @@
     :root[data-skin="retro"] .dcab .dface > .bench .lab { font: 700 11.5px var(--sil); letter-spacing: .16em; text-transform: uppercase; color: var(--face-ink); }
     :root[data-skin="retro"] .dcab .dface .rocker { appearance: none; border: 2px solid var(--rocker-bd); background: var(--rocker); color: var(--rocker-ink); border-radius: 4px; padding: 6px 12px; font: 700 12px var(--sil); letter-spacing: .1em; text-transform: uppercase; cursor: pointer; box-shadow: 0 2px 0 var(--rocker-sh); }
     :root[data-skin="retro"] .dcab .dface .rocker:active { transform: translateY(1px); box-shadow: 0 1px 0 var(--rocker-sh); }
-    :root[data-skin="retro"] #v0 .dface h3.sec, :root[data-skin="retro"] #v0 .dface .note { color: var(--ink2); }   /* text on the light face uses the face ink, not the page's light ink */
+    :root[data-skin="retro"] #v0 .dface h3.sec, :root[data-skin="retro"] #v0 .dface #o_note, :root[data-skin="retro"] #v0 .dface #d_table > .note { color: var(--ink2); }   /* text on the light face uses the face ink, not the page's light ink (notes inside the dark panels keep theirs) */
+    :root[data-skin="retro"] #v0 .dface table.rd th, :root[data-skin="retro"] #v0 .dface table.rd td .at, :root[data-skin="retro"] #v0 .dface table.rd .dash { color: var(--ink2); }
+    :root[data-skin="retro"] #v0 .dface #d_table tr.scen td:first-child { box-shadow: inset 3px 0 0 var(--meter-zone); }
     :root[data-skin="retro"] #v0 .dface .more { color: var(--face-ink); }
   }
   .retro .mono, #v0 .mono { font-family: ui-monospace, "DejaVu Sans Mono", Menlo, Consolas, monospace; }

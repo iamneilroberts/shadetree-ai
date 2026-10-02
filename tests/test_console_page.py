@@ -274,3 +274,33 @@ def test_cabinet_chrome_is_retro_desktop_only():
     hidden = " ".join(" ".join(r[1]) for r in rules if not r[0])
     for needle in (".dcab .plate", ".dcab .screw", ".dcab .bench"):
         assert needle in hidden, f"{needle} is hidden by default"
+
+
+FACE_OVERRIDES = {  # what sits directly on the light cabinet face (not inside its own panel/card) and so needs a face-safe colour
+    "h3.sec": "text", "#o_note": "text", "#d_table > .note": "text", ".more": "text", "table.rd th": "text", "table.rd td .at": "text", ".dash": "text",
+    "tr.scen td:first-child": "marker",
+}
+
+
+def _face_override(css, frag):
+    for media, sels, body in _cabinet_rules(css):
+        if media == "(min-width: 601px)" and any(s.endswith(frag) and s.startswith(':root[data-skin="retro"] #v0 .dface ') for s in sels):
+            m = re.search(r"(?:color:|box-shadow: inset 3px 0 0)\s*var\((--[\w-]+)\)", body)
+            if m:
+                return m.group(1)
+    return None
+
+
+@pytest.mark.parametrize("theme", ["dark", "light"])
+def test_text_and_marker_directly_on_the_light_cabinet_face_are_readable(theme):
+    p, css = _palette("retro", theme), _css()
+    face = re.findall(r"#[0-9a-fA-F]{6}", p["--face"])
+    assert len(face) == 2
+    for frag, kind in FACE_OVERRIDES.items():
+        tok = _face_override(css, frag)
+        assert tok, f"{frag}: a Retro desktop override gives it a face-safe colour"
+        need = 4.5 if kind == "text" else 3.0
+        assert all(_contrast(p[tok], f) >= need for f in face), f"{frag}: {tok} {p[tok]} on the face is below {need}:1"
+    if theme == "dark":
+        assert any(_contrast(p["--muted"], f) < 4.5 for f in face), "sanity: the page's --muted is unreadable on the face in Retro dark"
+    assert not any(s.endswith(".dface .note") for _, ss, _ in _cabinet_rules(css) for s in ss), "a blanket .dface .note would darken notes inside the dark panels"
