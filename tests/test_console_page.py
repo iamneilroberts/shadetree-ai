@@ -372,6 +372,17 @@ def test_text_and_marker_directly_on_the_light_cabinet_face_are_readable(theme):
     assert not any(s.endswith(".dface .note") for _, ss, _ in _cabinet_rules(css) for s in ss), "a blanket .dface .note would darken notes inside the dark panels"
 
 
+def test_every_pid_table_row_has_the_same_left_bar_and_scenario_rows_only_recolour_it():
+    rules = _css_rules(_css())
+    base = [b for m, s, b in rules if m is None and "table.rd tbody td:first-child" in s]
+    assert base and "box-shadow: inset 3px 0 0 var(--line)" in base[0], "every row of every PID table gets a 3px neutral left bar, so the edge is even"
+    scen = [(m, s, b) for m, s, b in rules if any("tr.scen" in x for x in s)]
+    assert len(scen) >= 2, "the plain marker and the Retro cabinet marker"
+    for m, s, b in scen:
+        decl = [d.strip() for d in b.split(";") if d.strip()]
+        assert len(decl) == 1 and re.fullmatch(r"box-shadow: inset 3px 0 0 var\(--[\w-]+\)", decl[0]) and "--line" not in decl[0], f"{s}: .scen only recolours the bar"
+
+
 # ---- console stage 3: the replay bar is pinned to the bottom on a phone -----------------------------
 def _rbar_problems(css):
     """Everything wrong with the phone replay-bar rules in `css` (empty when they hold)."""
