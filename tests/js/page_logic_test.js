@@ -22,14 +22,16 @@ function makeNode(id, handlers) {
   return n;
 }
 
-function makeEnv(states, viewId = 'v0', help = null, runs = [], store = {}, page = {}) {   // page: { search, hash, absent (ids getElementById answers null for), postReply(url, body), prefersLight, narrow, storageThrows }
+function makeEnv(states, viewId = 'v0', help = null, runs = [], store = {}, page = {}) {   // page: { search, hash, views (view nodes the page toggles is-active on), absent (ids getElementById answers null for), postReply(url, body), prefersLight, narrow, storageThrows }
   const els = {}, handlers = {}, docHandlers = {}, posts = [];
   let parts = null;   // the page hands its shared parts to window.__shadetreeParts
   function el(id) { return els[id] || (els[id] = makeNode(id, handlers)); }
+  (page.views || []).forEach(v => { els[v.id] = v; });   // page.views: real view sections, so show() toggling is observable
   let timer = null, i = 0, now = 0;
   const sandbox = {
     console, URLSearchParams, Promise, Math, Object, Array, Number, String, JSON, Date, parseInt, isFinite,
-    document: { documentElement: el('html'), getElementById: (id) => ((page.absent || []).includes(id) ? null : el(id)), querySelectorAll: (sel) => (sel === '.vbtn' ? (page.vbtns || []) : []), querySelector: () => ({ id: viewId }),
+    document: { documentElement: el('html'), getElementById: (id) => ((page.absent || []).includes(id) ? null : el(id)), querySelectorAll: (sel) => (sel === '.vbtn' ? (page.vbtns || []) : sel === '.view' ? (page.views || []) : []),
+                querySelector: (sel) => (page.views && sel === '.view.is-active' ? page.views.find(v => v.className.split(' ').includes('is-active')) || null : { id: viewId }),
                 createElement: () => makeNode('new', handlers), addEventListener(t, fn) { docHandlers[t] = fn; } },
     window: { addEventListener() {}, devicePixelRatio: 1, innerWidth: 500, innerHeight: 800, __shadetreeParts: page.noHook ? undefined : (p) => { parts = p; } },
     location: { search: page.search || '?t=abc', hash: page.hash || '' }, history: { replaceState() {} },
@@ -996,11 +998,15 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
     assert.ok(ml[3].on && ml[3].e === 'reads cold', 'coolant at 40 C reads cold');
   }
 
-  {   // a stale #v4 (the removed Analyzer) opens the default view: the page has no such id, so the fragment is ignored
-    const st = makeEnv(statesFor(4, base), 'v0', OVF, [], {}, { hash: '#v4', absent: ['v4'] });
+  {   // a stale #v4 (the removed Analyzer): the page has no such id, so the fragment is ignored and the Dashboard stays the only active view
+    const views = ['v0', 'v3', 'v5', 'v6'].map(id => { const v = makeNode(id, {}); v.className = id === 'v0' ? 'view is-active' : 'view'; return v; });
+    const st = makeEnv(statesFor(4, base), 'v0', OVF, [], {}, { hash: '#v4', absent: ['v4'], views });
     for (let k = 0; k < 4; k++) await st.tick();
-    assert.ok(/LIVE/.test(st.el('chipLive').innerHTML), 'the page renders');
-    assert.ok(st.el('d_lamps').innerHTML.includes('Check engine'), 'and shows the Dashboard (its lamps strip is drawn)');
+    assert.deepStrictEqual(views.filter(v => v.className.split(' ').includes('is-active')).map(v => v.id), ['v0'], 'the Dashboard is still the one active view');
+    assert.ok(/LIVE/.test(st.el('chipLive').innerHTML) && st.el('d_lamps').innerHTML.includes('Check engine'), 'and it renders');
+    const good = ['v0', 'v3', 'v5', 'v6'].map(id => { const v = makeNode(id, {}); v.className = id === 'v0' ? 'view is-active' : 'view'; return v; });
+    makeEnv(statesFor(1, base), 'v0', OVF, [], {}, { hash: '#v5', views: good });
+    assert.deepStrictEqual(good.filter(v => v.className.split(' ').includes('is-active')).map(v => v.id), ['v5'], 'a real #v5 still opens Handheld (the harness can see a switch)');
   }
 
   {   // every code is a row in the Dashboard list (the CSS scrolls it; nothing is dropped here)

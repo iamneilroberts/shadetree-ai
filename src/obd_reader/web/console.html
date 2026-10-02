@@ -103,8 +103,8 @@
   #v3 .cite { color: var(--cyan); }
   #v3 .band { display: inline-block; padding: 1px 8px; border: 1px solid var(--line); border-radius: 3px; font-size: 12px; }
   @media (max-width: 860px) { #v3 .wrap { grid-template-columns: 1fr; } #v3 .readouts { grid-template-columns: 1fr 1fr; } }
-  /* ---- retro layouts D (analyzer cabinet) and E (handheld / phone): oxblood finish ---- */
-  /* retro device palette: the Analyzer and Handheld faces read these in every skin and theme; the Retro skin also uses them for any view */
+  /* ---- retro layouts: the Dashboard cabinet and E (handheld / phone): oxblood finish ---- */
+  /* retro device palette: the Dashboard cabinet and Handheld faces read these in every skin and theme; the Retro skin also uses them for any view */
   :root {
     --sil: "Helvetica Neue", Helvetica, Arial, "Liberation Sans", sans-serif; --ghost: .16; --glow: 3px; --ink2: #4a4a4c; --mut: #a39b88; --retro-ink: #ece6d6;
     --rail: linear-gradient(90deg, #3a0f0e, #7d2724 22%, #a5423b 34%, #74221f 62%, #3f100f); --rail-rivet: radial-gradient(circle at 50% 28px, #e4e4e2 0 2.5px, #2b2b2c 3px 5px, transparent 5.5px) 0 0 / 100% 84px repeat-y; --rail-tex: repeating-linear-gradient(90deg, rgba(255,255,255,.05) 0 1px, rgba(0,0,0,.08) 1px 2px); --rail-edge: rgba(230,230,228,.35);
@@ -149,7 +149,7 @@
   .retro .lampbox.lit .lens.grn, #v0 .lampbox.lit .lens.grn { background: var(--lens-grn-lit); box-shadow: 0 0 12px var(--led-g); }
   .retro .lampbox b, #v0 .lampbox b { display: block; color: inherit; }
   .retro .lampbox em, #v0 .lampbox em { display: block; font-style: normal; font-weight: 400; letter-spacing: .04em; text-transform: none; font-size: 11px; opacity: .85; }
-  /* Dashboard cabinet: the Analyzer's look as the Retro skin of the Dashboard, desktop only; Plain and a phone keep the plain page (chrome hidden, wrapper adds nothing) */
+  /* Dashboard cabinet: the instrument-panel look as the Retro skin of the Dashboard, desktop only; Plain and a phone keep the plain page (chrome hidden, wrapper adds nothing) */
   .dcab .plate, .dcab .screw, .dcab .bench { display: none; }
   @media (min-width: 601px) {
     :root[data-skin="retro"] .dcab { position: relative; padding: 0 30px; }

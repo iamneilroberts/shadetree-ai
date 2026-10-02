@@ -108,7 +108,7 @@ RETAINED = {
     "Theme": ['id="themeBtn"'],
     "Skin": ['id="skinBtn"', "shadetree.skin"],
     "? help popups": ['id="helpPanel"', "function qbtn", "/api/help"],
-    "Codes and lamp": ['id="chipCodes"', 'id="chipLamp"', "lst.id = 'd_codes'", 'id="h_codes"'],
+    "Codes and lamp": ['id="chipCodes"', 'id="chipLamp"', 'id="d_codes_mount"', 'id="h_codes"'],
     "Guided test": ['data-view="v3"', 'id="go_idle"', 'id="go_rev"', 'id="verdict"'],
     "Upload": ['id="rp_file"'],
     "Transport bar": ['id="rbar"', 'id="rb_restart"', 'id="rb_play"', 'id="rb_speed"', 'id="rb_seek"', 'id="rb_time"', 'id="rb_exit"'],
