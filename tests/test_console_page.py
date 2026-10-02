@@ -360,9 +360,8 @@ def _steel(p):
 
 
 FACE_OVERRIDES = {  # what sits directly on the cabinet's steel body (not inside its own panel/card) and so needs a steel-safe colour
-    "h3.sec": "text", "#o_note": "text", "#d_table > .note": "text", ".more": "text", "table.rd th": "text", "table.rd td .at": "text", ".dash": "text",
-    "tr.scen td:first-child": "marker",
-}
+    "h3.sec": "text", "#o_note": "text", "#d_table > .note": "text", ".more": "text", "table.rd th": "text", "table.rd td .at": "text",
+}  # the readings table itself is the CRT bay (black): test_retro_readings_table_is_the_crt_bay
 
 
 def _face_override(css, frag):
@@ -424,9 +423,9 @@ def _bar_tok(rules, skin, media_ok, candidates):
 
 _BAR = "table.rd tbody td:first-child"
 _BAR_CONTEXTS = [  # (where, skins, media, a plain row's candidate selectors, a scenario row's extra selectors or None, background)
-    ("Dashboard cabinet (Retro desktop)", {"retro"}, {None, "(min-width: 601px)"}, [_BAR, _R + "#v0 .dface " + _BAR],
-     ["#d_table tr.scen td:first-child", _R + "#v0 .dface #d_table tr.scen td:first-child"], "steel"),
-    ("Dashboard on the page (Plain, or a phone)", {"plain", "retro"}, {None}, [_BAR], ["#d_table tr.scen td:first-child"], "--bg"),
+    ("Dashboard readings in the CRT bay (Retro, any width)", {"retro"}, {None, "(min-width: 601px)"}, [_BAR, _R + "#v0 .dface " + _BAR, _R + "#d_table.crt " + _BAR],
+     ["#d_table tr.scen td:first-child", _R + "#d_table.crt table.rd tbody tr.scen td:first-child"], "--cb-face"),
+    ("Dashboard on the page (Plain)", {"plain"}, {None}, [_BAR], ["#d_table tr.scen td:first-child"], "--bg"),
     ("Handheld table on the device face", {"plain", "retro"}, {None, "(min-width: 601px)"}, [_BAR, ".retro .hh " + _BAR], None, "face"),
 ]
 
@@ -505,8 +504,10 @@ _INK_CASES = [  # (where, chain, background: selectors inner to outer whose back
     ("attention value", _CAB + [["#v0 .attn"], ["#v0 .orow"], ["#v0 .orow .val"]], ["#v0 .attn"]),
     ("attention reason", _CAB + [["#v0 .attn"], ["#v0 .orow"], ["#v0 .orow .why"]], ["#v0 .attn"]),
     ("help button", _CAB + [[".q"]], [".q"]),
-    ("Dashboard table cell", _CAB + [["table.rd td"]], "face"),
-    ("Dashboard table head", _CAB + [["table.rd th", _R + "#v0 .dface table.rd th"]], "face"),
+    ("Dashboard table cell", _CAB + [["table.rd td", _R + "#d_table.crt table.rd td"]], "crt"),
+    ("Dashboard table name", _CAB + [["table.rd td", _R + "#d_table.crt table.rd td"], [_R + "#d_table.crt table.rd td.n"]], "crt"),
+    ("Dashboard table head", _CAB + [["table.rd th", _R + "#v0 .dface table.rd th", _R + "#d_table.crt table.rd th"]], "crt"),
+    ("Dashboard table when", _CAB + [["table.rd td"], ["table.rd td .at", _R + "#v0 .dface table.rd td .at", _R + "#d_table.crt table.rd td .at"]], "crt"),
     ("Health heading", _CAB + [["h3", "#v0 h3.sec", _R + "#v0 .dface h3.sec"]], "face"),
     ("Handheld table cell", _HH + [["table.rd td"]], "hhface"),
     ("Handheld table head", _HH + [["table.rd th", ".retro .hh table.rd th"]], "hhface"),
@@ -537,7 +538,9 @@ def test_text_in_the_cabinet_and_the_handheld_reads_on_its_own_card(skin, theme)
             backs = face  # the light device face (its two gradient stops)
         elif bg == "face" and skin == "retro":
             backs = _steel(p)  # the cabinet's steel body
-        elif bg == "face":
+        elif bg == "crt" and skin == "retro":
+            backs = [p["--cb-face"]]  # the readings table's black screen
+        elif bg in ("face", "crt"):
             backs = [p["--bg"]]  # Plain has no cabinet: the page
         else:
             backs = [q[t] for t in (_decl_tok(rules, s, skin, "background") for s in bg) if t and re.fullmatch(r"#[0-9a-fA-F]{6}", q[t])][:1]
@@ -629,3 +632,18 @@ def test_retro_dashboard_indicators_sit_on_pure_black_in_both_themes(theme):
     assert any(any(s.endswith("#v0 .dface .win") for s in ss) and "background: var(--cb-face)" in b for m, ss, b in _cabinet_rules(css)), "the code-count window too"
     hh = dict(p); hh.update(_block_all(".retro")); hh.update(_block_all(':root[data-skin="retro"] .stage-pad.retro'))
     assert hh["--g-face"] == "var(--meter-face)" and hh["--g-win"] == "var(--win-bg)", "the Handheld keeps its own faces and windows"
+
+
+def test_retro_readings_table_is_the_crt_bay():
+    assert '<div id="d_table" class="crt"></div>' in HTML, "the Dashboard table carries the scheme class"
+    rules, css = _css_rules(_css()), _css()
+    crt = [(m, ss, b) for m, ss, b in rules if any(s.startswith(_R + "#d_table.crt") for s in ss)]
+    assert crt and all(m in (None, "(max-width: 600px)") for m, _, _ in crt), "the scheme applies at every width, Retro only"
+    frame = [b for m, ss, b in crt if _R + "#d_table.crt .rwrap" in ss and m is None][0]
+    assert "background: var(--cb-face)" in frame and "border: 9px solid var(--cb-trim)" in frame
+    for theme in ("dark", "light"):
+        p = _palette("retro", theme)
+        for fg, need in (("--crt-fg", 7.0), ("--crt-head-fg", 7.0), ("--crt-muted", 4.5)):
+            assert _contrast(p[fg], p["--cb-face"]) >= need, (theme, fg)
+        assert 1.2 <= _contrast(p["--crt-rule"], p["--cb-face"]) < _contrast(p["--crt-rule-strong"], p["--cb-face"]) < _contrast(p["--cb-needle"], p["--cb-face"]), "rules faint, row bar visible, scenario marker strongest"
+    assert any(any(s.endswith("#d_table.crt table.rd .dash") for s in ss) and "var(--crt-muted)" in b for m, ss, b in crt)

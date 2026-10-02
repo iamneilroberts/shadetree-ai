@@ -256,9 +256,8 @@
     :root[data-skin="retro"] #v0 .dface > .bench { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
     :root[data-skin="retro"] #v0 .dface h3.sec, :root[data-skin="retro"] #v0 .dface #o_note, :root[data-skin="retro"] #v0 .dface #d_table > .note { color: var(--cb-engrave); }   /* text directly on the steel: the engraving colour */
     :root[data-skin="retro"] #v0 .dface h3.sec { margin: 0 0 10px; font: 400 13px var(--cb-stencil); letter-spacing: .14em; }
-    :root[data-skin="retro"] #v0 .dface table.rd th, :root[data-skin="retro"] #v0 .dface table.rd td .at, :root[data-skin="retro"] #v0 .dface table.rd .dash { color: var(--cb-engrave-soft); }
-    :root[data-skin="retro"] #v0 .dface table.rd tbody td:first-child { box-shadow: inset 3px 0 0 var(--cb-line); }   /* the neutral row bar, fainter than the scenario marker below */
-    :root[data-skin="retro"] #v0 .dface #d_table tr.scen td:first-child { box-shadow: inset 3px 0 0 var(--cb-accent); }
+    :root[data-skin="retro"] #v0 .dface table.rd th, :root[data-skin="retro"] #v0 .dface table.rd td .at { color: var(--cb-engrave-soft); }   /* the freeze-frame table on the steel */
+    :root[data-skin="retro"] #v0 .dface table.rd tbody td:first-child { box-shadow: inset 3px 0 0 var(--cb-line); }
     :root[data-skin="retro"] #v0 .dface .more { margin-top: 0; color: var(--cb-engrave); font: 600 14px var(--cb-label); letter-spacing: .06em; }
     /* meter bay: an engraved label and reading over a chrome bezel; every face inside is black (dial, LED bar, seven-segment window) */
     :root[data-skin="retro"] #v0 .dface .gauges { grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 18px; }
@@ -276,6 +275,23 @@
     :root[data-skin="retro"] #v0 .dface .gauge.out .gface { box-shadow: 0 0 0 2px var(--cb-bad), 0 3px 5px rgba(0,0,0,.3); }
     :root[data-skin="retro"] #v0 .dface svg.dial .df { stroke-width: 1; }
     :root[data-skin="retro"] #v0 .dface svg.dial text { font-family: var(--cb-label); font-weight: 600; }
+  }
+  /* the Retro Dashboard's readings table is scheme B, "CRT bay": a black scope screen in a dark bezel, amber mono readings, white stencil headings and
+     names, thin grey rules, the neutral row bar in grey and the scenario marker in the needle orange; every width and both themes */
+  :root[data-skin="retro"] #d_table.crt .rwrap { padding: 10px 12px; background: var(--cb-face); color: var(--crt-fg); border: 9px solid var(--cb-trim); border-radius: 14px;
+    box-shadow: inset 0 0 28px color-mix(in srgb, var(--crt-fg) 9%, transparent), 0 0 0 1px var(--cb-chrome-3); }
+  :root[data-skin="retro"] #d_table.crt table.rd { font: 400 13.5px/1.3 var(--cb-mono); }
+  :root[data-skin="retro"] #d_table.crt table.rd th { padding: 9px 10px; color: var(--crt-head-fg); font: 700 12px/1.2 var(--cb-stencil); letter-spacing: .12em; border-bottom: 2px solid var(--crt-rule-strong); }
+  :root[data-skin="retro"] #d_table.crt table.rd td { padding: 7px 10px; color: var(--crt-fg); border-bottom: 1px solid var(--crt-rule); text-shadow: 0 0 6px color-mix(in srgb, currentColor 40%, transparent); }
+  :root[data-skin="retro"] #d_table.crt table.rd tbody tr:last-child > td { border-bottom: 0; }
+  :root[data-skin="retro"] #d_table.crt table.rd td.n { font: 400 14px/1.3 var(--cb-stencil); letter-spacing: .02em; }
+  :root[data-skin="retro"] #d_table.crt table.rd td .at, :root[data-skin="retro"] #d_table.crt table.rd .dash { color: var(--crt-muted); }
+  :root[data-skin="retro"] #d_table.crt table.rd .q { background: transparent; border-color: var(--crt-muted); color: var(--crt-fg); text-shadow: none; }
+  :root[data-skin="retro"] #d_table.crt table.rd tbody td:first-child { box-shadow: inset 3px 0 0 var(--crt-rule-strong); }
+  :root[data-skin="retro"] #d_table.crt table.rd tbody tr.scen td:first-child { box-shadow: inset 3px 0 0 var(--cb-needle); }
+  @media (max-width: 600px) {
+    :root[data-skin="retro"] #d_table.crt .rwrap { padding: 6px; border-width: 6px; border-radius: 10px; }
+    :root[data-skin="retro"] #d_table.crt table.rd th, :root[data-skin="retro"] #d_table.crt table.rd td { padding: 5px 6px; }
   }
   @media (min-width: 601px) and (max-width: 900px) {
     :root[data-skin="retro"] #v0 .dface { grid-template-columns: minmax(0, 1fr); }
@@ -566,7 +582,7 @@
       <div class="attn" id="o_attn"></div>
       <p class="note" id="o_note"></p>
     </div>
-    <div id="d_table"></div>
+    <div id="d_table" class="crt"></div>
     <a class="more" href="#v6" id="o_more">Mode 06 results, capture options and the full readings view &rarr;</a>
     <div class="bench"><span class="lab">Display</span><button class="rocker" id="clarity" type="button">Clarity: standard</button></div>
   </div></div></section>
