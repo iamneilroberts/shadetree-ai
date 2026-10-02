@@ -977,5 +977,31 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
     assert.ok(!dk.el('topbar').className.includes('menu-open'), 'desktop: nothing collapsed or opened');
   }
 
+  // 14) Lamps strip and Codes panel on the Dashboard
+  {
+    const byId = (e, root, id) => { let r = null; walk(e.el(root), n => { if (n.id === id) r = n; }); return r; };
+    const cd = (codes, status = 'running') => statesFor(6, base).map(st => Object.assign(st, { status, codes }));
+    const e = makeEnv(cd({ read: true, note: null, mil: true, stored: [{ code: 'P0171', desc: 'System too lean <b>x</b>', hint: 'check <i>air</i>' }], pending: [], permanent: [] }), 'v0', OVF);
+    for (let k = 0; k < 6; k++) await e.tick();
+    const m = e.parts().lampModel();
+    assert.deepStrictEqual(Array.from(m).map(x => x.id), ['mil', 'ltft1', 'ltft2', 'ect', 'samp']);
+    assert.strictEqual(m[0].on, true); assert.strictEqual(m[0].e, 'ON'); assert.strictEqual(m[4].e, '2.5 Hz');
+    assert.ok(byId(e, 'd_codes_mount', 'd_cnt'), 'the count window is on the Dashboard');
+    const codes = byId(e, 'd_codes_mount', 'd_codes');
+    assert.ok(/P0171/.test(codes.innerHTML));
+    assert.ok(!/<b>x<\/b>/.test(codes.innerHTML) && /&lt;b&gt;x&lt;\/b&gt;/.test(codes.innerHTML), 'description escaped');
+    assert.ok(/&lt;i&gt;air&lt;\/i&gt;/.test(codes.innerHTML), 'hint escaped');
+    assert.ok(/<i class="lens red"><\/i><div><b>Check engine \(MIL\)<\/b>/.test(e.el('d_lamps').innerHTML) && /lampbox lit/.test(e.el('d_lamps').innerHTML), 'the strip is drawn, MIL lit');
+    const idleE = makeEnv([{ status: 'idle', channels: {}, stats: {}, extras: {}, seq: 1, codes: { read: false, note: null } }], 'v0', OVF); await idleE.tick();
+    assert.ok(/START SAMPLING TO READ CODES/.test(byId(idleE, 'd_codes_mount', 'd_codes').innerHTML));
+    const mi = idleE.parts().lampModel(); assert.strictEqual(mi[0].e, 'unknown'); assert.strictEqual(mi[4].e, 'not sampling');
+    const none = makeEnv(cd({ read: true, note: null, mil: false, stored: [], pending: [], permanent: [] }), 'v0', OVF); for (let k = 0; k < 6; k++) await none.tick();
+    assert.ok(/NO CODES STORED/.test(byId(none, 'd_codes_mount', 'd_codes').innerHTML)); assert.strictEqual(none.parts().lampModel()[0].e, 'off');
+    const lean = makeEnv(statesFor(6, () => ({ '0C': 700, '05': 40, '06': 2, '07': 14, '08': 2, '09': -13 })), 'v0', OVF); for (let k = 0; k < 6; k++) await lean.tick();
+    const ml = lean.parts().lampModel();
+    assert.ok(ml[1].on && ml[1].e === 'LEAN: outside ±10 %', 'trim above +10 lights LTFT 1'); assert.ok(ml[2].on && /RICH/.test(ml[2].e), 'trim below -10 lights LTFT 2');
+    assert.ok(ml[3].on && ml[3].e === 'reads cold', 'coolant at 40 C reads cold');
+  }
+
   console.log('page logic OK');
 })().catch(e => { console.error('FAIL', e.message); process.exit(1); });

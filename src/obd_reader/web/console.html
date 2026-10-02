@@ -127,9 +127,9 @@
   .retro .pan { background: var(--pan); border: 1px solid var(--pan-bd); border-radius: 4px; padding: 10px 12px; box-shadow: inset 0 1px 3px rgba(0,0,0,.28); position: relative; }
   .retro .lab { font: 700 11.5px var(--sil); letter-spacing: .16em; text-transform: uppercase; color: var(--face-ink); margin: 0 0 6px; display: flex; justify-content: space-between; }
   .retro .lab span { color: var(--ink2); letter-spacing: .08em; }
-  .retro .win { background: var(--win-bg); border: 3px solid var(--win-bd); border-radius: 4px; padding: 8px 10px; box-shadow: inset 0 0 12px #000; }
-  .retro .led svg { filter: drop-shadow(0 0 var(--glow) var(--c)); }
-  .retro svg.seg { display: block; }
+  .retro .win, #v0 .win { background: var(--win-bg); border: 3px solid var(--win-bd); border-radius: 4px; padding: 8px 10px; box-shadow: inset 0 0 12px #000; }
+  .retro .led svg, #v0 .led svg { filter: drop-shadow(0 0 var(--glow) var(--c)); }
+  .retro svg.seg, #v0 svg.seg { display: block; }
   .retro .leds { display: grid; grid-template-columns: repeat(21, 1fr); gap: 3px; background: var(--win-bg); border: 3px solid var(--win-bd); border-radius: 4px; padding: 7px 8px; }
   .retro .leds i { display: block; height: 20px; border-radius: 2px; background: var(--led-off); }
   .retro .leds i.g { background: var(--led-g); box-shadow: 0 0 6px var(--led-g); }
@@ -146,38 +146,38 @@
   svg.dial text.dx { fill: var(--g-ink2); }
   svg.dial .dn { stroke: var(--g-needle); }
   svg.dial .z-ok { stroke: var(--g-z-ok); } svg.dial .z-watch { stroke: var(--g-z-watch); } svg.dial .z-out { stroke: var(--g-z-out); }
-  .retro .lamps { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-top: 12px; }
-  .retro .lampbox { display: flex; align-items: center; gap: 10px; background: var(--plate-bg); border-radius: 4px; padding: 8px 10px; color: var(--plate-ink2); font: 700 11.5px var(--sil); letter-spacing: .12em; text-transform: uppercase; }
-  .retro .lampbox.lit { color: var(--lamp-lit); }
-  .retro .lens { width: 22px; height: 22px; border-radius: 50%; flex: none; border: 3px solid var(--lens-bd); background: var(--lens-red); }
-  .retro .lens.grn { background: var(--lens-grn); }
-  .retro .lens.amb { background: var(--lens-amb); }
-  .retro .lampbox.lit .lens.red { background: var(--lens-red-lit); box-shadow: 0 0 12px var(--led-r); }
-  .retro .lampbox.lit .lens.amb { background: var(--lens-amb-lit); box-shadow: 0 0 12px var(--led-y); }
-  .retro .lampbox.lit .lens.grn { background: var(--lens-grn-lit); box-shadow: 0 0 12px var(--led-g); }
-  .retro .lampbox b { display: block; color: inherit; }
-  .retro .lampbox em { display: block; font-style: normal; font-weight: 400; letter-spacing: .04em; text-transform: none; font-size: 11px; opacity: .85; }
+  .retro .lamps, #v0 .lamps { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-top: 12px; }
+  .retro .lampbox, #v0 .lampbox { display: flex; align-items: center; gap: 10px; background: var(--plate-bg); border-radius: 4px; padding: 8px 10px; color: var(--plate-ink2); font: 700 11.5px var(--sil); letter-spacing: .12em; text-transform: uppercase; }
+  .retro .lampbox.lit, #v0 .lampbox.lit { color: var(--lamp-lit); }
+  .retro .lens, #v0 .lens { width: 22px; height: 22px; border-radius: 50%; flex: none; border: 3px solid var(--lens-bd); background: var(--lens-red); }
+  .retro .lens.grn, #v0 .lens.grn { background: var(--lens-grn); }
+  .retro .lens.amb, #v0 .lens.amb { background: var(--lens-amb); }
+  .retro .lampbox.lit .lens.red, #v0 .lampbox.lit .lens.red { background: var(--lens-red-lit); box-shadow: 0 0 12px var(--led-r); }
+  .retro .lampbox.lit .lens.amb, #v0 .lampbox.lit .lens.amb { background: var(--lens-amb-lit); box-shadow: 0 0 12px var(--led-y); }
+  .retro .lampbox.lit .lens.grn, #v0 .lampbox.lit .lens.grn { background: var(--lens-grn-lit); box-shadow: 0 0 12px var(--led-g); }
+  .retro .lampbox b, #v0 .lampbox b { display: block; color: inherit; }
+  .retro .lampbox em, #v0 .lampbox em { display: block; font-style: normal; font-weight: 400; letter-spacing: .04em; text-transform: none; font-size: 11px; opacity: .85; }
   .retro .screw { position: absolute; width: 12px; height: 12px; border-radius: 50%; background: var(--screw); box-shadow: 0 1px 2px rgba(0,0,0,.5); }
   .retro .screw::after { content: ""; position: absolute; left: 2px; right: 2px; top: 5px; height: 2px; background: var(--screw-slot); transform: rotate(35deg); }
   .retro .bench { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px; padding: 8px 10px; background: var(--bench); border: 1px solid var(--pan-bd); border-radius: 4px; }
   .retro .rocker { appearance: none; border: 2px solid var(--rocker-bd); background: var(--rocker); color: var(--rocker-ink); border-radius: 4px; padding: 6px 12px; font: 700 12px var(--sil); letter-spacing: .1em; text-transform: uppercase; cursor: pointer; box-shadow: 0 2px 0 var(--rocker-sh); }
   .retro .rocker:active { transform: translateY(1px); box-shadow: 0 1px 0 var(--rocker-sh); }
-  .retro .mono { font-family: ui-monospace, "DejaVu Sans Mono", Menlo, Consolas, monospace; }
+  .retro .mono, #v0 .mono { font-family: ui-monospace, "DejaVu Sans Mono", Menlo, Consolas, monospace; }
   .retro .codes { margin-bottom: 12px; }
-  .retro .cwrap { display: grid; grid-template-columns: 150px 1fr; gap: 12px; }
-  .retro .cntbox { display: flex; flex-direction: column; justify-content: center; gap: 6px; }
-  .retro .cntbox small { font: 700 11px var(--sil); letter-spacing: .12em; text-transform: uppercase; color: var(--ink2); text-align: center; }
-  .retro .clist { background: var(--win-bg); border: 3px solid var(--win-bd); border-radius: 4px; padding: 4px 12px; height: 176px; overflow: hidden; }
-  .retro .crow { display: grid; grid-template-columns: 104px 86px 1fr; gap: 12px; align-items: center; padding: 7px 0; border-bottom: 1px solid var(--crow-line); }
-  .retro .crow:last-child { border-bottom: 0; }
-  .retro .ccode { font-weight: 800; font-size: 28px; color: var(--code-amber); text-shadow: 0 0 var(--glow) var(--code-amber); letter-spacing: .04em; }
-  .retro .cst { font: 700 11px var(--sil); letter-spacing: .12em; padding: 3px 6px; border-radius: 2px; text-align: center; }
-  .retro .cst.stored { background: var(--led-r); color: var(--on-red); }
-  .retro .cst.pending { background: var(--led-y); color: var(--on-amber); }
-  .retro .cdesc { color: var(--cdesc); font: 600 16px var(--sil); }
-  .retro .chint { display: block; font: 400 12.5px var(--sil); color: var(--chint); }
-  .retro .cnone { color: var(--led-g); font: 800 20px var(--sil); letter-spacing: .14em; padding: 60px 0; text-align: center; text-shadow: 0 0 var(--glow) var(--led-g); }
-  .retro .cfoot { font: 400 11.5px var(--sil); color: var(--ink2); margin: 6px 0 0; }
+  .retro .cwrap, #v0 .cwrap { display: grid; grid-template-columns: 150px 1fr; gap: 12px; }
+  .retro .cntbox, #v0 .cntbox { display: flex; flex-direction: column; justify-content: center; gap: 6px; }
+  .retro .cntbox small, #v0 .cntbox small { font: 700 11px var(--sil); letter-spacing: .12em; text-transform: uppercase; color: var(--ink2); text-align: center; }
+  .retro .clist, #v0 .clist { background: var(--win-bg); border: 3px solid var(--win-bd); border-radius: 4px; padding: 4px 12px; height: 176px; overflow: hidden; }
+  .retro .crow, #v0 .crow { display: grid; grid-template-columns: 104px 86px 1fr; gap: 12px; align-items: center; padding: 7px 0; border-bottom: 1px solid var(--crow-line); }
+  .retro .crow:last-child, #v0 .crow:last-child { border-bottom: 0; }
+  .retro .ccode, #v0 .ccode { font-weight: 800; font-size: 28px; color: var(--code-amber); text-shadow: 0 0 var(--glow) var(--code-amber); letter-spacing: .04em; }
+  .retro .cst, #v0 .cst { font: 700 11px var(--sil); letter-spacing: .12em; padding: 3px 6px; border-radius: 2px; text-align: center; }
+  .retro .cst.stored, #v0 .cst.stored { background: var(--led-r); color: var(--on-red); }
+  .retro .cst.pending, #v0 .cst.pending { background: var(--led-y); color: var(--on-amber); }
+  .retro .cdesc, #v0 .cdesc { color: var(--cdesc); font: 600 16px var(--sil); }
+  .retro .chint, #v0 .chint { display: block; font: 400 12.5px var(--sil); color: var(--chint); }
+  .retro .cnone, #v0 .cnone { color: var(--led-g); font: 800 20px var(--sil); letter-spacing: .14em; padding: 60px 0; text-align: center; text-shadow: 0 0 var(--glow) var(--led-g); }
+  .retro .cfoot, #v0 .cfoot { font: 400 11.5px var(--sil); color: var(--ink2); margin: 6px 0 0; }
   .retro .hhwrap { display: flex; flex-direction: column; align-items: center; gap: 12px; padding-top: 8px; }
   .retro .hh { width: 390px; height: 780px; flex: none; padding: 14px 12px; border-radius: 28px; background: var(--rail-tex), var(--rail); box-shadow: inset 0 0 0 1px var(--rail-edge), inset 0 0 12px rgba(0,0,0,.5), 0 10px 26px rgba(0,0,0,.6); }
   .retro .hh-in { height: 100%; display: flex; flex-direction: column; background: var(--face); border: 2px solid var(--face-bd); border-radius: 16px; color: var(--face-ink); overflow: hidden; }
@@ -210,7 +210,7 @@
   .retro .hh .lampbox { margin-bottom: 8px; }
   .retro .hh-size { font: 12px var(--sil); color: var(--mut); }
   .retro .hhwrap { padding-top: 0; }
-  @media (max-width: 900px) { .retro .row { grid-template-columns: 1fr; } .retro .cwrap { grid-template-columns: 1fr; } }
+  @media (max-width: 900px) { .retro .row { grid-template-columns: 1fr; } .retro .cwrap, #v0 .cwrap { grid-template-columns: 1fr; } }
   @media (max-width: 430px) {
     body:has(#v5.is-active) .topbar:not(.menu-open) + .status, body:has(#v5.is-active) .banner, body:has(#v5.is-active) .msgbar { display: none; }
     body:has(#v5.is-active) .stage { padding: 0; }
@@ -233,7 +233,7 @@
   .chip.idle b::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 6px; border: 1px solid var(--muted); }
   #chipConn { color: var(--ink); font-weight: 600; }
   .dash { color: var(--muted); }
-  .retro .cnone.wait { color: var(--wait-ink); text-shadow: none; }
+  .retro .cnone.wait, #v0 .cnone.wait { color: var(--wait-ink); text-shadow: none; }
   .retro .hlive { font: 700 11px var(--sil); letter-spacing: .12em; color: var(--wait-ink); }
   .retro .hlive.on { color: var(--led-g); } .retro .hlive.off { color: var(--hlive-off); }
   #v6 .card { margin-bottom: 12px; }
@@ -405,6 +405,8 @@
       <button class="qbtn" id="d_edit" type="button" aria-pressed="false" title="Edit this scenario's gauges">&#9998;</button>
     </div>
     <div id="d_panel"></div>
+    <div class="lamps" id="d_lamps"></div>
+    <div id="d_codes_mount"></div>
     <div id="d_strip">
       <h3 class="sec">Health</h3>
       <div class="tiles" id="o_tiles"></div>
@@ -1036,6 +1038,32 @@
     hd.appendChild(tr); tb.appendChild(hd); tb.appendChild(body); root.appendChild(tb);
     return { root: root, body: body };
   }
+  /* shared parts: Lamps strip (MIL, trims, coolant, sampling) and Codes panel */
+  function lampModel() {
+    var r = retroCommon(), st = state || {}, l1 = last.ltft1 !== null && Math.abs(last.ltft1) > 10, l2 = last.ltft2 !== null && Math.abs(last.ltft2) > 10,
+        cold = last.ect !== null && last.ect < 60, run = st.status === 'running';
+    return [
+      { id: 'mil', on: r.mil, cls: 'red', b: 'Check engine (MIL)', e: r.mil ? 'ON' : (r.c.read ? 'off' : 'unknown') },
+      { id: 'ltft1', on: l1, cls: 'red', b: 'LTFT bank 1', e: l1 ? trimText(last.ltft1) : 'within range' },
+      { id: 'ltft2', on: l2, cls: 'red', b: 'LTFT bank 2', e: l2 ? trimText(last.ltft2) : 'within range' },
+      { id: 'ect', on: cold, cls: 'amb', b: 'Coolant', e: cold ? 'reads cold' : 'warm' },
+      { id: 'samp', on: run, cls: 'grn', b: 'Sampling', e: run ? (st.hz_measured ? st.hz_measured.toFixed(1) + ' Hz' : 'starting') : 'not sampling' }
+    ];
+  }
+  function lampsHtml(m) { return m.map(function (x) { return ledLamp('', x.on, x.cls, x.b, x.e); }).join(''); }
+  function renderLamps(box) { var h = lampsHtml(lampModel()); if (box._sig !== h) { box._sig = h; box.innerHTML = h; } }
+  function codesPanel() {
+    var p = panel('Trouble codes'), wrap = el('div', 'cwrap'), box = el('div', 'cntbox'), cnt = el('div', 'win led'), lst = el('div', 'clist');
+    cnt.id = 'd_cnt'; cnt.setAttribute('style', '--c:var(--seg-red)'); lst.id = 'd_codes';
+    box.appendChild(cnt); box.appendChild(el('small', '', 'codes found')); wrap.appendChild(box); wrap.appendChild(lst); p.body.appendChild(wrap);
+    p.body.appendChild(el('p', 'cfoot', 'Meanings are plain-words drafts, unreviewed. Hints: general knowledge, unverified.'));
+    return { root: p.root, cnt: cnt, list: lst };
+  }
+  function renderCodes(cp) {
+    var r = retroCommon();
+    seven(cp.cnt, r.c.read ? r.list.length : null, 2, 0, r.list.length ? 'var(--seg-red)' : 'var(--led-g)', 64);
+    cp.list.innerHTML = r.list.length ? codeRows(r.list, 'cab') : '<div class="cnone' + (r.c.read ? '' : ' wait') + '">' + codeEmpty(r.c, r.live) + '</div>';
+  }
   var BUILTIN = [
     { id: 'general', name: 'General', gauges: [['0C','dial'],['0D','dial'],['05','dial'],['04','bar'],['11','bar'],['0B','bar'],['42','seven'],['06','seven']] },
     { id: 'fuel', name: 'Fuel trims', gauges: [['06','bar'],['07','bar'],['08','bar'],['09','bar'],['44','dial'],['0B','dial'],['0C','dial'],['04','seven']] },
@@ -1155,15 +1183,16 @@
     if (!DB) {
       var p = panel(''), t = pidTableEl(), g = el('div', 'gauges');
       p.body.appendChild(g); $('d_panel').appendChild(p.root); $('d_table').appendChild(t.root);
-      DB = { p: p, g: g, rows: t.body, none: el('p', 'note'), tnote: el('p', 'note') };
+      DB = { cp: codesPanel(), p: p, g: g, rows: t.body, none: el('p', 'note'), tnote: el('p', 'note') };
       $('d_table').appendChild(DB.tnote);
       p.body.insertBefore(DB.none, g);
+      $('d_codes_mount').appendChild(DB.cp.root);
       drawTabs();
     }
     var sc = curScenario(), specs = ED.on ? ED.draft : specsFor(sc), chs = (state && state.channels) || {}, ids = Object.keys(chs).sort(), mine = {};
     if (ED.on && (!ED.box || ED.sig !== ids.join())) drawEditor();   // the editor is rebuilt on actions and when the PIDs in the run change, not every poll
     DB.p.name.textContent = sc.name; DB.none.textContent = specs.length ? '' : 'No gauges. Add one or Reset.'; DB.none.hidden = specs.length > 0;
-    gauges(DB.g, specs);
+    gauges(DB.g, specs); renderLamps($('d_lamps')); renderCodes(DB.cp);
     specs.forEach(function (s) { mine[s.pid] = true; });   // keys are two-hex-digit PIDs (cleanSpecs), so a plain object is safe
     pidRows(DB.rows, ids); DB.tnote.textContent = ids.length ? '' : 'No readings yet.'; DB.tnote.hidden = ids.length > 0;
     Array.prototype.forEach.call(DB.rows.children, function (r) { r.classList.toggle('scen', mine[r.getAttribute('data-key')] === true); });
@@ -1521,7 +1550,7 @@
     })
     .catch(function () {});
   // the page test reaches the shared parts through this hook; a browser never defines it, so nothing is exposed
-  if (typeof window.__shadetreeParts === 'function') window.__shadetreeParts({ panel: panel, gaugeZones: gaugeZones, gauges: gauges, pidRows: pidRows, pidTableEl: pidTableEl,
+  if (typeof window.__shadetreeParts === 'function') window.__shadetreeParts({ lampModel: lampModel, panel: panel, gaugeZones: gaugeZones, gauges: gauges, pidRows: pidRows, pidTableEl: pidTableEl,
     gaugeModel: gaugeModel, segDigits: segDigits, BUILTIN: BUILTIN, cleanSpecs: cleanSpecs, scenarioList: scenarioList, loadSaved: loadSaved, saveSaved: saveSaved, specsFor: specsFor, editAdd: editAdd, editRemove: editRemove, editMove: editMove, editForm: editForm });
 })();
 </script>
