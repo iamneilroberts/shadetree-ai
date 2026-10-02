@@ -757,6 +757,9 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
     assert.strictEqual(e.el('d_sel').children.length, 5, 'the phone dropdown lists the same five');
     assert.strictEqual(e.el('d_sel').value, 'general');
     assert.strictEqual(dGauges(e).length, 8, 'General: 8 gauges');
+    { const cb = e.el('clarity'); assert.ok(cb.on && cb.on.click, 'the Dashboard has the Clarity rocker and it is wired');
+      cb.on.click(); await e.tick(); assert.strictEqual(cb.textContent, 'Clarity: max'); cb.on.click(); await e.tick(); assert.strictEqual(cb.textContent, 'Clarity: standard');
+      assert.strictEqual(dGauges(e).length, 8, 'still 8 gauges after toggling Clarity'); }
     assert.strictEqual(flat(e.el('d_panel').children[0].children[0]).trim(), 'General', 'the panel is titled with the scenario');
     assert.deepStrictEqual(dRows(e).map(r => r.getAttribute('data-key')), Object.keys(base()).sort(), 'the table lists every PID in the run');
     assert.deepStrictEqual(dRows(e).filter(r => r.className.split(' ').includes('scen')).map(r => r.getAttribute('data-key')), ['04', '05', '06', '0B', '0C', '42'], "General's PIDs are marked");

@@ -162,6 +162,30 @@
   .retro .bench { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px; padding: 8px 10px; background: var(--bench); border: 1px solid var(--pan-bd); border-radius: 4px; }
   .retro .rocker { appearance: none; border: 2px solid var(--rocker-bd); background: var(--rocker); color: var(--rocker-ink); border-radius: 4px; padding: 6px 12px; font: 700 12px var(--sil); letter-spacing: .1em; text-transform: uppercase; cursor: pointer; box-shadow: 0 2px 0 var(--rocker-sh); }
   .retro .rocker:active { transform: translateY(1px); box-shadow: 0 1px 0 var(--rocker-sh); }
+  /* Dashboard cabinet: the Analyzer's look as the Retro skin of the Dashboard, desktop only; Plain and a phone keep the plain page (chrome hidden, wrapper adds nothing) */
+  .dcab .plate, .dcab .screw, .dcab .bench { display: none; }
+  @media (min-width: 601px) {
+    :root[data-skin="retro"] .dcab { position: relative; padding: 0 30px; }
+    :root[data-skin="retro"] .dcab::before, :root[data-skin="retro"] .dcab::after { content: ""; position: absolute; top: 0; bottom: 0; width: 26px; border-radius: 5px; background: var(--rail-rivet), var(--rail-tex), var(--rail); box-shadow: inset 0 0 0 1px var(--rail-edge), inset 0 0 10px rgba(0,0,0,.5), 0 2px 6px rgba(0,0,0,.5); }
+    :root[data-skin="retro"] .dcab::before { left: 0; }
+    :root[data-skin="retro"] .dcab::after { right: 0; }
+    :root[data-skin="retro"] .dcab.max { --ghost: .05; --glow: 1px; }
+    :root[data-skin="retro"] .dcab .dface { position: relative; background: var(--face); border: 3px solid var(--face-bd); border-radius: 6px; padding: 14px; color: var(--face-ink); box-shadow: inset 0 1px 0 rgba(255,255,255,.35), 0 8px 22px rgba(0,0,0,.55); }
+    :root[data-skin="retro"] .dcab .dface > .plate { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 6px 12px; margin-bottom: 12px; background: var(--plate-bg); color: var(--plate-ink); border-radius: 3px; font: 700 14px var(--sil); letter-spacing: .22em; text-transform: uppercase; }
+    :root[data-skin="retro"] .dcab .dface > .plate small { font: 700 11px var(--sil); letter-spacing: .14em; color: var(--plate-ink2); }
+    :root[data-skin="retro"] .dcab .dface > .screw { display: block; position: absolute; width: 12px; height: 12px; border-radius: 50%; background: var(--screw); box-shadow: 0 1px 2px rgba(0,0,0,.5); }
+    :root[data-skin="retro"] .dcab .dface > .screw::after { content: ""; position: absolute; left: 2px; right: 2px; top: 5px; height: 2px; background: var(--screw-slot); transform: rotate(35deg); }
+    :root[data-skin="retro"] .dcab .dface > .screw:nth-of-type(1) { left: 8px; top: 8px; }
+    :root[data-skin="retro"] .dcab .dface > .screw:nth-of-type(2) { right: 8px; top: 8px; }
+    :root[data-skin="retro"] .dcab .dface > .screw:nth-of-type(3) { left: 8px; bottom: 8px; }
+    :root[data-skin="retro"] .dcab .dface > .screw:nth-of-type(4) { right: 8px; bottom: 8px; }
+    :root[data-skin="retro"] .dcab .dface > .bench { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px; padding: 8px 10px; background: var(--bench); border: 1px solid var(--pan-bd); border-radius: 4px; }
+    :root[data-skin="retro"] .dcab .dface > .bench .lab { font: 700 11.5px var(--sil); letter-spacing: .16em; text-transform: uppercase; color: var(--face-ink); }
+    :root[data-skin="retro"] .dcab .dface .rocker { appearance: none; border: 2px solid var(--rocker-bd); background: var(--rocker); color: var(--rocker-ink); border-radius: 4px; padding: 6px 12px; font: 700 12px var(--sil); letter-spacing: .1em; text-transform: uppercase; cursor: pointer; box-shadow: 0 2px 0 var(--rocker-sh); }
+    :root[data-skin="retro"] .dcab .dface .rocker:active { transform: translateY(1px); box-shadow: 0 1px 0 var(--rocker-sh); }
+    :root[data-skin="retro"] #v0 .dface h3.sec, :root[data-skin="retro"] #v0 .dface .note { color: var(--ink2); }   /* text on the light face uses the face ink, not the page's light ink */
+    :root[data-skin="retro"] #v0 .dface .more { color: var(--face-ink); }
+  }
   .retro .mono, #v0 .mono { font-family: ui-monospace, "DejaVu Sans Mono", Menlo, Consolas, monospace; }
   .retro .codes { margin-bottom: 12px; }
   .retro .cwrap, #v0 .cwrap { display: grid; grid-template-columns: 150px 1fr; gap: 12px; }
@@ -400,7 +424,9 @@
 </div>
 
 <main class="stage">
-  <section class="view is-active" id="v0" role="tabpanel">
+  <section class="view is-active" id="v0" role="tabpanel"><div class="dcab"><div class="dface">
+    <span class="screw"></span><span class="screw"></span><span class="screw"></span><span class="screw"></span>
+    <div class="plate"><span>Shadetree Model 7-A &middot; Engine Analyzer</span><small>SER. 0709</small></div>
     <div class="scenbar">
       <div class="stabs" id="d_tabs" role="tablist" aria-label="Scenarios"></div>
       <select class="b ssel" id="d_sel" aria-label="Scenario"></select>
@@ -418,7 +444,8 @@
     </div>
     <div id="d_table"></div>
     <a class="more" href="#v6" id="o_more">Mode 06 results, capture options and the full readings view &rarr;</a>
-  </section>
+    <div class="bench"><span class="lab">Display</span><button class="rocker" id="clarity" type="button">Clarity: standard</button></div>
+  </div></div></section>
 
   <!-- C: GUIDED TEST -->
   <section class="view" id="v3" role="tabpanel">
@@ -491,7 +518,7 @@
       <div class="lampbox lit"><i class="lens grn"></i><div><b>Sampling</b><em>2.5 Hz</em></div></div>
     </div>
     <div class="meters"><div class="pan meter" id="a_vm"><p class="lab">Battery / charging <span>VOLTS</span></p></div><div class="pan meter" id="a_tm"><p class="lab">Coolant <span>&deg;C</span></p></div></div>
-    <div class="bench"><span class="lab" style="margin:0 6px 0 0">Display</span><button class="rocker" id="clarity" type="button">Clarity: standard</button><span class="lab" style="margin:0 0 0 8px">Sampling and simulator controls are in the bar above</span></div>
+    <div class="bench"><span class="lab" style="margin:0 6px 0 0">Display</span><span class="lab" style="margin:0 0 0 8px">Sampling and simulator controls are in the bar above</span></div>
   </div></div>
   </div></section>
 
@@ -1467,8 +1494,8 @@
   }
   Array.prototype.forEach.call(document.querySelectorAll('.hh-nav button'), function (b) { b.addEventListener('click', function () { setMode(b.dataset.mode); }); });
   $('clarity').addEventListener('click', function () {
-    var on = false;
-    Array.prototype.forEach.call(document.querySelectorAll('.retro'), function (e) { e.classList.toggle('max'); on = e.classList.contains('max'); });
+    var on = $('clarity').textContent !== 'Clarity: max';   // the button holds the state; the .retro wrappers and the Dashboard cabinet follow it
+    Array.prototype.forEach.call(document.querySelectorAll('.retro, .dcab'), function (e) { e.classList.toggle('max', on); });
     $('clarity').textContent = on ? 'Clarity: max' : 'Clarity: standard'; render();
   });
 

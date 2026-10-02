@@ -227,3 +227,50 @@ def test_dashboard_code_list_scrolls_instead_of_clipping_and_its_small_text_is_r
     assert "overflow-y: auto" in body and "overflow: hidden" not in body
     assert "176px" not in body.replace("min-height: 176px", "") and "height: auto" in body
     assert re.search(r"(?m)^\s*#v0 \.cfoot, #v0 \.cntbox small \{\s*color: var\(--muted\)", HTML)
+
+
+def _css_rules(css, media=None):
+    """(media condition or None, selector list, body) for every style rule; one level of @media is walked."""
+    out, i = [], 0
+    while i < len(css):
+        j = css.find("{", i)
+        if j < 0:
+            break
+        head, depth, k = css[i:j].strip(), 1, j + 1
+        while depth:
+            depth += {"{": 1, "}": -1}.get(css[k], 0)
+            k += 1
+        body = css[j + 1:k - 1]
+        if head.startswith("@media"):
+            out += _css_rules(body, head[len("@media"):].strip())
+        elif not head.startswith("@"):
+            out.append((media, [s.strip() for s in head.split(",")], body))
+        i = k
+    return out
+
+
+def _cabinet_rules(css):
+    return [r for r in _css_rules(css) if any(".dcab" in s or ".dface" in s for s in r[1])]
+
+
+def test_cabinet_chrome_is_retro_desktop_only():
+    rules = _cabinet_rules(_css())
+    assert rules, "the Dashboard cabinet has CSS"
+    assert 'class="dcab"' in HTML and "dcab retro" not in HTML and "retro dcab" not in HTML, "the wrapper never wears the .retro class (it restyles Plain)"
+    assert HTML.count('id="clarity"') == 1, "one Clarity button on the page"
+    assert re.search(r'<div class="dcab"><div class="dface">', HTML) and 'class="plate"' in HTML[HTML.index('class="dcab"'):HTML.index('id="v4"')]
+    for media, sels, body in rules:
+        flat = " ".join(body.split())
+        if media is None and not all(s.startswith(':root[data-skin="retro"]') for s in sels):
+            # unscoped base: only hides the decorative chrome, never gives the wrapper or the face a look
+            assert flat in ("display: none;", "display: none"), f"{sels} outside the Retro skin may only be display: none"
+            assert all(re.search(r"\.dcab \.(plate|screw|bench)$", s) for s in sels), f"{sels}: only plate, screw and bench are hidden unscoped"
+        else:
+            assert media == "(min-width: 601px)", f"{sels} gives the cabinet a look outside the desktop media query: {media}"
+            assert all(s.startswith(':root[data-skin="retro"] ') for s in sels), f"{sels} is not scoped to the Retro skin"
+    scoped = " ".join(" ".join(r[1]) for r in rules if r[0])
+    for needle in (".dcab::before", ".dcab::after", ".dface", ".dface > .plate", ".screw", ".bench", ".rocker", ".dcab.max"):
+        assert needle in scoped, f"Retro desktop rule for {needle}"
+    hidden = " ".join(" ".join(r[1]) for r in rules if not r[0])
+    for needle in (".dcab .plate", ".dcab .screw", ".dcab .bench"):
+        assert needle in hidden, f"{needle} is hidden by default"
