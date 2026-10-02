@@ -32,7 +32,7 @@
     --cond: "Helvetica Neue", Helvetica, Arial, "Liberation Sans", sans-serif;
     --pn-plate-bg: var(--plate-bg); --pn-plate-ink: var(--plate-ink);
     --g-face: var(--meter-face); --g-rim: var(--meter-rim); --g-ink: var(--meter-ink); --g-ink2: var(--meter-ink2); --g-needle: var(--meter-needle);
-    --g-z-ok: #25793d; --g-z-watch: #a86b00; --g-z-out: var(--meter-zone); --g-seg: var(--code-amber); --g-ok: var(--led-g); --g-warn: var(--led-y); --g-bad: var(--led-r);
+    --g-z-ok: var(--meter-z-ok); --g-z-watch: var(--meter-z-watch); --g-z-out: var(--meter-zone); --g-seg: var(--code-amber); --g-ok: var(--led-g); --g-warn: var(--led-y); --g-bad: var(--led-r);
     --g-win: var(--win-bg); --g-led-off: var(--led-off); --g-glow: var(--glow);
   }
   :root[data-skin="retro"][data-theme="light"] {
@@ -114,10 +114,10 @@
     --lens-red-lit: radial-gradient(circle at 35% 30%, #ffd0c8, #ff4a3a 55%, #b3170b); --lens-amb-lit: radial-gradient(circle at 35% 30%, #fff0c0, #ffc233 55%, #b37c05); --lens-grn-lit: radial-gradient(circle at 35% 30%, #d6ffe0, #3fe06a 55%, #0e8a30);
     --screw: radial-gradient(circle at 35% 30%, #f1f1ee, #7d8288); --screw-slot: #454a4f; --rocker: linear-gradient(#5a5c60, #2b2c2f); --rocker-bd: #1b1c1e; --rocker-ink: #f1ead4; --rocker-sh: #101112;
     --nav-on: #e3b04b; --nav-on-bd: #a5782a; --on-amber: #241a06; --on-red: #1a0503; --crow-line: #2a2320; --cdesc: #f3ecd8; --chint: #b9ae94; --wait-ink: #a9aaad; --hlive-off: #ff8a7a;
-    --meter-face: #f6f5ef; --meter-rim: #7d765f; --meter-zone: #c9382a; --meter-ink: #2a2723; --meter-ink2: #5b5547; --meter-needle: #b22a1c;
+    --meter-face: #f6f5ef; --meter-rim: #7d765f; --meter-zone: #c9382a; --meter-z-ok: #25793d; --meter-z-watch: #a86b00; --meter-ink: #2a2723; --meter-ink2: #5b5547; --meter-needle: #b22a1c;
   }
   .retro { font: 14px/1.45 var(--sil); color: var(--retro-ink);
-           --g-face: var(--meter-face); --g-rim: var(--meter-rim); --g-ink: var(--meter-ink); --g-ink2: var(--meter-ink2); --g-needle: var(--meter-needle); --g-z-out: var(--meter-zone); }
+           --g-face: var(--meter-face); --g-rim: var(--meter-rim); --g-ink: var(--meter-ink); --g-ink2: var(--meter-ink2); --g-needle: var(--meter-needle); --g-z-ok: var(--meter-z-ok); --g-z-watch: var(--meter-z-watch); --g-z-out: var(--meter-zone); }
   .retro.max { --ghost: .05; --glow: 1px; }
   .retro .lampbox { margin-top: 0; }
   #v0 .win { background: var(--win-bg); border: 3px solid var(--win-bd); border-radius: 4px; padding: 8px 10px; box-shadow: inset 0 0 12px #000; }
@@ -204,7 +204,8 @@
   .retro .hh-scen { flex: none; padding: 8px 10px 0; } .retro .hh-scen select { width: 100%; }
   .retro .hh .lamps { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; margin-bottom: 10px; }
   .retro #h_table { margin-top: 10px; }
-  .retro .hh table.rd th, .retro .hh table.rd td .at { color: var(--ink2); }   /* the table sits on the light face */
+  .retro .hh table.rd th, .retro .hh table.rd td .at, .retro .hh .note { color: var(--ink2); }   /* the table and the notes sit on the light face */
+  .retro .hh .note { font-size: 12.5px; margin: 0 0 8px; }
   .retro .hh-nav { padding-bottom: calc(8px + env(safe-area-inset-bottom)); }
   .retro .hh-size { font: 12px var(--sil); color: var(--mut); }
   .retro .hhwrap { padding-top: 0; }
@@ -1369,14 +1370,20 @@
   function trimText(v) { return v > 10 ? 'LEAN: outside \u00b110 %' : 'RICH: outside \u00b110 %'; }
   function renderHandheld() {   // the top strip, Codes (unchanged), and Live: lamps, the scenario's gauges (no editing here), every PID in the run
     var r = retroCommon(), st = state || {};
-    if (!HB) { var t = pidTableEl(); $('h_table').appendChild(t.root); HB = { g: $('h_gauges'), rows: t.body }; drawTabs(); }
+    if (!HB) {
+      var t = pidTableEl(); HB = { g: $('h_gauges'), rows: t.body, none: el('p', 'note'), tnote: el('p', 'note') };
+      $('h_livepane').insertBefore(HB.none, HB.g); $('h_table').appendChild(t.root); $('h_table').appendChild(HB.tnote); drawTabs();
+    }
     var mil = $('h_mil'); mil.className = 'lens red';
     mil.style.cssText = 'width:18px;height:18px' + (r.mil ? ';background:var(--lens-red-lit);box-shadow:0 0 12px var(--led-r)' : '');
     $('h_miltxt').textContent = r.mil ? 'Check engine ON' : (r.c.read ? 'Check engine off' : 'Check engine ?');
     $('h_n').textContent = r.c.read ? r.list.length + (r.list.length === 1 ? ' CODE' : ' CODES') : '-- CODES'; $('h_n').className = 'n mono' + (r.c.read && !r.list.length ? ' zero' : '');
     var lv = $('h_live'); lv.textContent = { running: 'LIVE', stopped: 'STOPPED', error: 'ERROR', idle: 'IDLE', disconnected: 'NO LINK' }[st.status] || '--'; lv.className = 'hlive ' + (st.status === 'running' ? 'on' : 'off');
     $('h_codes').innerHTML = r.list.length ? codeRows(r.list, 'hh') + '<p class="cfoot">Meanings are plain-words drafts, unreviewed. Hints: general knowledge, unverified.</p>' : '<div class="cnone' + (r.c.read ? '' : ' wait') + '" style="padding:150px 0">' + codeEmpty(r.c, r.live) + '</div>';
-    renderLamps($('h_lamps')); gauges(HB.g, specsFor(curScenario())); pidRows(HB.rows, Object.keys(st.channels || {}).sort());
+    var specs = specsFor(curScenario()), ids = Object.keys(st.channels || {}).sort();
+    HB.none.textContent = specs.length ? '' : 'No gauges in this scenario. Edit it on the Dashboard.'; HB.none.hidden = specs.length > 0;
+    renderLamps($('h_lamps')); gauges(HB.g, specs);
+    pidRows(HB.rows, ids); HB.tnote.textContent = ids.length ? '' : 'No readings yet.'; HB.tnote.hidden = ids.length > 0;
   }
   function setMode(m) {
     Array.prototype.forEach.call(document.querySelectorAll('.hh-pane'), function (e) { e.hidden = e.dataset.mode !== m; });

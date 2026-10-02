@@ -1051,8 +1051,12 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
     assert.ok(!/aria-pressed|d_edit/.test(html.slice(html.indexOf('id="v5"'), html.indexOf('id="v6"'))), 'no gauge editing in the Handheld');
     const emp = await hhE({ 'shadetree.scen.general': '[]' });
     assert.strictEqual(emp.el('h_gauges').children.length, 0, 'an emptied scenario draws no gauges'); assert.strictEqual(hRows(emp).length, Object.keys(base()).length, 'and the table still lists the run');
+    const gNote = (x) => { let r = null; walk(x.el('h_livepane'), n => { if (n.className === 'note') r = n; }); return r; };
+    assert.ok(gNote(emp) && !gNote(emp).hidden && gNote(emp).textContent === 'No gauges in this scenario. Edit it on the Dashboard.', 'an emptied scenario says so');
+    assert.ok(gNote(e) && gNote(e).hidden && gNote(e).textContent === '', 'a scenario with gauges has no note');
+    assert.ok(!flat(e.el('h_table')).includes('No readings yet'), 'a run with channels has no empty-table note');
     const none = makeEnv([{ status: 'idle', channels: {}, stats: {}, extras: {}, seq: 1 }], 'v5', OVF); await none.tick();
-    assert.strictEqual(hRows(none).length, 0, 'no channels: the table body is empty');
+    assert.strictEqual(hRows(none).length, 0, 'no channels: the table body is empty'); assert.ok(flat(none.el('h_table')).includes('No readings yet.'), 'and the table says so');
     assert.ok(none.el('h_gauges').children.every(g => g.children.some(c => c.className === 'gnote' && c.textContent === 'not sampling')), 'and the gauges say not sampling');
   }
 

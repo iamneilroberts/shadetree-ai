@@ -235,18 +235,32 @@ GAUGE_PAIRS = [  # (foreground token, background token, minimum contrast, why, l
 
 @pytest.mark.parametrize("skin,theme", [("plain", "dark"), ("plain", "light"), ("retro", "dark"), ("retro", "light")])
 def test_every_skin_and_theme_keeps_gauge_faces_high_contrast(skin, theme):
-    p = _palette(skin, theme)
+    assert _gauge_low(_palette(skin, theme), theme) == [], f"{skin}/{theme} gauge pairs below target"
+
+
+def _gauge_low(p, theme):
     low = [(a, b, need, why, round(_contrast(p[a], p[b]), 2)) for a, b, need, why, light_only in GAUGE_PAIRS
            if (theme == "light" or not light_only) and _contrast(p[a], p[b]) < need]
     off = _over(p["--g-led-off"], p["--g-win"])
     low += [(a, "unlit LED", 2.0, "lit vs unlit", round(_contrast(p[a], off), 2)) for a in ("--g-ok", "--g-warn", "--g-bad", "--g-seg")
             if _contrast(p[a], off) < 2.0]
-    assert low == [], f"{skin}/{theme} gauge pairs below target: {low}"
+    return low
+
+
+@pytest.mark.parametrize("skin,theme", [("plain", "dark"), ("plain", "light"), ("retro", "dark"), ("retro", "light")])
+def test_the_always_retro_handheld_keeps_gauge_faces_high_contrast_in_every_skin_and_theme(skin, theme):
+    p = _palette(skin, theme)
+    p.update(_block_all(".retro"))  # the .retro wrapper's overrides win inside it, over whichever skin and theme the page wears
+    for k in p:
+        while (m := re.fullmatch(r"var\((--[\w-]+)\)", p[k])):
+            p[k] = p[m.group(1)]
+    low = _gauge_low(p, theme)
+    assert low == [], f"Handheld under {skin}/{theme}: gauge pairs below target: {low}"
 
 
 def test_shared_parts_fit_a_phone_width():  # Review Focus 5
     css = _css()
-    rule = lambda sel: re.search(r"(?:^|[}\s])" + re.escape(sel) + r"\s*\{([^}]*)\}", css).group(1)
+    rule = lambda sel: re.search(r"(?:^|\})\s*" + re.escape(sel) + r"\s*\{([^}]*)\}", css).group(1)  # the base rule: the selector starts the rule, so `.hh .gauges` is not read as `.gauges`
     tile = int(re.search(r"minmax\((\d+)px", rule(".gauges")).group(1))
     assert 2 * tile + 10 <= 360 - 2 * 16, "two gauges side by side on a 360 px phone inside the 16 px gutters"
     for sel in (".panel", ".panel > .pbody", ".panel > .ptitle .pname", ".gauge", ".gauge .gname"):
