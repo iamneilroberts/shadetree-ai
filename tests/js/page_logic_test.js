@@ -1120,5 +1120,46 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
     assert.strictEqual(none.hidden, true, 'no notices: the alert is hidden');
   }
 
+  {   // 18) dial scale labels land on round numbers in the displayed unit, in metric and US, for every gauge
+    const nt = (P, lo, hi, majors, div) => { const r = P.niceTicks(lo, hi, majors, div); return { step: r.step, dec: r.dec, values: Array.from(r.values), minors: Array.from(r.minors) }; };
+    const P = (await gOver({})).parts();
+    const labels = (r) => r.values.map(v => v.toFixed(r.dec));
+    assert.deepStrictEqual(labels(nt(P, 0, 124.27, 5, 1)), ['0', '25', '50', '75', '100'], 'speed mph');
+    assert.deepStrictEqual(labels(nt(P, 0, 200, 5, 1)), ['0', '50', '100', '150', '200'], 'speed km/h');
+    assert.deepStrictEqual(labels(nt(P, -4, 266, 5, 1)), ['0', '50', '100', '150', '200', '250'], 'coolant F');
+    assert.deepStrictEqual(labels(nt(P, 0, 73.8, 6, 1)), ['0', '20', '40', '60'], 'MAP inHg');
+    assert.deepStrictEqual(labels(nt(P, 0, 250, 6, 1)), ['0', '50', '100', '150', '200', '250'], 'MAP kPa');
+    assert.deepStrictEqual(labels(nt(P, 10, 16, 6, 1)), ['10', '11', '12', '13', '14', '15', '16'], 'voltage');
+    assert.deepStrictEqual(labels(nt(P, 0, 7000, 7, 1000)), ['0', '1', '2', '3', '4', '5', '6', '7'], 'tach x1000');
+    assert.deepStrictEqual(labels(nt(P, -25, 25, 5, 1)), ['-20', '-10', '0', '10', '20'], 'trims');
+    assert.deepStrictEqual(labels(nt(P, 0.5, 1.5, 5, 1)), ['0.50', '0.75', '1.00', '1.25', '1.50'], 'lambda: no float noise');
+    const units = { '0C': 'rpm', '0D': 'km/h', '05': '°C', '04': '%', '11': '%', '0B': 'kPa', '42': 'V', '06': '%', '07': '%', '08': '%', '09': '%', '0E': '°', '0F': '°C', '44': '' };
+    const withChannels = (st) => { for (const pid in units) st.channels[pid] = { name: 'ch' + pid, unit: units[pid], samples: [[st.seq, st.now, 1]] }; return st; };
+    for (const unitSys of ['metric', 'us']) {
+      const e = await gOver({}, withChannels, OVF, { 'shadetree.units': unitSys }), Q = e.parts();
+      for (const pid in units) {
+        const m = Q.gaugeModel({ pid, form: 'dial' }), r = nt(Q, m.lo, m.hi, m.majors, m.div), tag = pid + ' ' + unitSys + ' [' + m.lo + ', ' + m.hi + ']';
+        assert.ok(r.values.length >= 3 && r.values.length <= Math.max(7, m.majors + 1), tag + ' label count ' + r.values.length);
+        for (const v of r.values.concat(r.minors)) { assert.ok(v * m.div >= m.lo - 1e-6 && v * m.div <= m.hi + 1e-6, tag + ' tick outside the range: ' + v); }
+        for (const v of r.values) {
+          const k = v / r.step; assert.ok(Math.abs(k - Math.round(k)) < 1e-9, tag + ' label ' + v + ' not a multiple of ' + r.step);
+          assert.strictEqual(Number(v.toFixed(r.dec)), v, tag + ' label ' + v + ' has more decimals than ' + r.dec);
+        }
+        for (let i = 1; i < r.values.length; i++) assert.ok(Math.abs(r.values[i] - r.values[i - 1] - r.step) < 1e-9, tag + ' labels evenly spaced');
+        const face = gpart(gk(gbox(e, [{ pid, form: 'dial' }]), pid + ':dial'), 'gface').innerHTML;
+        const txt = Array.from(face.matchAll(/<text x="[^"]*" y="[^"]*" font-size="13"[^>]*>([^<]*)<\/text>/g), x => x[1]);
+        assert.deepStrictEqual(txt, labels(r), tag + ' dial text is the label list');
+        assert.strictEqual((face.match(/class="dt"/g) || []).length, r.values.length + r.minors.length, tag + ' one tick per label or minor');
+      }
+    }
+    const usSpeed = await gOver({}, withChannels, OVF, { 'shadetree.units': 'us' });
+    const sf = gpart(gk(gbox(usSpeed, [{ pid: '0D', form: 'dial' }]), '0D:dial'), 'gface').innerHTML;
+    assert.deepStrictEqual(Array.from(sf.matchAll(/font-size="13"[^>]*>([^<]*)<\/text>/g), x => x[1]), ['0', '25', '50', '75', '100'], 'US speed dial prints 0 25 50 75 100');
+    const needle = (v) => { const m = P.dialSvg(v, 0, 200, 5, [], 'x', 1).match(/class="dn" x1="110" y1="118" x2="([\d.-]+)" y2="([\d.-]+)"/); return [+m[1], +m[2]]; };
+    assert.ok(Math.abs(needle(100)[0] - 110) < 1e-6, 'mid value points straight up on the unchanged scale');
+    assert.ok(needle(0)[0] < 110 && needle(200)[0] > 110, 'low end left, high end right');
+    const mins = nt(P, 0, 124.27, 5, 1); assert.deepStrictEqual(mins.minors.slice(0, 3), [6.25, 12.5, 18.75], 'three minors between majors');
+  }
+
   console.log('page logic OK');
 })().catch(e => { console.error('FAIL', e.message); process.exit(1); });

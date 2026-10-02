@@ -1339,6 +1339,22 @@
     }
     el.innerHTML = out + '</g></svg>';
   }
+  function niceTicks(lo, hi, majors, div) {   // round-number dial ticks in the displayed unit (value / div): the nice step (1, 2, 2.5, 5 x 10^k) giving the label count nearest majors + 1, 3 to max(7, majors + 1) labels; minors every step / 4, none outside [lo, hi]
+    div = div || 1;
+    var a = lo / div, b = hi / div, best = null, E = 1e-9, cap = Math.max(7, majors + 1);
+    [1, 2, 2.5, 5].forEach(function (m) {
+      for (var k = -4; k <= 5; k++) {
+        var st = m * Math.pow(10, k), n = Math.floor(b / st + E) - Math.ceil(a / st - E) + 1;
+        if (n < 3 || n > cap) continue;
+        var d = Math.abs(n - (majors + 1));
+        if (!best || d < best.d || (d === best.d && st > best.st)) best = { d: d, st: st, dec: Math.max(0, -k + (m === 2.5 ? 1 : 0)) };
+      }
+    });
+    if (!best) best = { st: (b - a) / majors, dec: 1 };
+    var q = best.st / 4, vals = [], mins = [];
+    for (var i = Math.ceil(a / q - E), e = Math.floor(b / q + E); i <= e; i++) (i % 4 === 0 ? vals : mins).push(i * q + 0);
+    return { step: best.st, dec: best.dec, values: vals, minors: mins };
+  }
   function dialSvg(v, lo, hi, majors, zones, label, div) {   // the dial face (Dashboard and Guided gauges); zones [{from, to, s: 'ok'|'watch'|'out'}] are coloured arcs; v null draws no needle
     div = div || 1;
     var cx = 110, cy = 118, r = 92, a0 = -50, a1 = 50, s = '<svg class="dial" viewBox="0 0 220 128" role="img" aria-label="' + esc(label) + '">';
@@ -1346,12 +1362,13 @@
     function P(val, rad) { var a = (a0 + (a1 - a0) * (val - lo) / (hi - lo)) * Math.PI / 180; return [cx + rad * Math.sin(a), cy - rad * Math.cos(a)]; }
     zones.forEach(function (z) { var p = P(z.from, r), q = P(z.to, r); s += '<path class="z-' + z.s + '" d="M' + p[0] + ' ' + p[1] + ' A' + r + ' ' + r + ' 0 0 1 ' + q[0] + ' ' + q[1] + '" stroke-width="7" fill="none"/>'; });
     var p0 = P(lo, r), p1 = P(hi, r); s += '<path class="da" d="M' + p0[0] + ' ' + p0[1] + ' A' + r + ' ' + r + ' 0 0 1 ' + p1[0] + ' ' + p1[1] + '" stroke-width="2.6" fill="none"/>';
-    for (var i = 0; i <= majors; i++) {
-      var val = lo + (hi - lo) * i / majors, o = P(val, r + 2), inn = P(val, r - 12), tx = P(val, r - 24);
+    var T = niceTicks(lo, hi, majors, div);
+    T.values.forEach(function (dv) {
+      var val = dv * div, o = P(val, r + 2), inn = P(val, r - 12), tx = P(val, r - 24);
       s += '<line class="dt" x1="' + o[0] + '" y1="' + o[1] + '" x2="' + inn[0] + '" y2="' + inn[1] + '" stroke-width="2.8"/>';
-      s += '<text x="' + tx[0] + '" y="' + (tx[1] + 4) + '" font-size="13" font-weight="700" text-anchor="middle" font-family="Helvetica,Arial,sans-serif">' + (Math.round(val / div * 10) / 10) + '</text>';
-      if (i < majors) for (var j = 1; j < 4; j++) { var mv = val + (hi - lo) / majors * j / 4, m1 = P(mv, r + 1), m2 = P(mv, r - 6); s += '<line class="dt" x1="' + m1[0] + '" y1="' + m1[1] + '" x2="' + m2[0] + '" y2="' + m2[1] + '" stroke-width="1.7"/>'; }
-    }
+      s += '<text x="' + tx[0] + '" y="' + (tx[1] + 4) + '" font-size="13" font-weight="700" text-anchor="middle" font-family="Helvetica,Arial,sans-serif">' + dv.toFixed(T.dec) + '</text>';
+    });
+    T.minors.forEach(function (dv) { var m1 = P(dv * div, r + 1), m2 = P(dv * div, r - 6); s += '<line class="dt" x1="' + m1[0] + '" y1="' + m1[1] + '" x2="' + m2[0] + '" y2="' + m2[1] + '" stroke-width="1.7"/>'; });
     if (div !== 1) s += '<text class="dx" x="12" y="22" font-size="10" font-weight="700" text-anchor="start" font-family="Helvetica,Arial,sans-serif" letter-spacing="1.5">x' + div + ' RPM</text>';
     if (v !== null && v !== undefined) { var nv = P(Math.max(lo, Math.min(hi, v)), r - 6); s += '<line class="dn" x1="' + cx + '" y1="' + cy + '" x2="' + nv[0] + '" y2="' + nv[1] + '" stroke-width="3" stroke-linecap="round"/>'; }
     return s + '<circle class="dh" cx="' + cx + '" cy="' + cy + '" r="7"/></svg>';
@@ -1497,7 +1514,7 @@
     .catch(function () {});
   // the page test reaches the shared parts through this hook; a browser never defines it, so nothing is exposed
   if (typeof window.__shadetreeParts === 'function') window.__shadetreeParts({ lampModel: lampModel, pickView: pickView, panel: panel, gaugeZones: gaugeZones, gauges: gauges, pidRows: pidRows, pidTableEl: pidTableEl,
-    gaugeModel: gaugeModel, segDigits: segDigits, BUILTIN: BUILTIN, cleanSpecs: cleanSpecs, scenarioList: scenarioList, loadSaved: loadSaved, saveSaved: saveSaved, specsFor: specsFor, editAdd: editAdd, editRemove: editRemove, editMove: editMove, editForm: editForm });
+    gaugeModel: gaugeModel, niceTicks: niceTicks, dialSvg: dialSvg, segDigits: segDigits, BUILTIN: BUILTIN, cleanSpecs: cleanSpecs, scenarioList: scenarioList, loadSaved: loadSaved, saveSaved: saveSaved, specsFor: specsFor, editAdd: editAdd, editRemove: editRemove, editMove: editMove, editForm: editForm });
 })();
 </script>
 </body>
