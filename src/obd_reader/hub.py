@@ -92,6 +92,7 @@ class LiveHub:
         self._supported: set[str] = set()
         self._prior: dict | None = None
         self._saved: tuple[Path, int] | None = None  # (file, seq) of the last save of this run
+        self._transcript: str | None = None  # this run's raw transcript, relative to home
         self._replay: dict | None = None     # while a saved run is loaded: name, run, pos, speed, playing, ended, i
 
     @property
@@ -271,6 +272,8 @@ class LiveHub:
     def _run(self, pids: list[str], hz: float, seconds: float, capture_all: bool = False) -> None:
         try:
             with self._s.connection("console") as t:
+                if t.transcript_path is not None:  # relative, so a shared run file does not carry the home path
+                    self._transcript = t.transcript_path.relative_to(self._s.config.home).as_posix()
                 a = identify(t)
                 self._adapter.update(chip=a.chip, ati=a.ati)
                 t0 = self._clock()
@@ -551,7 +554,7 @@ class LiveHub:
             series = {p: Series(name=PIDS[p].name, unit=PIDS[p].unit,
                                 samples=[(tt, v) for s, tt, v in d if s <= seq])
                       for p, d in self._full.items()}
-            codes, m06, key = dict(self._codes), dict(self._m06), self._key
+            codes, m06, key, tr = dict(self._codes), dict(self._m06), self._key, self._transcript
         ls = LiveSample(duration_s=self.state()["now"], rate_hz=self.hz or 0.0, series=series)
         rdir = Path(self._s.config.home) / "runs"
         rdir.mkdir(parents=True, exist_ok=True)
@@ -559,7 +562,7 @@ class LiveHub:
         with open(path, "x", encoding="utf-8") as fh:
             json.dump({"kind": "live_run", "demo": self._sim is not None, "adapter": self._adapter,
                        "live_sample": ls.model_dump(mode="json"), "codes": codes, "mode06": m06,
-                       "vehicle": {"key": key} if key else None}, fh, indent=2)
+                       "vehicle": {"key": key} if key else None, "transcript": tr}, fh, indent=2)
         with self._data_lock:
             self._saved = (path, seq)
         return path

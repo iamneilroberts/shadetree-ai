@@ -159,6 +159,18 @@ def test_save_run_writes_a_json_file_and_never_overwrites(tmp_path):
             hub.save_run(bad)
 
 
+def test_run_file_names_the_runs_transcript_relative_to_home(tmp_path):
+    hub, _, _ = make(tmp_path)
+    hub.start(DEFAULT_PIDS, hz=10, seconds=30)
+    assert wait_for(lambda: hub.state()["seq"] >= 3)
+    hub.stop()
+    data = json.loads(hub.save_run("bench-idle").read_text())
+    tr = data["transcript"]
+    assert tr.startswith("transcripts/") and tr.endswith("-console.jsonl")  # relative: no home path in a shared run
+    lines = (tmp_path / tr).read_text().splitlines()
+    assert any(json.loads(ln)["tx"] == "010C" for ln in lines)
+
+
 def test_set_sim_only_in_demo(tmp_path):
     hub, _, sim = make(tmp_path)
     hub.set_sim(scenario="lean", rev=True)

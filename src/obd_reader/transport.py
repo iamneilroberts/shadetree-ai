@@ -19,6 +19,7 @@ class Port(Protocol):
 
 class TranscriptRecorder:
     def __init__(self, path: Path):
+        self.path = Path(path)
         self._fh = open(path, "x", encoding="utf-8")  # never overwrite a real capture
 
     def record(self, t: float, tx: str, rx: list[str]) -> None:
@@ -42,6 +43,10 @@ class Transport:
         self._clock = clock
         self._t0 = clock()
         self._default_timeout = default_timeout
+
+    @property
+    def transcript_path(self) -> Path | None:
+        return self._recorder.path if self._recorder is not None else None
 
     def send(self, cmd: str, timeout: float | None = None) -> list[str]:
         canon = check_command(cmd)  # raises before anything touches the port
