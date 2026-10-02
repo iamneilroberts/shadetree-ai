@@ -713,6 +713,7 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
   assert(/class="dn"/.test(gpart(ect, 'gface').innerHTML), 'and a needle');
   assert(findQ(ect, '05'), 'every gauge has its ? help');
   assert(/aria-label="14.2"/.test(gpart(gk(b1, '42:seven'), 'gface').innerHTML), 'battery digits');
+  assert(/viewBox="0 0 240 92"/.test(gpart(gk(b1, '42:seven'), 'gface').innerHTML), 'a short reading still gets the 4-digit display, so every seven-segment indicator is one size');
   const gs = await gOver({ '0C': 2500, '99': 123.4 }, st => { st.channels['99'] = { name: 'x', unit: '', samples: [[st.seq, st.now, 123.4]] }; return st; });   // Review Focus 3: digits fit the reading, never 9s
   const bs = gbox(gs, [{ pid: '0C', form: 'seven' }, { pid: '99', form: 'seven' }]);
   assert(/aria-label="2500"/.test(gpart(gk(bs, '0C:seven'), 'gface').innerHTML), 'rpm 2500 shown in full: ' + gpart(gk(bs, '0C:seven'), 'gface').innerHTML.slice(0, 80));

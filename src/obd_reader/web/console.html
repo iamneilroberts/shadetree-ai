@@ -1037,7 +1037,7 @@
   }
   function segDigits(it) {   // enough digits for the range and the value, so the display does not clip to 9s
     function need(x) { return x === null ? 0 : String(Math.round(Math.abs(x))).length + it.dp + (x < 0 ? 1 : 0); }
-    return Math.max(3, Math.min(7, Math.max(need(it.lo), need(it.hi), need(it.v))));
+    return Math.max(4, Math.min(7, Math.max(need(it.lo), need(it.hi), need(it.v))));
   }
   function makeGauge(it) {   // a gauge card: a short name and its ?, the face, a value line (with the unit) and a note
     var root = el('div', 'gauge'), top = el('div', 'gtop'), name = el('span', 'gname'), face = el('div', 'gface'), val = el('div', 'gval'), note = el('div', 'gnote');
