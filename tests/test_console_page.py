@@ -218,3 +218,12 @@ def test_shared_parts_fit_a_phone_width():  # Review Focus 5
     for sel in (".panel > .ptitle .pname", ".gauge .gname"):
         assert "text-overflow: ellipsis" in rule(sel), sel  # a long reading name shortens instead of widening the page
     assert "overflow-x: auto" in rule(".rwrap"), "a wide table scrolls inside its card, not the page"
+
+
+def test_dashboard_code_list_scrolls_instead_of_clipping_and_its_small_text_is_readable():
+    rules = re.findall(r"(?m)^\s*#v0 \.clist\s*\{([^}]*)\}", HTML)
+    assert rules, "a #v0-only .clist rule must exist"
+    body = rules[-1]
+    assert "overflow-y: auto" in body and "overflow: hidden" not in body
+    assert "176px" not in body.replace("min-height: 176px", "") and "height: auto" in body
+    assert re.search(r"(?m)^\s*#v0 \.cfoot, #v0 \.cntbox small \{\s*color: var\(--muted\)", HTML)

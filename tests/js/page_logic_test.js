@@ -1003,5 +1003,14 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
     assert.ok(ml[3].on && ml[3].e === 'reads cold', 'coolant at 40 C reads cold');
   }
 
+  {   // every code is a row in the Dashboard list (the CSS scrolls it; nothing is dropped here)
+    const six = [1, 2, 3, 4, 5, 6].map(n => ({ code: 'P010' + n, desc: 'desc ' + n, hint: 'hint ' + n }));
+    const e6 = makeEnv(statesFor(6, base).map(st => Object.assign(st, { codes: { read: true, note: null, mil: true, stored: six, pending: [], permanent: [] } })), 'v0', OVF);
+    for (let k = 0; k < 6; k++) await e6.tick();
+    let l6 = null; walk(e6.el('d_codes_mount'), n => { if (n.id === 'd_codes') l6 = n; });
+    assert.strictEqual((l6.innerHTML.match(/class="crow"/g) || []).length, 6, 'six codes, six rows');
+    assert.strictEqual((l6.innerHTML.match(/class="chint"/g) || []).length, 6, 'each with its hint');
+  }
+
   console.log('page logic OK');
 })().catch(e => { console.error('FAIL', e.message); process.exit(1); });
