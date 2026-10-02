@@ -78,12 +78,13 @@ def _mode09_ids(transport: Transport, advertised: set[str], warnings: list[str])
     return Mode09Ids(cal_ids=text("04"), cvns=[c.hex().upper() for c in got.get("06", [])], ecu_names=text("0A"))
 
 
-def _dtcs(transport: Transport, cmd: str, sid: int) -> list[Dtc]:
-    """Union of the codes every responding ECU reports, first-seen order."""
+def _dtcs(transport: Transport, cmd: str, sid: int) -> list[Dtc] | None:
+    """Union of the codes every responding ECU reports, first-seen order; None if no ECU answered."""
+    payloads = parse_all(transport.send(cmd), sid)
     codes: list[str] = []
-    for payload in parse_all(transport.send(cmd), sid):
+    for payload in payloads:
         codes += [c for c in decode_dtc_list(payload) if c not in codes]
-    return [Dtc(code=c) for c in codes]
+    return [Dtc(code=c) for c in codes] if payloads else None
 
 
 def _discover_ecus(transport: Transport) -> list[Ecu]:
@@ -106,8 +107,8 @@ def _supported(payloads: list[bytes], base: int) -> set[str]:
 
 
 def _walk_pages(transport: Transport, mode: int) -> set[str]:
-    """Supported-PID bitmaps for Mode 01 (`01xx`) or Mode 02 (`02xx00`), page by page."""
-    sid, off = 0x40 + mode, (2 if mode == 0x01 else 3)
+    """Supported-PID bitmaps for Mode 01 (`01xx`), Mode 02 (`02xx00`) or Mode 06 (`06xx`, MIDs), page by page."""
+    sid, off = 0x40 + mode, (3 if mode == 0x02 else 2)
     found: set[str] = set()
     base = 0x00
     while base <= 0xE0:
@@ -177,7 +178,9 @@ def scan(
     protocol: str | None = None,
     transcript: str | None = None,
     symptoms: str = "",
+    mode06: bool = False,
 ) -> Snapshot:
+    """`mode06` also walks the Mode 06 MID support bitmaps (CAN only) into supported_pids["06"]; no test results are read."""
     warnings: list[str] = []
     raw, transport = transport, _Classified(transport)
     init_adapter(transport, protocol)
@@ -230,11 +233,14 @@ def scan(
             warnings.append("VIN unsupported via Mode 09")
         mode09 = _mode09_ids(transport, pids09, warnings)
 
-        dtcs = Dtcs(
-            stored=_dtcs(transport, "03", 0x43),
-            pending=_dtcs(transport, "07", 0x47),
-            permanent=_dtcs(transport, "0A", 0x4A),
-        )
+        # As in the console (hub._read_codes): no answer is recorded as unanswered, never as an empty list.
+        got = {k: _dtcs(transport, cmd, sid) for k, cmd, sid in
+               (("stored", "03", 0x43), ("pending", "07", 0x47), ("permanent", "0A", 0x4A))}
+        dtcs = Dtcs(**{k: v or [] for k, v in got.items()}, unanswered=[k for k, v in got.items() if v is None])
+        if mode06:
+            mids = _walk_pages(transport, 0x06)
+            if mids:
+                supported["06"] = sorted(mids)
     else:
         warnings.append(
             f"non-CAN or unknown protocol ({proto.name!r}): DTC and VIN decoding skipped (not supported yet)"

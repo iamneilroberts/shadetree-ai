@@ -111,6 +111,13 @@ def test_no_dtc_data_replies_mean_empty_lists_not_a_crash():
     assert snap.dtcs.stored == [] and snap.dtcs.permanent == []
 
 
+def test_an_unanswered_dtc_request_is_recorded_not_shown_as_no_codes():
+    records = _patch(_patch(load_transcript(FIXTURE), "03", ["NO DATA"]), "07", ["7F 07 12"])
+    snap, _ = run_scan(records)
+    assert snap.dtcs.unanswered == ["stored", "pending"]  # 0A answered "no codes", so it is not listed
+    assert snap.dtcs.stored == [] and snap.freeze_frame is None
+
+
 def test_non_can_protocol_skips_dtc_and_vin_decoding_with_a_warning():
     # Non-CAN Mode 03 has no count byte and the VIN reply is 5 lines; decoding
     # them with the CAN layout would yield wrong codes (P0133 -> P3300).

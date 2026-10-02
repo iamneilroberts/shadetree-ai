@@ -95,6 +95,8 @@ class Dtcs(_Model):
     stored: list[Dtc] = Field(default_factory=list)
     pending: list[Dtc] = Field(default_factory=list)
     permanent: list[Dtc] = Field(default_factory=list)
+    # kinds whose request got no usable answer (NO DATA, refused, garbled): unknown, not "no codes"
+    unanswered: list[Literal["stored", "pending", "permanent"]] = Field(default_factory=list)
 
 
 class Mil(_Model):

@@ -19,6 +19,7 @@ def capture(
     timeout: float = 10.0,
     now: datetime | None = None,
     symptoms: str = "",
+    mode06: bool = False,
 ) -> tuple[Snapshot, Path, Path]:
     if not _LABEL_RE.fullmatch(label):
         raise ValueError("label must be 1-40 chars of [a-z0-9-]")
@@ -42,6 +43,7 @@ def capture(
             protocol=protocol,
             transcript=str(t_path),
             symptoms=symptoms,
+            mode06=mode06,
         )
     finally:
         transport.close()  # the transcript stays on disk even if the scan raised

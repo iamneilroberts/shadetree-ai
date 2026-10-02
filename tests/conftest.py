@@ -84,3 +84,38 @@ class RampPort(ScriptedPort):
             self._pending = f"41 0C {self.n * 40:04X}\r"
         else:
             super().write(data)
+
+
+@pytest.fixture
+def elm_server():
+    """A TCP 'adapter' that answers like an ELM from transcript records (rx lines, then '>').
+    `elm_server(records)` returns a `socket://` URL for SerialPort, so a live CLI path runs end to end."""
+    import socket
+    import threading
+
+    from obd_reader.replay import ReplayPort
+
+    socks = []
+
+    def start(records):
+        port = ReplayPort(records)
+        srv = socket.create_server(("127.0.0.1", 0))
+        socks.append(srv)
+
+        def serve():
+            conn, _ = srv.accept()
+            buf = b""
+            with conn:
+                while chunk := conn.recv(256):
+                    buf += chunk
+                    while b"\r" in buf:
+                        cmd, buf = buf.split(b"\r", 1)
+                        port.write(cmd + b"\r")
+                        conn.sendall(port.read_until_prompt(0).encode("ascii") + b"\r>")
+
+        threading.Thread(target=serve, daemon=True).start()
+        return f"socket://127.0.0.1:{srv.getsockname()[1]}"
+
+    yield start
+    for s in socks:
+        s.close()

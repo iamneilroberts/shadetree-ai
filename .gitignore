@@ -9,6 +9,7 @@ transcripts/
 runs/
 !/examples/runs/
 profiles/
+probes/
 cache/
 !tests/fixtures/**
 .claude/worktrees/

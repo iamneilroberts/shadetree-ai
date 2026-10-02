@@ -1,5 +1,7 @@
 import argparse
 import sys
+from collections import Counter
+from datetime import datetime, timezone
 from pathlib import Path
 
 from obd_reader.capture import capture
@@ -25,7 +27,7 @@ def _scan(args) -> int:
     snap, s_path, t_path = capture(
         port, args.out_dir, label=args.label, protocol=args.protocol, timeout=args.timeout
     )
-    codes = lambda ds: ", ".join(d.code for d in ds) or "none"  # noqa: E731
+    codes = lambda k: "no answer" if k in snap.dtcs.unanswered else ", ".join(d.code for d in getattr(snap.dtcs, k)) or "none"  # noqa: E731
     print(f"vin:        {snap.vehicle.vin or 'not read'}")
     print(f"protocol:   {snap.protocol.name or 'unknown'}")
     a, m9 = snap.source.adapter, snap.mode09
@@ -33,14 +35,37 @@ def _scan(args) -> int:
     print(f"battery:    {a.supply_voltage or 'not read'}")
     print(f"ecu names:  {', '.join(m9.ecu_names) or 'not read'}")
     print(f"cal ids:    {', '.join(m9.cal_ids) or 'not read'} (cvn {', '.join(m9.cvns) or 'not read'})")
-    print(f"stored:     {codes(snap.dtcs.stored)}")
-    print(f"pending:    {codes(snap.dtcs.pending)}")
-    print(f"permanent:  {codes(snap.dtcs.permanent)}")
+    print(f"stored:     {codes('stored')}")
+    print(f"pending:    {codes('pending')}")
+    print(f"permanent:  {codes('permanent')}")
     print(f"mil:        {snap.mil.on} ({snap.mil.dtc_count} codes)")
+    classes = Counter(r.reply for r in snap.replies)
+    print(f"replies:    {len(snap.replies)} ({', '.join(f'{k} {n}' for k, n in sorted(classes.items())) or 'none'})")
+    print(f"undecoded:  {len(snap.undecoded)} PIDs" + (f" ({', '.join(u.pid for u in snap.undecoded)})" if snap.undecoded else ""))
     for w in snap.warnings:
         print(f"warning:    {w}")
     print(f"snapshot:   {s_path}")
     print(f"transcript: {t_path}")
+    return 0
+
+
+def _probe(args) -> int:
+    from obd_reader.capture import _LABEL_RE
+    from obd_reader.probe import write_probe
+
+    if args.replay:
+        if not _LABEL_RE.fullmatch(args.label):
+            raise ValueError("label must be 1-40 chars of [a-z0-9-]")
+        snap = scan(Transport(ReplayPort.from_file(args.replay)),
+                    snapshot_id=f"{datetime.now(timezone.utc):%Y-%m-%dT%H-%M-%SZ}-{args.label}",
+                    protocol=args.protocol, transcript=str(args.replay), mode06=True)
+    else:
+        snap, s_path, t_path = capture(SerialPort(args.port, baudrate=args.baud), args.out_dir, label=args.label,
+                                       protocol=args.protocol or "0", timeout=args.timeout, mode06=True)
+        print(f"snapshot and transcript (contain the VIN, keep local): {s_path}, {t_path}")
+    j_path, m_path = write_probe(snap, args.out_dir)
+    print(m_path.read_text(encoding="utf-8"), end="")
+    print(f"report (no VIN, safe to share): {j_path} and {m_path}")
     return 0
 
 
@@ -127,6 +152,17 @@ def build_parser() -> argparse.ArgumentParser:
     sc.add_argument("--label", default="scan", help="short name for the capture, [a-z0-9-]")
     sc.add_argument("--out-dir", type=Path, default=Path("."), help="snapshots/ and transcripts/ go here")
     sc.set_defaults(func=_scan)
+
+    pr = sub.add_parser("probe", help="read-only scan plus Mode 06 support bitmaps; writes a VIN-free report to probes/")
+    src = pr.add_mutually_exclusive_group(required=True)
+    src.add_argument("--port", help="serial device or pyserial URL, e.g. /dev/ttyUSB0")
+    src.add_argument("--replay", type=Path, metavar="TRANSCRIPT", help="probe a recorded transcript instead (no adapter)")
+    pr.add_argument("--protocol", default=None, help="ATSP value; live default 0 = automatic search")
+    pr.add_argument("--baud", type=int, default=115200)
+    pr.add_argument("--timeout", type=float, default=10.0, help="seconds to wait per command")
+    pr.add_argument("--label", default="probe", help="short name for the probe, [a-z0-9-]")
+    pr.add_argument("--out-dir", type=Path, default=Path("."), help="probes/ (and, live, snapshots/ and transcripts/) go here")
+    pr.set_defaults(func=_probe)
 
     co = sub.add_parser("console", help="open the live console web page (read-only)")
     co.add_argument("--port", default=None, help="adapter serial device (not needed with --demo)")

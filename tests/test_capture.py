@@ -64,3 +64,17 @@ def test_cli_scan_stops_cleanly_when_the_adapter_never_returns_a_prompt(tmp_path
     assert "error:" in proc.stderr and "prompt" in proc.stderr and "Traceback" not in proc.stderr
     assert len(list((tmp_path / "transcripts").glob("*-smoke.jsonl"))) == 1  # what was sent is kept
     assert list((tmp_path / "snapshots").glob("*-smoke.json")) == []          # no half-made snapshot
+
+
+def test_cli_scan_summary_counts_replies_and_undecoded_pids_and_names_unanswered_codes(tmp_path, elm_server, capsys):
+    from obd_reader.__main__ import main
+
+    records = [dict(r, rx=["NO DATA"]) if r["tx"] == "07" else r for r in load_transcript(FIXTURE)]
+    url = elm_server(records + [{"tx": "ATSP0", "rx": ["OK"]}])
+    assert main(["scan", "--port", url, "--timeout", "2", "--out-dir", str(tmp_path)]) == 0
+    out = capsys.readouterr().out
+    (s,) = (tmp_path / "snapshots").glob("*-scan.json")
+    n = len(Snapshot.model_validate_json(s.read_text()).replies)
+    assert f"replies:    {n} (no_data 1, ok {n - 1})" in out
+    assert "undecoded:  1 PIDs (13)" in out
+    assert "pending:    no answer" in out and "permanent:  none" in out

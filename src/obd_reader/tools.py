@@ -2,6 +2,7 @@
 live tools are the only ones that open the adapter, always through a Session."""
 import math
 import re
+from collections import Counter
 from pathlib import Path
 from typing import Callable
 
@@ -69,7 +70,8 @@ def build_tools(session: Session) -> dict[str, Callable]:
         s = latest_or(snapshot_id)
         kinds = ("stored", "pending", "permanent") if kind == "all" else (kind,)
         dtcs = [{**_dump(d), "kind": k} for k in kinds for d in getattr(s.dtcs, k)]
-        return {"snapshot_id": s.snapshot_id, "kind": kind, "dtcs": dtcs, "mil": _dump(s.mil)}
+        return {"snapshot_id": s.snapshot_id, "kind": kind, "dtcs": dtcs, "mil": _dump(s.mil),
+                "unanswered": [k for k in kinds if k in s.dtcs.unanswered]}  # no answer: unknown, not "no codes"
 
     def freeze_frame(snapshot_id: str | None = None) -> dict:
         """The freeze frame stored with the first DTC, if the snapshot has one."""
@@ -88,7 +90,8 @@ def build_tools(session: Session) -> dict[str, Callable]:
         }
 
     def vehicle_info(snapshot_id: str | None = None) -> dict:
-        """VIN, protocol, adapter (incl. battery voltage), ECUs, Mode 09 items and CAL ID / CVN / ECU name from a snapshot."""
+        """VIN, protocol, adapter (incl. battery voltage), ECUs, Mode 09 items and CAL ID / CVN / ECU name from a snapshot,
+        plus how many scan requests got each reply class and how many advertised PIDs have no decoder."""
         s = latest_or(snapshot_id)
         return {
             "snapshot_id": s.snapshot_id,
@@ -101,6 +104,8 @@ def build_tools(session: Session) -> dict[str, Callable]:
             "supported_mode09_pids": s.supported_pids.get("09", []),
             "mode09": _dump(s.mode09),
             "user_context": _dump(s.user_context),
+            "reply_counts": dict(Counter(r.reply for r in s.replies)),
+            "undecoded_count": len(s.undecoded),
             "warnings": s.warnings,
         }
 

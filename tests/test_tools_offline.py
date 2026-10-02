@@ -78,6 +78,20 @@ def test_vehicle_info_shows_mode09_identity_and_battery_voltage(tools):
     assert v["adapter"]["supply_voltage"] == "12.6V"
 
 
+def test_vehicle_info_counts_reply_classes_and_undecoded_pids(tools):
+    v = tools["vehicle_info"]("sedan-1")
+    assert v["reply_counts"] == {"ok": sum(v["reply_counts"].values())} and v["reply_counts"]["ok"] > 0
+    assert v["undecoded_count"] == 1  # 0113 in the synthetic sedan
+
+
+def test_read_dtcs_names_kinds_the_car_did_not_answer(session):
+    snap = snapshot_from("synthetic_sedan.jsonl", "sedan-2", "6")
+    session.store.save(snap.model_copy(update={"dtcs": snap.dtcs.model_copy(update={"unanswered": ["pending"]})}))
+    t = build_tools(session)
+    assert t["read_dtcs"]("sedan-2", "all")["unanswered"] == ["pending"]
+    assert t["read_dtcs"]("sedan-2", "stored")["unanswered"] == []
+
+
 def test_list_supported_pids_names_decodable_pids(tools):
     out = tools["list_supported_pids"]("ridge-1")["mode01"]
     by = {p["pid"]: p for p in out}
