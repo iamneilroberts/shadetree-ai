@@ -1489,9 +1489,9 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
     const vbtns = ['v0', 'v3', 'v5', 'v6'].map(id => { const b = makeNode('vb_' + id, {}); b.dataset.view = id; return b; }), sess = {};
     const e = makeEnv(statesFor(3, idle), 'v0', OVF, [], { 'shadetree.skin': 'retro' }, { views, vbtns, session: sess });
     await e.tick();
-    const where = () => e.el('ctl').parentNode.id + ' ' + e.el('pause').parentNode.id, open = () => e.el('optDrawer').hidden === false;
-    assert.strictEqual(where(), 'optDrawer topbar', 'Retro Dashboard: the controls are in the drawer, Start/Stop in the bar');
-    assert.strictEqual(e.el('pause').nextSibling, e.el('optBtn'), 'Start/Stop sits just before Options');
+    const where = () => ['ctl', 'pause', 'menuStatus', 'rbar'].map(id => e.el(id).parentNode.id).join(' '), open = () => e.el('optDrawer').hidden === false;
+    assert.strictEqual(where(), 'optDrawer topbar topbar topbar', 'Retro Dashboard: the controls are in the drawer, Start/Stop in the bar');
+    assert.deepStrictEqual(e.el('topbar').children.map(c => c.id), ['menuBtn', 'viewNav', 'menuStatus', 'rbar', 'pause', 'optBtn', 'optDrawer'], 'one bar: views, chips, replay controls, Start/Stop, Options');
     assert.ok(!open() && e.el('optBtn').getAttribute('aria-expanded') === 'false', 'the drawer starts closed');
     e.handlers['optBtn:click']();
     assert.ok(open() && e.el('optBtn').getAttribute('aria-expanded') === 'true' && sess['shadetree.options'] === 'open', 'Options opens it, for this session');
@@ -1500,16 +1500,16 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
     e.handlers['optBtn:click'](); e.docHandlers.click({ target: e.el('chipLive') }); assert.ok(!open() && sess['shadetree.options'] === 'closed', 'a click outside closes it');
     e.handlers['optBtn:click']();
     vbtns[2].on.click(); await e.tick();
-    assert.strictEqual(where(), 'menuStatus ctl', 'Handheld: the toolbar again');
-    assert.ok(e.el('pause').nextSibling === e.el('save') && e.el('ctl').nextSibling === null && !open(), 'each part back in its own spot, no drawer');
+    assert.strictEqual(where(), 'menuStatus ctl body body', 'Handheld: the toolbar again');
+    assert.ok(e.el('pause').nextSibling === e.el('save') && e.el('ctl').nextSibling === null && e.el('menuStatus').nextSibling === e.el('msg') && e.el('rbar').nextSibling === null && !open(), 'each part back in its own spot, no drawer');
     vbtns[0].on.click(); await e.tick();
-    assert.ok(where() === 'optDrawer topbar' && open(), 'back on the Dashboard: the drawer, still open this session');
-    for (const v of [1, 3]) { vbtns[v].on.click(); await e.tick(); assert.strictEqual(where(), 'menuStatus ctl', views[v].id + ': the toolbar'); }
+    assert.ok(where() === 'optDrawer topbar topbar topbar' && open(), 'back on the Dashboard: the drawer, still open this session');
+    for (const v of [1, 3]) { vbtns[v].on.click(); await e.tick(); assert.strictEqual(where(), 'menuStatus ctl body body', views[v].id + ': the toolbar'); }
     vbtns[0].on.click(); await e.tick();
     e.handlers['skinBtn:click'](); await e.tick();
-    assert.ok(where() === 'menuStatus ctl' && !open(), 'Plain: the toolbar, so Skin can switch back');
+    assert.ok(where() === 'menuStatus ctl body body' && !open(), 'Plain: the toolbar, so Skin can switch back');
     assert.strictEqual(e.el('skinBtn').getAttribute('aria-checked'), 'false');
-    e.handlers['skinBtn:click'](); await e.tick(); assert.strictEqual(where(), 'optDrawer topbar', 'and Retro moves them again');
+    e.handlers['skinBtn:click'](); await e.tick(); assert.strictEqual(where(), 'optDrawer topbar topbar topbar', 'and Retro moves them again');
     const re = makeEnv(statesFor(1, idle), 'v0', OVF, [], { 'shadetree.skin': 'retro' }, { views: [], session: { 'shadetree.options': 'open' } }); await re.tick();
     assert.ok(re.el('optDrawer').hidden === false, 'a reload in the same tab keeps it open');
     const pl = makeEnv(statesFor(1, idle), 'v0', OVF, [], { 'shadetree.skin': 'plain' }); await pl.tick();

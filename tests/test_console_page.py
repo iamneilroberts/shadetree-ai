@@ -195,10 +195,13 @@ def _contrast(a, b):
 
 
 def _palette(skin, theme):
-    """The general tokens as the cascade gives them for <html data-skin=skin data-theme=theme> (later, more specific blocks win)."""
+    """The general tokens as the cascade gives them for <html data-skin=skin data-theme=theme> (later, more specific blocks win).
+    skin "retro-dashboard" is Retro with the Dashboard showing (data-view="v0"): its gunmetal page around the cabinet."""
+    dash, skin = skin == "retro-dashboard", "retro" if skin == "retro-dashboard" else skin
     sels = [":root"] + ([':root[data-theme="light"]'] if theme == "light" else []) + \
            ([':root[data-skin="retro"]'] if skin == "retro" else []) + \
-           ([':root[data-skin="retro"][data-theme="light"]'] if skin == "retro" and theme == "light" else [])
+           ([':root[data-skin="retro"][data-theme="light"]'] if skin == "retro" and theme == "light" else []) + \
+           ([':root[data-skin="retro"][data-view="v0"]'] if dash else [])
     p = {}
     for s in sels:
         p.update(_block_all(s))
@@ -214,7 +217,7 @@ TEXT_PAIRS = [("--ink", "--bg"), ("--ink", "--panel"), ("--ink", "--panel2"), ("
               ("--amber", "--panel2"), ("--bad", "--panel2"), ("--g-ink", "--g-face")]  # gauge text: the amber/red notes sit on the gauge card, digits on the face
 
 
-@pytest.mark.parametrize("skin,theme", [("plain", "dark"), ("plain", "light"), ("retro", "dark"), ("retro", "light")])
+@pytest.mark.parametrize("skin,theme", [("plain", "dark"), ("plain", "light"), ("retro", "dark"), ("retro", "light"), ("retro-dashboard", "dark"), ("retro-dashboard", "light")])
 def test_every_skin_and_theme_keeps_text_readable(skin, theme):  # Review Focus 2
     p = _palette(skin, theme)
     low = [(a, b, round(_contrast(p[a], p[b]), 2)) for a, b in TEXT_PAIRS if _contrast(p[a], p[b]) < 4.5]
@@ -682,3 +685,18 @@ def test_the_cabinet_has_a_phone_layout_and_the_knob_stays_desktop_only():
     knob = [(m, b) for m, ss, b in rules if any(s.endswith(" .knob") for s in ss) and "display: block" in b]
     assert [m for m, _ in knob] == ["(min-width: 701px)"], "the knob shows only wider than 700 px; at 700 px or less it stays hidden"
     assert all(m != "(max-width: 600px)" for m, ss, b in rules if any(".knob" in s for s in ss)), "no phone rule touches the knob"
+
+
+@pytest.mark.parametrize("theme", ["dark", "light"])
+def test_the_retro_dashboard_page_is_gunmetal_not_oxblood(theme):
+    """Retro Dashboard (2026-10-02): the bar, chips and page ground take a neutral grey from the cabinet's steel; the accent is the lamp amber."""
+    p, old = _palette("retro-dashboard", theme), _palette("retro", theme)
+    for tok in ("--bg", "--panel", "--panel2", "--line"):
+        rgb = [int(p[tok][i:i + 2], 16) for i in (1, 3, 5)]
+        assert max(rgb) - min(rgb) <= 12, f"{theme} {tok} {p[tok]} is not a neutral grey"
+        assert p[tok] != old[tok]
+    acc = [int(p["--cyan"][i:i + 2], 16) for i in (1, 3, 5)]
+    assert acc[0] > acc[1] > acc[2], f"{theme}: the active view and the scrubber are amber, {p['--cyan']}"
+    assert re.search(r':root\[data-skin="retro"\]\[data-view="v0"\] \{[^}]*--bg: var\(--rd-bg\)', _css()), "the re-point block uses tokens only"
+    js = re.search(r"<script>(.*?)</script>", HTML, re.S).group(1)
+    assert "document.documentElement.setAttribute('data-view', id)" in js, "show() tells the CSS which view is up"
