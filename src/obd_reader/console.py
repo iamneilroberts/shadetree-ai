@@ -42,7 +42,7 @@ def _page_csp(page: bytes) -> str:
     script = re.search(rb"<script>(.*?)</script>", page, re.S)
     digest = base64.b64encode(hashlib.sha256(script.group(1)).digest()).decode() if script else ""
     return (f"default-src 'self'; script-src 'sha256-{digest}'; style-src 'unsafe-inline'; "
-            "connect-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none'")
+            "connect-src 'self'; img-src 'self' data:; font-src data:; object-src 'none'; base-uri 'none'; form-action 'none'")
 
 
 def guess_lan_ip() -> str | None:

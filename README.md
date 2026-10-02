@@ -123,6 +123,7 @@ While the console samples, other live tools report the adapter as busy and point
 ## License
 
 MIT (see [LICENSE](LICENSE)). Reference data pulled in later keeps its own per-record license tag; share-alike or non-commercial data stays out of this repo.
+The console page embeds subsets of three fonts under the SIL OFL 1.1 (Stardos Stencil and Share Tech Mono, renamed Cabinet Stencil and Cabinet Mono as the licence requires for modified versions, and Archivo Narrow); notices and licence text: [src/obd_reader/web/FONTS-OFL.txt](src/obd_reader/web/FONTS-OFL.txt).
 
 ## Grounding
 

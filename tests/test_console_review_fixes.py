@@ -63,6 +63,15 @@ def test_csp_pins_the_inline_script_by_hash_and_drops_unsafe_inline_for_scripts(
     assert "default-src 'self'" in csp and "object-src 'none'" in csp
 
 
+def test_csp_allows_only_the_page_embedded_data_fonts(srv):
+    """The Retro cabinet's fonts are base64 data URIs inside the page; no font is fetched from anywhere."""
+    server, _, _ = srv
+    status, page, hdr = request(server, "GET", "/")
+    font_src = re.search(r"font-src ([^;]*)", hdr["content-security-policy"])
+    assert font_src and font_src.group(1).split() == ["data:"]
+    assert re.search(rb"@font-face \{[^}]*src: url\(data:font/woff2;base64,", page)
+
+
 # ---- Important 2: only whole sweeps are ever published ---------------------------------------------
 
 def test_state_never_returns_a_partially_written_sweep(tmp_path):
