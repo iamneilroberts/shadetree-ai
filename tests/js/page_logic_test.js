@@ -11,15 +11,17 @@ function makeNode(id, handlers) {
     classList: { toggle(c, want) { const cs = n.className.split(' ').filter(x => x && x !== c); if (want === undefined ? !n.className.split(' ').includes(c) : want) cs.push(c); n.className = cs.join(' '); } },
     setAttribute(k, v) { this.attrs[k] = String(v); },
     getAttribute(k) { return k in this.attrs ? this.attrs[k] : null; },
-    appendChild(c) { this.children = this.children.filter(x => x !== c); this.children.push(c); return c; },
-    insertBefore(c, ref) { const cs = this.children.filter(x => x !== c), at = cs.indexOf(ref); cs.splice(at < 0 ? cs.length : at, 0, c); this.children = cs; return c; },
-    removeChild(c) { this.children = this.children.filter(x => x !== c); return c; },
+    parentNode: null,   // kept by appendChild / insertBefore / removeChild, which take the node out of its old parent first, as the DOM does
+    get nextSibling() { const p = this.parentNode; return p ? p.children[p.children.indexOf(this) + 1] || null : null; },
+    appendChild(c) { return this.insertBefore(c, null); },
+    insertBefore(c, ref) { if (c.parentNode && c.parentNode !== this) c.parentNode.removeChild(c); const cs = this.children.filter(x => x !== c), at = ref ? cs.indexOf(ref) : -1; cs.splice(at < 0 ? cs.length : at, 0, c); this.children = cs; c.parentNode = this; return c; },
+    removeChild(c) { this.children = this.children.filter(x => x !== c); if (c.parentNode === this) c.parentNode = null; return c; },
     contains(t) { return t === this || this.children.some(c => c.contains(t)); },
     closest(sel) { return sel[0] === '.' && this.className.split(' ').includes(sel.slice(1)) ? this : null; },
     getBoundingClientRect() { return { left: 0, top: 0, bottom: 0, right: 0 }; }, focus() { focused = n; },
     addEventListener(t, fn) { handlers[id + ':' + t] = fn; this.on[t] = fn; }, querySelector() { return null; }
   };
-  Object.defineProperty(n, 'textContent', { get() { return this._t; }, set(v) { this._t = v; this.children = []; } });
+  Object.defineProperty(n, 'textContent', { get() { return this._t; }, set(v) { this._t = v; this.children.forEach(c => { c.parentNode = null; }); this.children = []; } });
   return n;
 }
 
@@ -28,6 +30,8 @@ function makeEnv(states, viewId = 'v0', help = null, runs = [], store = {}, page
   let parts = null;   // the page hands its shared parts to window.__shadetreeParts
   function el(id) { return els[id] || (els[id] = makeNode(id, handlers)); }
   (page.views || []).forEach(v => { els[v.id] = v; });   // page.views: real view sections, so show() toggling is observable
+  // the nesting the page moves between the toolbar and the Retro Dashboard's bar and drawer, read from the markup (TREE below)
+  TREE.forEach(([parent, kids]) => kids.forEach(k => el(parent).appendChild(el(k))));
   // the Handheld panes and nav buttons, built from the page's own markup so they start as the page starts them
   const hhPanes = [...html.matchAll(/<div class="hh-pane" data-mode="(\w+)" id="(\w+)"( hidden)?>/g)].map(m => { const n = el(m[2]); n.dataset.mode = m[1]; n.hidden = !!m[3]; return n; });
   const hhNav = html.match(/<nav class="hh-nav">([\s\S]*?)<\/nav>/);
@@ -58,6 +62,7 @@ function makeEnv(states, viewId = 'v0', help = null, runs = [], store = {}, page
     }
   };
   if (store !== null) sandbox.localStorage = { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); }, removeItem: (k) => { delete store[k]; } };
+  if (page.session) sandbox.sessionStorage = { getItem: (k) => (k in page.session ? page.session[k] : null), setItem: (k, v) => { page.session[k] = String(v); } };   // page.session: this tab's store
   if (page.storageThrows) sandbox.localStorage = { getItem() { throw new Error('blocked'); }, setItem() { throw new Error('blocked'); }, removeItem() { throw new Error('blocked'); } };
   if (page.prefersLight !== undefined || page.narrow !== undefined)   // a width query answers page.narrow, a colour-scheme query page.prefersLight
     sandbox.window.matchMedia = (q) => ({ matches: /max-width/.test(q) ? !!page.narrow : /light/.test(q) === !!page.prefersLight });
@@ -67,6 +72,18 @@ function makeEnv(states, viewId = 'v0', help = null, runs = [], store = {}, page
     timer() { timer(); }, setHelp(h) { help = h; }, advance(ms) { now += ms; },
     async tick() { timer(); await new Promise(r => setImmediate(r)); await new Promise(r => setImmediate(r)); }
   };
+}
+
+// the parts the page re-parents, with the parents and order the markup gives them (checked against the markup: a stale list fails here)
+const TREE = [['body', ['topbar', 'menuStatus', 'msg', 'rbar']], ['topbar', ['menuBtn', 'viewNav', 'optBtn', 'optDrawer']], ['optDrawer', ['clarity']],
+              ['menuStatus', ['chipConn', 'chipCar', 'chipLamp', 'chipCodes', 'chipLive', 'ctl']],
+              ['ctl', ['simctl', 'unitsBtn', 'themeBtn', 'skinBtn', 'replayBtn', 'capAll', 'pause', 'save']], ['v0', ['d_sum']]];
+{
+  const at = (id) => { const i = html.indexOf('id="' + id + '"'); assert.ok(i > 0, id); return i; };
+  const close = (id, tag) => html.indexOf('</' + tag + '>', at(id));
+  const TAG = { body: null, topbar: 'header', menuStatus: 'div', optDrawer: 'div', ctl: 'div', v0: 'section' };
+  TREE.forEach(([parent, kids]) => { kids.reduce((prev, k) => { assert.ok(at(k) > prev, k + ' follows its elder sibling in the markup'); return at(k); }, parent === 'body' ? 0 : at(parent));
+    if (TAG[parent]) kids.forEach(k => assert.ok(at(k) < close(parent, TAG[parent]), k + ' sits inside ' + parent)); });
 }
 
 function walk(n, f) { f(n); (n.children || []).forEach(c => walk(c, f)); }
@@ -1448,6 +1465,52 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
     const hh = makeEnv(live, 'v5', OVF, [], { 'shadetree.scenario': 'fuel' }); for (let k = 0; k < 4; k++) await hh.tick();
     assert.ok(/Not supported by this car: O2 B1S1 \(14\)/.test(missOf(hh, 'h_livepane').textContent), 'the Handheld names them too');
     assert.strictEqual(missOf(await dash(), 'd_panel').hidden, true, 'nothing missing: no line (no bitmap read yet says nothing about support)');
+  }
+
+  {   // Retro Dashboard: the controls move into the Options drawer and Start/Stop into the bar; another view or skin puts the same nodes back in the toolbar
+    const views = ['v0', 'v3', 'v5', 'v6'].map(id => { const v = makeNode(id, {}); v.className = 'view'; return v; });
+    const vbtns = ['v0', 'v3', 'v5', 'v6'].map(id => { const b = makeNode('vb_' + id, {}); b.dataset.view = id; return b; }), sess = {};
+    const e = makeEnv(statesFor(3, idle), 'v0', OVF, [], { 'shadetree.skin': 'retro' }, { views, vbtns, session: sess });
+    await e.tick();
+    const where = () => e.el('ctl').parentNode.id + ' ' + e.el('pause').parentNode.id, open = () => e.el('optDrawer').hidden === false;
+    assert.strictEqual(where(), 'optDrawer topbar', 'Retro Dashboard: the controls are in the drawer, Start/Stop in the bar');
+    assert.strictEqual(e.el('pause').nextSibling, e.el('optBtn'), 'Start/Stop sits just before Options');
+    assert.ok(!open() && e.el('optBtn').getAttribute('aria-expanded') === 'false', 'the drawer starts closed');
+    e.handlers['optBtn:click']();
+    assert.ok(open() && e.el('optBtn').getAttribute('aria-expanded') === 'true' && sess['shadetree.options'] === 'open', 'Options opens it, for this session');
+    e.docHandlers.click({ target: e.el('unitsBtn') }); assert.ok(open(), 'a click on a control inside keeps it open');
+    e.docHandlers.keydown({ key: 'Escape' }); assert.ok(!open() && focused === e.el('optBtn'), 'Esc closes it and focus returns to Options');
+    e.handlers['optBtn:click'](); e.docHandlers.click({ target: e.el('chipLive') }); assert.ok(!open() && sess['shadetree.options'] === 'closed', 'a click outside closes it');
+    e.handlers['optBtn:click']();
+    vbtns[2].on.click(); await e.tick();
+    assert.strictEqual(where(), 'menuStatus ctl', 'Handheld: the toolbar again');
+    assert.ok(e.el('pause').nextSibling === e.el('save') && e.el('ctl').nextSibling === null && !open(), 'each part back in its own spot, no drawer');
+    vbtns[0].on.click(); await e.tick();
+    assert.ok(where() === 'optDrawer topbar' && open(), 'back on the Dashboard: the drawer, still open this session');
+    for (const v of [1, 3]) { vbtns[v].on.click(); await e.tick(); assert.strictEqual(where(), 'menuStatus ctl', views[v].id + ': the toolbar'); }
+    vbtns[0].on.click(); await e.tick();
+    e.handlers['skinBtn:click'](); await e.tick();
+    assert.ok(where() === 'menuStatus ctl' && !open(), 'Plain: the toolbar, so Skin can switch back');
+    assert.strictEqual(e.el('skinBtn').getAttribute('aria-checked'), 'false');
+    e.handlers['skinBtn:click'](); await e.tick(); assert.strictEqual(where(), 'optDrawer topbar', 'and Retro moves them again');
+    const re = makeEnv(statesFor(1, idle), 'v0', OVF, [], { 'shadetree.skin': 'retro' }, { views: [], session: { 'shadetree.options': 'open' } }); await re.tick();
+    assert.ok(re.el('optDrawer').hidden === false, 'a reload in the same tab keeps it open');
+    const pl = makeEnv(statesFor(1, idle), 'v0', OVF, [], { 'shadetree.skin': 'plain' }); await pl.tick();
+    assert.ok(pl.el('ctl').parentNode.id === 'menuStatus' && pl.el('optDrawer').hidden === true, 'Plain Dashboard: the toolbar as before');
+    // the switches: role and state, both state names, a fixed name
+    for (const [id, a, b] of [['unitsBtn', 'Metric', 'US'], ['themeBtn', 'Light', 'Dark'], ['skinBtn', 'Plain', 'Retro'], ['clarity', 'Standard', 'Max']]) {
+      const tag = html.match(new RegExp('<button [^>]*id="' + id + '"[^>]*>'))[0];
+      assert.ok(/role="switch"/.test(tag) && /aria-checked="(true|false)"/.test(tag) && tag.includes('data-a="' + a + '"') && tag.includes('data-b="' + b + '"') && tag.includes('aria-label="'), tag);
+    }
+    assert.ok(/<input type="checkbox" id="capAll" role="switch"/.test(html), 'Capture all is a native switch');
+    const us = makeEnv(statesFor(1, idle), 'v0'); await us.tick();
+    assert.strictEqual(us.el('unitsBtn').getAttribute('aria-checked'), 'false'); us.handlers['unitsBtn:click'](); await us.tick();
+    assert.ok(us.el('unitsBtn').getAttribute('aria-checked') === 'true' && us.el('unitsBtn').textContent === 'Units: US', 'Units: the switch state follows, the label is as before');
+    us.handlers['themeBtn:click'](); assert.strictEqual(us.el('themeBtn').getAttribute('aria-checked'), String(us.el('html').getAttribute('data-theme') === 'dark'));
+    us.handlers['clarity:click'](); assert.ok(us.el('clarity').getAttribute('aria-checked') === 'true' && us.el('clarity').textContent === 'Clarity: max');
+    assert.ok(/id="clarity"[^>]*title="Max: unlit segments nearly invisible and no glow \(crisper\); Standard: faint unlit segments and a soft glow\."/.test(html), 'Clarity says what it does');
+    const ids = [...html.matchAll(/\sid="([^"]+)"/g)].map(m => m[1]), dup = ids.filter((x, i) => ids.indexOf(x) !== i);
+    assert.deepStrictEqual(dup, [], 'no id twice in the markup');
   }
 
   console.log('page logic OK');

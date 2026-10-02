@@ -170,7 +170,7 @@
      nameplate sits between vents with a calibration sticker; controls, lamps and panels are engraved groups; labels and body in Archivo Narrow,
      plate and legends in the stencil face, digits in the mono face. Inside the body the page tokens are re-pointed at the engraving colours.
      Plain keeps the plain page (chrome hidden, wrapper adds nothing). */
-  .dcab .plate, .dcab .screw, .dcab .bench, .dcab .knob { display: none; }
+  .dcab .plate, .dcab .screw, .dcab .knob { display: none; }
     :root[data-skin="retro"] .dcab { position: relative; padding: 30px 24px 64px; }
     :root[data-skin="retro"] .dcab::before, :root[data-skin="retro"] .dcab::after { content: ""; position: absolute; top: 30px; bottom: 64px; width: 24px; background: var(--cb-cheek); }
     :root[data-skin="retro"] .dcab::before { left: 0; border-radius: 8px 0 0 0; }
@@ -193,7 +193,6 @@
     :root[data-skin="retro"] #v0 .dface > * { grid-column: 1 / -1; min-width: 0; }
     :root[data-skin="retro"] #v0 .dface > .scenbar { grid-column: 1; grid-row: 2 / span 2; }
     :root[data-skin="retro"] #v0 .dface > .lamps { grid-column: 2; grid-row: 2; }
-    :root[data-skin="retro"] #v0 .dface > .bench { grid-column: 2; grid-row: 3; }
     /* nameplate: vents | brushed plate | vents | sticker */
     :root[data-skin="retro"] #v0 .dface > .plate { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto; gap: 18px; align-items: center; }
     :root[data-skin="retro"] #v0 .dface > .plate::before, :root[data-skin="retro"] #v0 .dface > .plate::after { content: ""; grid-row: 1; grid-column: 1; height: 50px; border-radius: 3px; background: repeating-linear-gradient(180deg, var(--cb-vent) 0 6px, transparent 6px 11px); }
@@ -213,9 +212,9 @@
     :root[data-skin="retro"] #v0 .dface > .screw:nth-of-type(2) { right: 6px; top: 6px; }
     :root[data-skin="retro"] #v0 .dface > .screw:nth-of-type(3) { left: 6px; bottom: 6px; }
     :root[data-skin="retro"] #v0 .dface > .screw:nth-of-type(4) { right: 6px; bottom: 6px; }
-    /* engraved groups: the selector, the lamps, the Display bench and every panel; the legend is engraved in the stencil face */
-    :root[data-skin="retro"] #v0 .dface > .scenbar, :root[data-skin="retro"] #v0 .dface > .lamps, :root[data-skin="retro"] #v0 .dface > .bench { position: relative; margin: 0; padding: 36px 14px 14px; border: 1.5px solid var(--cb-engrave-soft); border-radius: 4px; background: transparent; }
-    :root[data-skin="retro"] #v0 .dface > .scenbar::before, :root[data-skin="retro"] #v0 .dface > .lamps::before, :root[data-skin="retro"] #v0 .dface > .bench .lab { position: absolute; top: 11px; left: 14px; font: 400 13px/1 var(--cb-stencil); letter-spacing: .14em; text-transform: uppercase; color: var(--cb-engrave); }
+    /* engraved groups: the selector, the lamps and every panel; the legend is engraved in the stencil face */
+    :root[data-skin="retro"] #v0 .dface > .scenbar, :root[data-skin="retro"] #v0 .dface > .lamps { position: relative; margin: 0; padding: 36px 14px 14px; border: 1.5px solid var(--cb-engrave-soft); border-radius: 4px; background: transparent; }
+    :root[data-skin="retro"] #v0 .dface > .scenbar::before, :root[data-skin="retro"] #v0 .dface > .lamps::before { position: absolute; top: 11px; left: 14px; font: 400 13px/1 var(--cb-stencil); letter-spacing: .14em; text-transform: uppercase; color: var(--cb-engrave); }
     :root[data-skin="retro"] #v0 .dface > .scenbar::before { content: "Test selector"; }
     :root[data-skin="retro"] #v0 .dface > .lamps::before { content: "Status"; }
     :root[data-skin="retro"] #v0 .dface > .scenbar { flex-wrap: wrap; align-items: flex-start; }
@@ -234,15 +233,15 @@
     :root[data-skin="retro"] #v0 .dface #d_ready_mount .panel + .panel { margin-top: 0; }
     :root[data-skin="retro"] #v0 .dface .win, :root[data-skin="retro"] #v0 .dface .clist { background: var(--cb-face); border-color: var(--cb-chrome-3); }
     :root[data-skin="retro"] #v0 .dface .mono { font-family: var(--cb-mono); }
-    /* pushbuttons: chrome bezel, black cap, a pilot lamp that lights on the chosen one (scenario tabs, the edit pencil, Clarity) */
+    /* pushbuttons: chrome bezel, black cap, a pilot lamp that lights on the chosen one (scenario tabs, the edit pencil) */
     :root[data-skin="retro"] #v0 .dface .stabs { gap: 10px; }
-    :root[data-skin="retro"] #v0 .dface .stab, :root[data-skin="retro"] #v0 .dface .rocker, :root[data-skin="retro"] #v0 .dface #d_edit { appearance: none; position: relative; border: 4px solid transparent; border-radius: 5px; padding: 15px 12px 8px; cursor: pointer;
+    :root[data-skin="retro"] #v0 .dface .stab, :root[data-skin="retro"] #v0 .dface #d_edit { appearance: none; position: relative; border: 4px solid transparent; border-radius: 5px; padding: 15px 12px 8px; cursor: pointer;
       background: linear-gradient(180deg, var(--cb-cap-1), var(--cb-cap-2)) padding-box, linear-gradient(145deg, var(--cb-chrome-1), var(--cb-chrome-2) 45%, var(--cb-chrome-3) 70%, var(--cb-chrome-2)) border-box;
       color: var(--cb-silk); font: 700 12.5px/1.1 var(--cb-label); letter-spacing: .14em; text-transform: uppercase; box-shadow: 0 2px 3px rgba(0,0,0,.3); }
-    :root[data-skin="retro"] #v0 .dface .stab::before, :root[data-skin="retro"] #v0 .dface .rocker::before, :root[data-skin="retro"] #v0 .dface #d_edit::before { content: ""; position: absolute; top: 4px; left: 50%; width: 20px; margin-left: -10px; height: 3px; border-radius: 2px; background: color-mix(in srgb, var(--cb-lamp) 22%, var(--cb-cap-2)); }
-    :root[data-skin="retro"] #v0 .dface .stab.is-active::before, :root[data-skin="retro"] #v0 .dface #d_edit[aria-pressed="true"]::before, :root[data-skin="retro"] #v0 .dcab.max .dface .rocker::before { background: var(--cb-lamp); box-shadow: 0 0 6px var(--cb-lamp); }
+    :root[data-skin="retro"] #v0 .dface .stab::before, :root[data-skin="retro"] #v0 .dface #d_edit::before { content: ""; position: absolute; top: 4px; left: 50%; width: 20px; margin-left: -10px; height: 3px; border-radius: 2px; background: color-mix(in srgb, var(--cb-lamp) 22%, var(--cb-cap-2)); }
+    :root[data-skin="retro"] #v0 .dface .stab.is-active::before, :root[data-skin="retro"] #v0 .dface #d_edit[aria-pressed="true"]::before { background: var(--cb-lamp); box-shadow: 0 0 6px var(--cb-lamp); }
     :root[data-skin="retro"] #v0 .dface .stab:hover, :root[data-skin="retro"] #v0 .dface .stab.is-active { color: var(--cb-silk); }
-    :root[data-skin="retro"] #v0 .dface .stab:active, :root[data-skin="retro"] #v0 .dface .rocker:active, :root[data-skin="retro"] #v0 .dface #d_edit:active { transform: translateY(1px); box-shadow: inset 0 2px 3px rgba(0,0,0,.7); }
+    :root[data-skin="retro"] #v0 .dface .stab:active, :root[data-skin="retro"] #v0 .dface #d_edit:active { transform: translateY(1px); box-shadow: inset 0 2px 3px rgba(0,0,0,.7); }
     :root[data-skin="retro"] #v0 .dface #d_edit { padding: 13px 9px 5px; font-size: 14px; letter-spacing: 0; }
     /* status lamps: chrome-ringed lenses, engraved label and state under each */
     :root[data-skin="retro"] #v0 .dface > .lamps { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px 6px; }
@@ -252,7 +251,6 @@
     :root[data-skin="retro"] #v0 .dface .lampbox.lit .lens.red { box-shadow: 0 0 0 4px var(--cb-chrome-2), 0 0 0 5px var(--cb-chrome-4), 0 0 16px 6px var(--led-r); }
     :root[data-skin="retro"] #v0 .dface .lampbox.lit .lens.amb { box-shadow: 0 0 0 4px var(--cb-chrome-2), 0 0 0 5px var(--cb-chrome-4), 0 0 16px 6px var(--led-y); }
     :root[data-skin="retro"] #v0 .dface .lampbox.lit .lens.grn { box-shadow: 0 0 0 4px var(--cb-chrome-2), 0 0 0 5px var(--cb-chrome-4), 0 0 16px 6px var(--led-g); }
-    :root[data-skin="retro"] #v0 .dface > .bench { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
     :root[data-skin="retro"] #v0 .dface h3.sec, :root[data-skin="retro"] #v0 .dface #o_note, :root[data-skin="retro"] #v0 .dface #d_table > .note { color: var(--cb-engrave); }   /* text directly on the steel: the engraving colour */
     :root[data-skin="retro"] #v0 .dface h3.sec { margin: 0 0 10px; font: 400 13px var(--cb-stencil); letter-spacing: .14em; }
     :root[data-skin="retro"] #v0 .dface table.rd th, :root[data-skin="retro"] #v0 .dface table.rd td .at { color: var(--cb-engrave-soft); }   /* the freeze-frame table on the steel */
@@ -315,7 +313,7 @@
   }
   @media (max-width: 900px) {
     :root[data-skin="retro"] #v0 .dface { grid-template-columns: minmax(0, 1fr); }
-    :root[data-skin="retro"] #v0 .dface > .scenbar, :root[data-skin="retro"] #v0 .dface > .lamps, :root[data-skin="retro"] #v0 .dface > .bench { grid-column: 1; grid-row: auto; }
+    :root[data-skin="retro"] #v0 .dface > .scenbar, :root[data-skin="retro"] #v0 .dface > .lamps { grid-column: 1; grid-row: auto; }
     :root[data-skin="retro"] #v0 .dface > .plate { grid-template-columns: minmax(0, 1fr) auto; }
     :root[data-skin="retro"] #v0 .dface > .plate::before, :root[data-skin="retro"] #v0 .dface > .plate::after { display: none; }
     :root[data-skin="retro"] #v0 .dface > .plate .np { grid-column: 1; } :root[data-skin="retro"] #v0 .dface > .plate .sticker { grid-column: 2; }
@@ -337,7 +335,7 @@
     :root[data-skin="retro"] #v0 .dface > .plate .sticker b { font-size: 12px; }
     :root[data-skin="retro"] #v0 .dface > .screw:nth-of-type(1), :root[data-skin="retro"] #v0 .dface > .screw:nth-of-type(2) { top: 4px; } :root[data-skin="retro"] #v0 .dface > .screw:nth-of-type(3), :root[data-skin="retro"] #v0 .dface > .screw:nth-of-type(4) { bottom: 4px; }
     :root[data-skin="retro"] #v0 .dface > .screw:nth-of-type(1), :root[data-skin="retro"] #v0 .dface > .screw:nth-of-type(3) { left: 3px; } :root[data-skin="retro"] #v0 .dface > .screw:nth-of-type(2), :root[data-skin="retro"] #v0 .dface > .screw:nth-of-type(4) { right: 3px; }
-    :root[data-skin="retro"] #v0 .dface > .scenbar, :root[data-skin="retro"] #v0 .dface > .lamps, :root[data-skin="retro"] #v0 .dface > .bench { padding: 34px 10px 10px; }
+    :root[data-skin="retro"] #v0 .dface > .scenbar, :root[data-skin="retro"] #v0 .dface > .lamps { padding: 34px 10px 10px; }
     :root[data-skin="retro"] #v0 .dface > .scenbar { flex-wrap: nowrap; align-items: stretch; }
     :root[data-skin="retro"] #v0 .dface > .scenbar #d_edit { position: relative; top: auto; right: auto; flex: none; min-width: 44px; }
     :root[data-skin="retro"] #v0 .dface > .scenbar .ssel { flex: 1 1 auto; min-width: 0; appearance: none; border: 4px solid transparent; border-radius: 5px; padding: 6px 34px 6px 12px;
@@ -345,7 +343,6 @@
         linear-gradient(180deg, var(--cb-cap-1), var(--cb-cap-2)) padding-box, linear-gradient(145deg, var(--cb-chrome-1), var(--cb-chrome-2) 45%, var(--cb-chrome-3) 70%, var(--cb-chrome-2)) border-box;
       color: var(--cb-silk); font: 700 13px/1.1 var(--cb-label); letter-spacing: .12em; text-transform: uppercase; box-shadow: 0 2px 3px rgba(0,0,0,.3); }
     :root[data-skin="retro"] #v0 .dface > .scenbar .ssel option { background: var(--cb-cap-2); color: var(--cb-silk); }
-    :root[data-skin="retro"] #v0 .dface .rocker { min-height: 44px; }
     :root[data-skin="retro"] #v0 .dface > .lamps { gap: 12px 4px; }
     :root[data-skin="retro"] #v0 .dface .gauges { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 10px; }
     :root[data-skin="retro"] #v0 .dface .gauge { grid-template-columns: minmax(0, 1fr); grid-template-areas: "top" "face" "val" "note"; gap: 5px; }
@@ -555,6 +552,40 @@
   .sumbar { display: flex; flex-wrap: wrap; gap: 4px 18px; margin: 0 0 10px; padding: 8px 12px; background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-left: 5px solid var(--line); border-radius: 6px; font: 700 14px var(--cond); }
   .hh .sumbar { gap: 2px 12px; padding: 6px 10px; font-size: 12.5px; }   /* the Handheld repeats the Dashboard's summary bar, smaller */
   .sumbar.bad { border-left-color: var(--bad); } .sumbar.warn { border-left-color: var(--amber); } .sumbar.ok { border-left-color: var(--ok); } .sumbar .on { color: var(--bad); }
+  /* Retro Dashboard: the controls live in a drawer under the bar that the Options button opens (closed by default; Esc or a click outside closes it).
+     Two-state settings are narrow switches with both states engraved, actions small chrome pushbuttons. Plain and the other views keep the toolbar. */
+  .optbtn { display: none; }
+  .tgw { display: contents; }
+  :root[data-skin="retro"][data-view="v0"] .optbtn { display: inline-block; }
+  :root[data-skin="retro"][data-view="v0"] .optd { flex: 1 1 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px; padding: 7px 2px 3px; border-top: 1px solid var(--line); }
+  :root[data-skin="retro"][data-view="v0"] .optd .ctl, :root[data-skin="retro"][data-view="v0"] .optd #simctl { display: contents; }
+  :root[data-skin="retro"][data-view="v0"] .optd > .tgw, :root[data-skin="retro"][data-view="v0"] .optd .ctl > .tgw { order: 1; }
+  :root[data-skin="retro"][data-view="v0"] .optd::after { content: ""; order: 2; flex: 1 1 100%; }
+  :root[data-skin="retro"][data-view="v0"] .optd .ctl > :not(.tgw), :root[data-skin="retro"][data-view="v0"] .optd #simctl > * { order: 3; }
+  :root[data-skin="retro"][data-view="v0"] .optd .tgw { display: inline-flex; align-items: center; gap: 7px; }
+  :root[data-skin="retro"][data-view="v0"] .optd .tgw::before { content: attr(data-n); font: 400 11px/1 var(--cb-stencil); letter-spacing: .12em; text-transform: uppercase; color: var(--ink); }
+  :root[data-skin="retro"][data-view="v0"] .optd .tg { position: relative; display: inline-grid; grid-template-columns: 1fr 34px 1fr; align-items: center; column-gap: 5px; min-height: 30px; margin: 0; padding: 2px 6px;
+    border: 1px solid transparent; border-radius: 4px; cursor: pointer; font-size: 0; white-space: nowrap; background-color: transparent; background-repeat: no-repeat;
+    background-image: radial-gradient(circle, var(--cb-chrome-1) 0 4px, var(--cb-chrome-3) 4.5px 5.5px, transparent 6px), radial-gradient(circle, var(--cb-vent) 0 6.5px, transparent 7px),
+      radial-gradient(circle, var(--cb-vent) 0 6.5px, transparent 7px), linear-gradient(var(--cb-vent), var(--cb-vent));
+    background-size: 14px 14px, 14px 14px, 14px 14px, 14px 13px; background-position: calc(50% - 7px) 50%, calc(50% - 7px) 50%, calc(50% + 7px) 50%, 50% 50%; }
+  :root[data-skin="retro"][data-view="v0"] .optd button.tg[aria-checked="true"], :root[data-skin="retro"][data-view="v0"] .optd label.tg:has(:checked) { background-position: calc(50% + 7px) 50%, calc(50% - 7px) 50%, calc(50% + 7px) 50%, 50% 50%; }
+  :root[data-skin="retro"][data-view="v0"] .optd .tg::before, :root[data-skin="retro"][data-view="v0"] .optd .tg::after { grid-row: 1; font: 600 11.5px/1 var(--cb-label); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  :root[data-skin="retro"][data-view="v0"] .optd .tg::before { content: attr(data-a); grid-column: 1; text-align: right; }
+  :root[data-skin="retro"][data-view="v0"] .optd .tg::after { content: attr(data-b); grid-column: 3; text-align: left; }
+  :root[data-skin="retro"][data-view="v0"] .optd button.tg:not([aria-checked="true"])::before, :root[data-skin="retro"][data-view="v0"] .optd button.tg[aria-checked="true"]::after, :root[data-skin="retro"][data-view="v0"] .optd label.tg:not(:has(:checked))::before, :root[data-skin="retro"][data-view="v0"] .optd label.tg:has(:checked)::after { color: var(--ink); font-weight: 700; }
+  :root[data-skin="retro"][data-view="v0"] .optd label.tg input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+  :root[data-skin="retro"][data-view="v0"] .optd .tg:hover { border-color: var(--line); }
+  :root[data-skin="retro"][data-view="v0"] .optd .tg:focus-visible, :root[data-skin="retro"][data-view="v0"] .optd label.tg:has(:focus-visible) { outline: 2px solid var(--cb-focus); outline-offset: 1px; }
+  :root[data-skin="retro"][data-view="v0"] .optd label.tg:has(:disabled) { opacity: .45; } :root[data-skin="retro"][data-view="v0"] .optd label.tg input:disabled { cursor: not-allowed; }
+  :root[data-skin="retro"][data-view="v0"] .optd label.chip:not(.tg) { display: inline-flex; align-items: center; gap: 7px; padding: 0; border: 0; font: 400 11px/1 var(--cb-stencil); letter-spacing: .12em; text-transform: uppercase; color: var(--ink); }
+  :root[data-skin="retro"][data-view="v0"] .topbar button.b:not(.tg), :root[data-skin="retro"][data-view="v0"] .topbar select.b { min-height: 28px; padding: 3px 10px; border: 2px solid transparent; border-radius: 4px; box-shadow: 0 1px 2px rgba(0,0,0,.3); cursor: pointer;
+    background: linear-gradient(180deg, var(--cb-cap-1), var(--cb-cap-2)) padding-box, linear-gradient(145deg, var(--cb-chrome-1), var(--cb-chrome-2) 45%, var(--cb-chrome-3) 70%, var(--cb-chrome-2)) border-box;
+    color: var(--cb-silk); font: 700 11.5px/1.1 var(--cb-label); letter-spacing: .1em; text-transform: uppercase; }
+  :root[data-skin="retro"][data-view="v0"] .topbar button.b.primary:not(.tg), :root[data-skin="retro"][data-view="v0"] .topbar .optbtn[aria-expanded="true"] { color: var(--cb-lamp); }
+  :root[data-skin="retro"][data-view="v0"] .topbar button.b:not(.tg):active { transform: translateY(1px); box-shadow: inset 0 2px 3px rgba(0,0,0,.7); }
+  :root[data-skin="retro"][data-view="v0"] .topbar button.b:not(.tg):focus-visible, :root[data-skin="retro"][data-view="v0"] .topbar select.b:focus-visible { outline: 2px solid var(--cb-focus); outline-offset: 2px; }
+  :root[data-skin="retro"][data-view="v0"] .topbar select.b option { background: var(--cb-cap-2); color: var(--cb-silk); }
 </style>
 </head>
 <body>
@@ -570,6 +601,10 @@
     <button class="vbtn" data-view="v5" role="tab">Handheld</button>
     <button class="vbtn" data-view="v6" role="tab">All readings</button>
   </nav>
+  <button type="button" class="b optbtn" id="optBtn" aria-expanded="false" aria-controls="optDrawer">Options</button>
+  <div class="optd" id="optDrawer" role="group" aria-label="Options" hidden>
+    <span class="tgw" data-n="Clarity"><button class="b tg" id="clarity" type="button" role="switch" aria-checked="false" aria-label="Clarity: Max" data-a="Standard" data-b="Max" title="Max: unlit segments nearly invisible and no glow (crisper); Standard: faint unlit segments and a soft glow.">Clarity: standard</button></span>
+  </div>
 </header>
 <div class="status" id="menuStatus">
   <span class="chip" id="chipConn"><b>no adapter</b></span>
@@ -580,7 +615,7 @@
   <span class="chip">rate <b id="rate">&mdash;</b></span>
   <span class="chip">last sample <b id="age">&mdash;</b></span>
   <span class="chip">auto-stop in <b id="autostop">&mdash;</b></span>
-  <div class="ctl">
+  <div class="ctl" id="ctl">
     <span id="simctl" hidden>
       <button class="b primary" id="demoBtn">Demo</button>
       <label class="chip">simulate
@@ -591,11 +626,11 @@
         </select></label>
       <button class="b" id="rev">Rev to 2500 rpm (sim)</button>
     </span>
-    <button class="b" id="unitsBtn">Units: Metric</button>
-    <button class="b" id="themeBtn">Theme: Light</button>
-    <button class="b" id="skinBtn">Skin: Retro</button>
+    <span class="tgw" data-n="Units"><button class="b tg" id="unitsBtn" type="button" role="switch" aria-checked="false" aria-label="Units: US" data-a="Metric" data-b="US">Units: Metric</button></span>
+    <span class="tgw" data-n="Theme"><button class="b tg" id="themeBtn" type="button" role="switch" aria-checked="false" aria-label="Theme: Dark" data-a="Light" data-b="Dark">Theme: Light</button></span>
+    <span class="tgw" data-n="Skin"><button class="b tg" id="skinBtn" type="button" role="switch" aria-checked="true" aria-label="Skin: Retro" data-a="Plain" data-b="Retro">Skin: Retro</button></span>
     <button class="b" id="replayBtn">Replay&hellip;</button>
-    <label class="chip" title="Read every reading the car supports: engine speed, speed, load and throttle every sweep, the rest a few at a time"><input type="checkbox" id="capAll"> Capture all supported</label>
+    <span class="tgw" data-n="Capture all"><label class="chip tg" data-a="Off" data-b="On" title="Read every reading the car supports: engine speed, speed, load and throttle every sweep, the rest a few at a time"><input type="checkbox" id="capAll" role="switch" aria-label="Capture all supported"> Capture all supported</label></span>
     <button class="b" id="pause">Start sampling</button>
     <button class="b primary" id="save">Save run</button>
   </div>
@@ -644,7 +679,6 @@
     </div>
     <div id="d_table" class="crt"></div>
     <a class="more" href="#v6" id="o_more">Mode 06 results, capture options and the full readings view &rarr;</a>
-    <div class="bench"><span class="lab">Display</span><button class="rocker" id="clarity" type="button">Clarity: standard</button></div>
   </div></div></section>
 
   <!-- C: GUIDED TEST -->
@@ -1113,11 +1147,15 @@
     if (box.focus) box.focus({ preventScroll: true });
   }
   document.addEventListener('click', function (e) {
+    if (OPT && !$('optDrawer').hidden && e.target && !$('optDrawer').contains(e.target) && !$('optBtn').contains(e.target)) setOpt(false);   // a click outside the open drawer closes it
     var b = e.target && e.target.closest ? e.target.closest('.q') : null;
     if (b) { var k = b.getAttribute('data-help'); if (helpKey === k) closeHelp(true); else openHelp(b, k); return; }
     if (helpKey !== null && !$('helpPanel').contains(e.target)) closeHelp();
   });
-  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && helpKey !== null) closeHelp(true); });
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+    if (helpKey !== null) closeHelp(true); else if (OPT && !$('optDrawer').hidden) { setOpt(false); $('optBtn').focus(); }
+  });
   function loadHelp() {
     helpTried = performance.now();
     fetch(api('/api/help'))
@@ -1646,7 +1684,7 @@
   }
   $('o_more').addEventListener('click', function (e) { if (e.preventDefault) e.preventDefault(); show('v6'); });
   function renderUnits() {
-    $('unitsBtn').textContent = 'Units: ' + (US ? 'US' : 'Metric');
+    $('unitsBtn').textContent = 'Units: ' + (US ? 'US' : 'Metric'); $('unitsBtn').setAttribute('aria-checked', US ? 'true' : 'false');
     $('v3ect_u').textContent = unitOf('05'); $('v3map_u').textContent = unitOf('0B');
   }
   /* ---------- theme: a stored choice, else the system preference, else dark ---------- */
@@ -1655,7 +1693,7 @@
   function setTheme(t) {
     THEME = t; setPal();
     document.documentElement.setAttribute('data-theme', t);
-    $('themeBtn').textContent = 'Theme: ' + (t === 'dark' ? 'Light' : 'Dark');
+    $('themeBtn').textContent = 'Theme: ' + (t === 'dark' ? 'Light' : 'Dark'); $('themeBtn').setAttribute('aria-checked', t === 'dark' ? 'true' : 'false');
   }
   (function () {
     var stored = null, light = false;
@@ -1675,7 +1713,7 @@
   function setSkin(s) {
     SKIN = s; setPal();
     document.documentElement.setAttribute('data-skin', s);
-    $('skinBtn').textContent = 'Skin: ' + (s === 'plain' ? 'Retro' : 'Plain');
+    $('skinBtn').textContent = 'Skin: ' + (s === 'plain' ? 'Retro' : 'Plain'); $('skinBtn').setAttribute('aria-checked', s === 'retro' ? 'true' : 'false');
   }
   (function () {
     var stored = null, narrow = false;
@@ -1693,7 +1731,28 @@
     try { localStorage.setItem('shadetree.units', US ? 'us' : 'metric'); } catch (e) { /* storage unavailable: the choice lasts until reload */ }
     renderResults(); render();
   });
+  /* the Retro Dashboard keeps one slim bar: the controls move into the Options drawer (and Start/Stop into the bar); every other skin and view keeps the
+     toolbar. The same nodes move (ids, handlers and state go with them), each back to the spot it came from */
+  var HOME = {}, OPT = false;
+  ['ctl', 'pause'].forEach(function (id) { var n = $(id); HOME[id] = { n: n, p: n.parentNode, s: n.nextSibling }; });
+  try { OPT = sessionStorage.getItem('shadetree.options') === 'open'; } catch (e) { OPT = false; }   // open or closed for this session only
+  function put(id, to, before) {
+    var h = HOME[id], p = to || h.p;
+    if (h.n.parentNode !== p) p.insertBefore(h.n, to ? before || null : h.s);
+  }
+  function place() {
+    var rd = SKIN === 'retro' && active() === 'v0', f = document.activeElement;
+    if (rd) { put('ctl', $('optDrawer')); put('pause', $('topbar'), $('optBtn')); } else { put('ctl'); put('pause'); }
+    $('optDrawer').hidden = !(rd && OPT); $('topbar').classList.toggle('opt-open', rd && OPT); $('optBtn').setAttribute('aria-expanded', rd && OPT ? 'true' : 'false');
+    if (f && f !== document.activeElement && f.focus) f.focus();   // a moved control keeps the keyboard focus (Skin, say, clicked in the drawer)
+  }
+  function setOpt(open) {
+    OPT = open; try { sessionStorage.setItem('shadetree.options', open ? 'open' : 'closed'); } catch (e) { /* storage unavailable: closed after a reload */ }
+    place();
+  }
+  $('optBtn').addEventListener('click', function () { setOpt(!OPT); });
   function render() {
+    place();
     renderUnits();
     if (!helpLoaded() && performance.now() - helpTried > 5000) loadHelp();   // the first fetch failed or is slow: try again
     chips();
@@ -1827,9 +1886,9 @@
   }
   Array.prototype.forEach.call(document.querySelectorAll('.hh-nav button'), function (b) { b.addEventListener('click', function () { setMode(b.dataset.mode); }); });
   $('clarity').addEventListener('click', function () {
-    var on = $('clarity').textContent !== 'Clarity: max';   // the button holds the state; the .retro wrappers and the Dashboard cabinet follow it
+    var on = $('clarity').getAttribute('aria-checked') !== 'true';   // the switch holds the state; the .retro wrappers and the Dashboard cabinet follow it
     Array.prototype.forEach.call(document.querySelectorAll('.retro, .dcab'), function (e) { e.classList.toggle('max', on); });
-    $('clarity').textContent = on ? 'Clarity: max' : 'Clarity: standard'; render();
+    $('clarity').textContent = on ? 'Clarity: max' : 'Clarity: standard'; $('clarity').setAttribute('aria-checked', on ? 'true' : 'false'); render();
   });
 
   /* ---------- talking to the server ---------- */
@@ -1878,7 +1937,7 @@
   function setMenu(open) { $('topbar').classList.toggle('menu-open', open); $('menuBtn').setAttribute('aria-expanded', open ? 'true' : 'false'); }
   $('menuBtn').addEventListener('click', function () { setMenu(!$('topbar').className.split(' ').includes('menu-open')); });
   function show(id) {
-    setMenu(false);
+    setMenu(false); document.documentElement.setAttribute('data-view', id);
     Array.prototype.forEach.call(btns, function (b) { b.classList.toggle('is-active', b.dataset.view === id); });
     Array.prototype.forEach.call(views, function (v) { v.classList.toggle('is-active', v.id === id); });
     render();

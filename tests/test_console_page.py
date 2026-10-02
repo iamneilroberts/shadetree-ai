@@ -342,14 +342,14 @@ def test_cabinet_chrome_is_retro_only_at_every_width():
         if not all(s.startswith(':root[data-skin="retro"]') for s in sels):
             # unscoped base: only hides the decorative chrome, never gives the wrapper or the face a look
             assert flat in ("display: none;", "display: none"), f"{sels} outside the Retro skin may only be display: none"
-            assert media is None and all(re.search(r"\.dcab \.(plate|screw|bench|knob)$", s) for s in sels), f"{sels}: only plate, screw, bench and knob are hidden unscoped"
+            assert media is None and all(re.search(r"\.dcab \.(plate|screw|knob)$", s) for s in sels), f"{sels}: only plate, screw and knob are hidden unscoped"
         else:
             assert media in _CAB_MEDIA, f"{sels} gives the cabinet a look in an unexpected media query: {media}"
     scoped = " ".join(" ".join(r[1]) for r in rules if all(s.startswith(':root[data-skin="retro"]') for s in r[1]))
-    for needle in (".dcab::before", ".dcab::after", ".dface", ".dface > .plate", ".screw", ".bench", ".rocker", ".dcab.max"):
+    for needle in (".dcab::before", ".dcab::after", ".dface", ".dface > .plate", ".screw", ".dcab.max"):   # the Display bench and its rocker are gone: Clarity is in the Options drawer (2026-10-02)
         assert needle in scoped, f"Retro rule for {needle}"
     hidden = " ".join(" ".join(r[1]) for r in rules if not all(s.startswith(':root[data-skin="retro"]') for s in r[1]))
-    for needle in (".dcab .plate", ".dcab .screw", ".dcab .bench", ".dcab .knob"):
+    for needle in (".dcab .plate", ".dcab .screw", ".dcab .knob"):
         assert needle in hidden, f"{needle} is hidden by default"
 
 
@@ -675,7 +675,7 @@ def test_the_cabinet_has_a_phone_layout_and_the_knob_stays_desktop_only():
     assert "repeat(2, minmax(0, 1fr))" in phone[P + " .gauges"], "gauges two across"
     assert '"top" "face" "val" "note"' in phone[P + " .gauge"], "the reading under the face, not squeezed beside the name"
     assert "var(--cb-cap-1)" in phone[P + " > .scenbar .ssel"] and "appearance: none" in phone[P + " > .scenbar .ssel"], "the dropdown is a cabinet pushbutton"
-    assert "min-width: 44px" in phone[P + " > .scenbar #d_edit"] and "min-height: 44px" in phone[P + " .rocker"], "44 px controls"
+    assert "min-width: 44px" in phone[P + " > .scenbar #d_edit"], "44 px controls (the drawer's controls get theirs from the shared touch-target rule)"
     assert not re.search(r"min-height:\s*(?:[0-3]?\d|4[0-3])px", " ".join(phone.values())), "nothing shrinks a control below 44 px"
     tiny = {s: " ".join(b.split()) for m, ss, b in rules if m == "(max-width: 360px)" for s in ss}
     assert tiny[P + " > .plate .sticker"] == "display: none;", "the sticker gives way on the narrowest phones"
