@@ -163,7 +163,7 @@
     :root[data-skin="retro"] .dcab .dface .rocker:active { transform: translateY(1px); box-shadow: 0 1px 0 var(--rocker-sh); }
     :root[data-skin="retro"] #v0 .dface h3.sec, :root[data-skin="retro"] #v0 .dface #o_note, :root[data-skin="retro"] #v0 .dface #d_table > .note { color: var(--ink2); }   /* text on the light face uses the face ink, not the page's light ink (notes inside the dark panels keep theirs) */
     :root[data-skin="retro"] #v0 .dface table.rd th, :root[data-skin="retro"] #v0 .dface table.rd td .at, :root[data-skin="retro"] #v0 .dface table.rd .dash { color: var(--ink2); }
-    :root[data-skin="retro"] #v0 .dface table.rd tbody td:first-child { box-shadow: inset 3px 0 0 var(--pan); }   /* on the light face the neutral row bar is a faint grey, weaker than the scenario marker below */
+    :root[data-skin="retro"] #v0 .dface table.rd tbody td:first-child { box-shadow: inset 3px 0 0 var(--pan-bd); }   /* on the light face the neutral row bar is a faint grey, weaker than the scenario marker below */
     :root[data-skin="retro"] #v0 .dface #d_table tr.scen td:first-child { box-shadow: inset 3px 0 0 var(--meter-zone); }
     :root[data-skin="retro"] #v0 .dface .more { color: var(--face-ink); }
   }
@@ -207,7 +207,7 @@
   .retro #h_table { margin-top: 6px; }
   .retro .hh table.rd th, .retro .hh table.rd td .at, .retro .hh .note { color: var(--ink2); }   /* the table and the notes sit on the light face */
   .retro .hh .note { font-size: 12.5px; margin: 0 0 8px; }
-  .retro .hh table.rd tbody td:first-child { box-shadow: inset 3px 0 0 var(--pan); }   /* the neutral row bar, faint on the light face in every skin */
+  .retro .hh table.rd tbody td:first-child { box-shadow: inset 3px 0 0 var(--pan-bd); }   /* the neutral row bar, faint on the light face in every skin */
   .retro .hh-alert { display: none; flex: none; margin: 8px 10px 0; padding: 6px 10px; background: var(--msg-bg); border: 1px solid var(--amber); border-radius: 4px; color: var(--amber); font-size: 12.5px; white-space: pre-line; overflow-wrap: anywhere; }   /* the page's notices, shown in the frame only where the phone hides the page's own */
   .retro .hh-nav { padding-bottom: calc(8px + env(safe-area-inset-bottom)); }
   .retro .hh-size { font: 12px var(--sil); color: var(--mut); }
