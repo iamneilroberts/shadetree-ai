@@ -215,15 +215,16 @@
     body:has(#v5.is-active) .topbar:not(.menu-open) + .status, body:has(#v5.is-active) .banner, body:has(#v5.is-active) .msgbar { display: none; }
     body:has(#v5.is-active) .stage { padding: 0; }
     #v5 .stage-pad { padding: 0; }
-    .retro .hh { width: 100%; height: calc(100dvh - 50px); padding: 0; border-radius: 0; background: none; box-shadow: none; }
+    .retro .hh { width: 100%; height: calc(100dvh - var(--topbar-h)); padding: 0; border-radius: 0; background: none; box-shadow: none; }
     .retro .hh-in { border: 0; border-radius: 0; }
     .retro .hh-top { height: 60px; } .retro .hh-body { padding: 8px; } .retro .hh-size { display: none; }
   }
+  :root { --topbar-h: 49px; }
   .menubtn { display: none; }
   @media (max-width: 600px) {
     .topbar .menubtn { display: inline-block; margin-left: auto; min-height: 36px; padding: 5px 16px; }
     .topbar:not(.menu-open) .switcher, .topbar:not(.menu-open) + .status { display: none; }
-    .topbar { flex-wrap: nowrap; min-height: 49px; box-sizing: border-box; padding: 6px 12px; } .topbar.menu-open { flex-wrap: wrap; }
+    .topbar { flex-wrap: nowrap; min-height: var(--topbar-h); box-sizing: border-box; padding: 6px 12px; } .topbar.menu-open { flex-wrap: wrap; }
     .switcher { flex: 1 1 100%; margin-left: 0; }
   }
   .banner[hidden], [hidden] { display: none !important; }

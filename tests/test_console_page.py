@@ -68,7 +68,14 @@ def test_phone_width_hides_the_status_and_controls_but_keeps_the_topbar_menu_for
     assert "100dvh" in media
     hide = re.search(r"([^{}]*)\{ display: none; \}", media).group(1)
     assert "#v5.is-active) .topbar:not(.menu-open) + .status" in hide, "Handheld shows the status and controls once the Menu is open"
-    assert not re.search(r"\.topbar(?!:not)", hide), "the topbar (with the Menu button) stays in Handheld"
+    assert not re.search(r"\.topbar(?!:not\(\.menu-open\) \+ \.status)", hide), "the only topbar-related hide is the closed menu's status"
+    assert "body:has(#v5.is-active) .banner" in hide and "body:has(#v5.is-active) .msgbar" in hide
+    assert re.search(r"body:has\(#v5\.is-active\) \.stage \{ padding: 0; \}", media)
+    frame = re.search(r"\.retro \.hh \{([^}]*)\}", media).group(1)
+    assert "width: 100%" in frame
+    assert re.search(r"height: calc\(100dvh - var\(--topbar-h\)\)", frame), "the frame leaves room for the topbar"
+    assert re.search(r"\.topbar \{[^}]*min-height: var\(--topbar-h\)", _css()), "the topbar uses the same height variable"
+    assert re.search(r"--topbar-h: \d+px", _css())
 
 
 def test_phone_menu_collapse_lives_in_the_600px_query_and_uses_no_colour_literals():
