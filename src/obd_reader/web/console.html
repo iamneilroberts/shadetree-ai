@@ -203,7 +203,7 @@
   /* Live: lamps, the scenario's gauges two across, then the PID table (it scrolls sideways inside its .rwrap); the pane scrolls inside .hh-body */
   .retro .hh-scen { flex: none; padding: 8px 10px 0; } .retro .hh-scen select { width: 100%; }
   .retro .hh .lamps { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; margin-bottom: 10px; }
-  .retro .hh-tbl { display: block; width: 100%; min-height: 40px; margin-top: 10px; padding: 8px 12px; appearance: none; border: 0; border-radius: 4px; background: var(--plate-bg); color: var(--plate-ink); font: 700 12px var(--sil); letter-spacing: .12em; text-transform: uppercase; text-align: left; cursor: pointer; }   /* the table's heading: says how many readings there are and scrolls to them */
+  .retro .hh-tbl { display: block; width: 100%; min-height: 44px; margin-top: 10px; padding: 8px 12px; appearance: none; border: 0; border-radius: 4px; background: var(--plate-bg); color: var(--plate-ink); font: 700 12px var(--sil); letter-spacing: .12em; text-transform: uppercase; text-align: left; cursor: pointer; }   /* the table's heading: says how many readings there are and scrolls to them */
   .retro #h_table { margin-top: 6px; }
   .retro .hh table.rd th, .retro .hh table.rd td .at, .retro .hh .note { color: var(--ink2); }   /* the table and the notes sit on the light face */
   .retro .hh .note { font-size: 12.5px; margin: 0 0 8px; }
@@ -223,11 +223,12 @@
     .retro .hh-top { height: 60px; } .retro .hh-body { padding: 8px; } .retro .hh-size { display: none; }
     .retro .hh-alert, .retro .hh-foot { display: block; }
     body:has(.rbar:not([hidden])) .hh { height: calc(100dvh - var(--topbar-h) - var(--rbar-h)); }   /* the frame ends above the pinned replay bar */
+    body:has(#v5.is-active):has(.topbar.menu-open):has(.rbar:not([hidden])) .stage { padding-bottom: var(--rbar-h); }   /* an open Menu pushes the frame down: room to scroll its nav above the bar */
   }
-  :root { --topbar-h: 49px; }
+  :root { --topbar-h: 57px; }   /* 44px Menu button + 12px padding + 1px border */
   .menubtn { display: none; }
   @media (max-width: 600px) {
-    .topbar .menubtn { display: inline-block; margin-left: auto; min-height: 36px; padding: 5px 16px; }
+    .topbar .menubtn { display: inline-block; margin-left: auto; min-height: 44px; padding: 5px 16px; }
     .topbar:not(.menu-open) .switcher, .topbar:not(.menu-open) + .status { display: none; }
     .topbar { flex-wrap: nowrap; min-height: var(--topbar-h); box-sizing: border-box; padding: 6px 12px; } .topbar.menu-open { flex-wrap: wrap; }
     .switcher { flex: 1 1 100%; margin-left: 0; }
@@ -237,6 +238,10 @@
     .rbar:not([hidden]) input[type=range] { order: -1; flex: 1 1 100%; min-width: 0; }
     .rbar:not([hidden]) .tm { flex: 1; min-width: 0; }
     body:has(.rbar:not([hidden])) .stage { padding-bottom: var(--rbar-h); }   /* room under the pinned replay bar (Handheld's stage padding of 0 wins by specificity; its frame height reserves the bar instead) */
+  }
+  @media (max-width: 600px), (pointer: coarse) {   /* 44px touch targets; a ? keeps its look and gets a 44px hit area */
+    button.b, select.b, .vbtn, .stab, .qbtn, label.chip { min-height: 44px; } label.chip { display: inline-flex; align-items: center; }
+    .q { position: relative; } .q::after { content: ""; position: absolute; inset: calc(50% - 22px); }
   }
   .banner[hidden], [hidden] { display: none !important; }
   .msgbar { padding: 8px 16px; background: var(--msg-bg); border-bottom: 1px solid var(--amber); color: var(--amber); font-size: 13px; }
@@ -504,7 +509,7 @@
 </main>
 <p class="foot">Values come from one shared sampler, so Claude and this page see the same numbers. Normal, watch and out of range are general rules of thumb, not limits for your car [general knowledge, unverified]. The guided test is a draft, unreviewed playbook.</p>
 
-<div id="helpPanel" role="dialog" aria-live="polite"></div>
+<div id="helpPanel" role="dialog" aria-modal="true" aria-labelledby="helpTitle" tabindex="-1"></div>
 <script>
 (function () {
   'use strict';
@@ -878,11 +883,12 @@
     var a = assess(key), u = unitOf(key); if (a.v === null) return 'not reported by this car';
     return 'now ' + fmtPid(key, a.v) + (u ? ' ' + u : '') + (a.s === 'stale' ? ': not current' : WORD[a.s] ? ': ' + WORD[a.s] + ' (10 s)' : '');
   }
-  function closeHelp() { $('helpPanel').className = ''; helpKey = null; }
+  var helpBtn = null;
+  function closeHelp(back) { $('helpPanel').className = ''; helpKey = null; if (back && helpBtn && helpBtn.focus) helpBtn.focus(); helpBtn = null; }   // back: focus returns to the ? that opened it
   function openHelp(btn, key) {
     var h = helpEntry(key), box = $('helpPanel');
     box.textContent = '';
-    box.appendChild(el('h4', '', String(h.title)));
+    box.appendChild(el('h4', '', String(h.title))).id = 'helpTitle';
     box.appendChild(el('h5', '', 'What it measures')); box.appendChild(el('p', '', String(h.measures)));
     if (Array.isArray(h.use) && h.use.length) {
       box.appendChild(el('h5', '', 'How to use it'));
@@ -891,17 +897,18 @@
     if (h.typical) { box.appendChild(el('h5', '', 'Typical / worry if')); box.appendChild(el('p', '', String(h.typical))); }
     var lv = liveLine(key); box._live = lv ? box.appendChild(el('div', 'live', lv)) : null;   // render() keeps it current while open
     if (Array.isArray(h.status) && h.status.indexOf('unreviewed') >= 0) box.appendChild(el('div', 'draft', 'Wording drafted by the model, not yet reviewed.'));
-    box.className = 'open'; helpKey = key;
+    box.className = 'open'; helpKey = key; helpBtn = btn;
     var r = btn.getBoundingClientRect(), w = box.offsetWidth || 360, hgt = box.offsetHeight || 0, below = r.bottom + 8;
     box.style.left = Math.max(12, Math.min(r.left, window.innerWidth - w - 12)) + 'px';
     box.style.top = (below + hgt > window.innerHeight ? Math.max(12, r.top - hgt - 8) : below) + 'px';
+    if (box.focus) box.focus({ preventScroll: true });
   }
   document.addEventListener('click', function (e) {
     var b = e.target && e.target.closest ? e.target.closest('.q') : null;
-    if (b) { var k = b.getAttribute('data-help'); if (helpKey === k) closeHelp(); else openHelp(b, k); return; }
+    if (b) { var k = b.getAttribute('data-help'); if (helpKey === k) closeHelp(true); else openHelp(b, k); return; }
     if (helpKey !== null && !$('helpPanel').contains(e.target)) closeHelp();
   });
-  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeHelp(); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && helpKey !== null) closeHelp(true); });
   function loadHelp() {
     helpTried = performance.now();
     fetch(api('/api/help'))

@@ -3,6 +3,7 @@ const fs = require('fs'), vm = require('vm'), assert = require('assert');
 const html = fs.readFileSync(process.argv[2], 'utf8');
 const js = html.match(/<script>([\s\S]*?)<\/script>/)[1];
 
+let focused = null;   // the node the page last focused
 function makeNode(id, handlers) {
   const n = {
     id, style: {}, className: '', innerHTML: '', hidden: false, dataset: {}, disabled: false, type: '',
@@ -15,7 +16,7 @@ function makeNode(id, handlers) {
     removeChild(c) { this.children = this.children.filter(x => x !== c); return c; },
     contains(t) { return t === this || this.children.some(c => c.contains(t)); },
     closest(sel) { return sel[0] === '.' && this.className.split(' ').includes(sel.slice(1)) ? this : null; },
-    getBoundingClientRect() { return { left: 0, top: 0, bottom: 0, right: 0 }; },
+    getBoundingClientRect() { return { left: 0, top: 0, bottom: 0, right: 0 }; }, focus() { focused = n; },
     addEventListener(t, fn) { handlers[id + ':' + t] = fn; this.on[t] = fn; }, querySelector() { return null; }
   };
   Object.defineProperty(n, 'textContent', { get() { return this._t; }, set(v) { this._t = v; this.children = []; } });
@@ -261,8 +262,10 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
   assert(/first tip/.test(flat(panel)) && /now 28/.test(flat(panel)) && /not yet reviewed/.test(flat(panel)), 'tips, live value, unreviewed tag');
   hp.docHandlers.click({ target: findQ(hp.el('x_grid'), '04') });
   assert.strictEqual(panel.className, '', 'the same ? again closes it');
-  hp.docHandlers.click({ target: q04 }); hp.docHandlers.keydown({ key: 'Escape' });
-  assert.strictEqual(panel.className, '', 'Escape closes');
+  hp.docHandlers.click({ target: q04 });
+  assert.ok(focused === panel && /role="dialog" aria-modal="true" aria-labelledby="helpTitle" tabindex="-1"/.test(html) && panel.children[0].id === 'helpTitle', 'focus moves into the labelled dialog');
+  hp.docHandlers.keydown({ key: 'Escape' });
+  assert.strictEqual(panel.className, '', 'Escape closes'); assert.strictEqual(focused, q04, 'focus returns to the ? that opened it');
   hp.docHandlers.click({ target: q04 }); hp.docHandlers.click({ target: {} });
   assert.strictEqual(panel.className, '', 'a click outside closes');
   hp.docHandlers.click({ target: findQ(hp.el('x_grid'), '99') });

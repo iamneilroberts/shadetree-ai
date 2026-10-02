@@ -563,3 +563,19 @@ def _rbar_problems(css):
 
 def test_replay_bar_is_pinned_to_the_bottom_on_a_phone_with_room_reserved():
     assert _rbar_problems(_css()) == []
+
+
+def test_touch_controls_are_44px_and_the_topbar_height_follows_the_menu_button():
+    css = _css()
+    touch = css[css.index("@media (max-width: 600px), (pointer: coarse) {"):]
+    touch = touch[:touch.index("\n  }")]
+    sels = re.search(r"([^{}]*)\{ min-height: 44px; \}", touch).group(1)
+    assert {s.strip() for s in sels.split(",")} >= {"button.b", "select.b", ".vbtn", ".stab", ".qbtn", "label.chip"}
+    assert re.search(r"\.q::after \{ content: \"\"; position: absolute; inset: calc\(50% - 22px\); \}", touch), "a ? keeps its size with a 44px hit area"
+    assert re.search(r"\.topbar \.menubtn \{[^}]*min-height: 44px", css) and re.search(r"\.retro \.hh-tbl \{[^}]*min-height: 44px", css)
+    assert int(re.search(r"--topbar-h: (\d+)px", css).group(1)) == 44 + 12 + 1, "the phone topbar (6px padding each side, 1px border) fits the Menu button exactly, so the Handheld frame does not overflow"
+
+
+def test_open_menu_leaves_room_to_scroll_the_handheld_nav_above_the_replay_bar():
+    narrower = _css()[_css().index("@media (max-width: 430px)"):]
+    assert re.search(r"body:has\(#v5\.is-active\):has\(\.topbar\.menu-open\):has\(\.rbar:not\(\[hidden\]\)\) \.stage \{ padding-bottom: var\(--rbar-h\); \}", narrower[:narrower.index("\n  }")])
