@@ -38,9 +38,10 @@
     --cyan: #e3b04b; --amber: #ffc233; --ok: #3fe06a; --bad: #ff6a5a; --on-accent: #241a06; --banner: #e3b04b; --msg-bg: #2a1c10;
     --cond: "Helvetica Neue", Helvetica, Arial, "Liberation Sans", sans-serif;
     --pn-plate-bg: var(--plate-bg); --pn-plate-ink: var(--plate-ink);
-    --g-face: var(--meter-face); --g-rim: var(--meter-rim); --g-ink: var(--meter-ink); --g-ink2: var(--meter-ink2); --g-needle: var(--meter-needle);
-    --g-z-ok: var(--meter-z-ok); --g-z-watch: var(--meter-z-watch); --g-z-out: var(--meter-zone); --g-seg: var(--code-amber); --g-ok: var(--led-g); --g-warn: var(--led-y); --g-bad: var(--led-r);
-    --g-win: var(--win-bg); --g-led-off: var(--led-off); --g-glow: var(--glow);
+    /* the Dashboard's meters are the cabinet's black faces in both themes: silk ink, orange needle, LED-coloured zones; the Handheld keeps its pale faces (the .retro block) */
+    --g-face: var(--cb-face); --g-rim: var(--cb-rim); --g-ink: var(--cb-silk); --g-ink2: var(--cb-silk-dim); --g-needle: var(--cb-needle);
+    --g-z-ok: var(--led-g); --g-z-watch: var(--led-y); --g-z-out: var(--cb-redzone); --g-seg: var(--code-amber); --g-ok: var(--led-g); --g-warn: var(--led-y); --g-bad: var(--led-r);
+    --g-win: var(--cb-face); --g-led-off: var(--led-off); --g-glow: var(--glow);
     /* the Dashboard cabinet, dark: grey hammertone steel, dark steel end cheeks, light engraving */
     --cb-steel: #34383b; --cb-steel-hi: #40454a; --cb-steel-lo: #25282b; --cb-seam: #1b1d1f; --cb-line: #5b6064; --cb-engrave: #dedbd2; --cb-engrave-soft: #bbb7ad;
     --cb-trim: #1c1e20; --cb-trim-hi: #2a2d30; --cb-trim-ink: #dedbd2; --cb-chrome-1: #d9dce0; --cb-chrome-2: #80868b; --cb-chrome-3: #3e4246; --cb-chrome-4: #24272a; --cb-vent: #0a0b0c;
@@ -51,7 +52,6 @@
   :root[data-skin="retro"][data-theme="light"] {
     --bg: #efe9dc; --panel: #f8f4ea; --panel2: #e6dfcf; --line: #c9bca3; --ink: #1d1410; --muted: #5b4e3f;
     --cyan: #8e2a24; --amber: #805300; --ok: #186b31; --bad: #b3170b; --on-accent: #fff6e6; --banner: #e3b04b; --msg-bg: #fbeed0;
-    --g-rim: #5f5944;   /* a darker rim on the pale meter face in light mode */
     /* the Dashboard cabinet, light: beige hammertone steel, wood end cheeks, dark engraving */
     --cb-steel: #cdc5ae; --cb-steel-hi: #ddd6c2; --cb-steel-lo: #b8af96; --cb-seam: #8d846e; --cb-line: #9a9178; --cb-engrave: #25231f; --cb-engrave-soft: #403b31;
     --cb-trim: #2e3134; --cb-trim-hi: #3c4044; --cb-trim-ink: #e8e3d5; --cb-chrome-1: #f6f7f8; --cb-chrome-2: #aab0b5; --cb-chrome-3: #62676c; --cb-chrome-4: #3b3f43; --cb-vent: #1b1c1d;
@@ -135,13 +135,14 @@
     --nav-on: #e3b04b; --nav-on-bd: #a5782a; --on-amber: #241a06; --on-red: #1a0503; --crow-line: #2a2320; --cdesc: #f3ecd8; --chint: #b9ae94; --wait-ink: #a9aaad; --hlive-off: #ff8a7a;
     --meter-face: #f6f5ef; --meter-rim: #7d765f; --meter-zone: #c9382a; --meter-z-ok: #25793d; --meter-z-watch: #a86b00; --meter-ink: #2a2723; --meter-ink2: #5b5547; --meter-needle: #b22a1c;
     /* the Retro Dashboard cabinet (1970s shop analyzer): meter faces, CRT table and fonts, the same in both themes; its steel, chrome and engraving follow the theme (the Retro token blocks) */
-    --cb-face: #000; --cb-silk: #f0ece1; --cb-silk-dim: #8f8b82; --cb-needle: #ff7a1a; --cb-redzone: #e0412b; --cb-rim: #62676c; --cb-cap-1: #2c2e30; --cb-cap-2: #111213; --cb-lamp: #ffad2f;
+    --cb-face: #000000; --cb-silk: #f0ece1; --cb-silk-dim: #8f8b82; --cb-needle: #ff7a1a; --cb-redzone: #e0412b; --cb-rim: #62676c; --cb-cap-1: #2c2e30; --cb-cap-2: #111213; --cb-lamp: #ffad2f;
     --crt-fg: #ffb547; --crt-muted: #c08a3a; --crt-rule: #333333; --crt-rule-strong: #6a6a6a; --crt-head-fg: #f2efe6;
     --cb-stencil: "Cabinet Stencil", "Arial Black", sans-serif; --cb-label: "Archivo Narrow", "Arial Narrow", Arial, sans-serif; --cb-mono: "Cabinet Mono", ui-monospace, "DejaVu Sans Mono", monospace;
     --cb-noise: url("data:image/svg+xml,%3Csvg xmlns='http%3A//www.w3.org/2000/svg' width='260' height='260'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.045' numOctaves='3' seed='9'/%3E%3CfeColorMatrix values='1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 0 0 0 0 .26'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   }
   .retro { font: 14px/1.45 var(--sil); color: var(--retro-ink);
            --g-face: var(--meter-face); --g-rim: var(--meter-rim); --g-ink: var(--meter-ink); --g-ink2: var(--meter-ink2); --g-needle: var(--meter-needle); --g-z-ok: var(--meter-z-ok); --g-z-watch: var(--meter-z-watch); --g-z-out: var(--meter-zone); }
+  :root[data-skin="retro"] .stage-pad.retro { --g-win: var(--win-bg); }   /* the Handheld keeps its window colour under the Retro skin (the Dashboard's is the cabinet's black) */
   .retro.max { --ghost: .05; --glow: 1px; }
   .retro .lampbox { margin-top: 0; }
   #v0 .win { background: var(--win-bg); border: 3px solid var(--win-bd); border-radius: 4px; padding: 8px 10px; box-shadow: inset 0 0 12px #000; }
@@ -259,6 +260,22 @@
     :root[data-skin="retro"] #v0 .dface table.rd tbody td:first-child { box-shadow: inset 3px 0 0 var(--cb-line); }   /* the neutral row bar, fainter than the scenario marker below */
     :root[data-skin="retro"] #v0 .dface #d_table tr.scen td:first-child { box-shadow: inset 3px 0 0 var(--cb-accent); }
     :root[data-skin="retro"] #v0 .dface .more { margin-top: 0; color: var(--cb-engrave); font: 600 14px var(--cb-label); letter-spacing: .06em; }
+    /* meter bay: an engraved label and reading over a chrome bezel; every face inside is black (dial, LED bar, seven-segment window) */
+    :root[data-skin="retro"] #v0 .dface .gauges { grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 18px; }
+    :root[data-skin="retro"] #v0 .dface .gauge { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "top val" "face face" "note note"; gap: 7px 8px; align-items: baseline;
+      padding: 0; border: 0; background: transparent; color: var(--cb-engrave); }
+    :root[data-skin="retro"] #v0 .dface .gauge .gtop { grid-area: top; color: var(--cb-engrave); font: 600 12px/1.15 var(--cb-label); letter-spacing: .14em; }
+    :root[data-skin="retro"] #v0 .dface .gauge .gval { grid-area: val; margin: 0; font: 400 15px/1 var(--cb-mono); }
+    :root[data-skin="retro"] #v0 .dface .gauge .gnote { grid-area: note; font-size: 13px; }
+    :root[data-skin="retro"] #v0 .dface .gauge .gface { grid-area: face; margin: 0; border: 9px solid transparent; border-radius: 7px; box-shadow: 0 3px 5px rgba(0,0,0,.3);
+      background: linear-gradient(var(--cb-face), var(--cb-face)) padding-box, linear-gradient(150deg, var(--cb-chrome-1), var(--cb-chrome-2) 38%, var(--cb-chrome-3) 62%, var(--cb-chrome-2) 82%, var(--cb-chrome-1)) border-box; }
+    :root[data-skin="retro"] #v0 .dface .gauge .gface:empty { display: none; }
+    :root[data-skin="retro"] #v0 .dface .gauge .gface.led { padding: 10px 12px; }
+    :root[data-skin="retro"] #v0 .dface .gauge .leds { padding: 12px 10px; border-radius: 0; }
+    :root[data-skin="retro"] #v0 .dface .gauge.watch .gface { box-shadow: 0 0 0 2px var(--cb-warn), 0 3px 5px rgba(0,0,0,.3); }
+    :root[data-skin="retro"] #v0 .dface .gauge.out .gface { box-shadow: 0 0 0 2px var(--cb-bad), 0 3px 5px rgba(0,0,0,.3); }
+    :root[data-skin="retro"] #v0 .dface svg.dial .df { stroke-width: 1; }
+    :root[data-skin="retro"] #v0 .dface svg.dial text { font-family: var(--cb-label); font-weight: 600; }
   }
   @media (min-width: 601px) and (max-width: 900px) {
     :root[data-skin="retro"] #v0 .dface { grid-template-columns: minmax(0, 1fr); }

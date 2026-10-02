@@ -616,3 +616,16 @@ def test_cabinet_fonts_are_embedded_data_uris_and_the_stencil_set_uses_them():
     assert uses("#v0 .dface", "--cb-label"), "labels and body text in Archivo Narrow"
     assert uses(".plate .np b", "--cb-stencil") and uses(".panel > .ptitle", "--cb-stencil") and uses("#v0 .dface h3.sec", "--cb-stencil"), "plate and legends in the stencil"
     assert "SIL OFL 1.1" in HTML[:HTML.index(":root {")] and resources.files("obd_reader.web").joinpath("FONTS-OFL.txt").is_file()
+
+
+@pytest.mark.parametrize("theme", ["dark", "light"])
+def test_retro_dashboard_indicators_sit_on_pure_black_in_both_themes(theme):
+    p = _palette("retro", theme)
+    assert _block_all(":root")["--cb-face"] == "#000000"
+    assert p["--g-face"] == "#000000" and p["--g-win"] == "#000000", "dials, LED bar tracks and seven-segment windows are black"
+    css = _css()
+    bezel = [b for m, ss, b in _cabinet_rules(css) if m and any(s.endswith("#v0 .dface .gauge .gface") for s in ss)]
+    assert bezel and "linear-gradient(var(--cb-face), var(--cb-face)) padding-box" in bezel[0], "the face inside every bezel is black"
+    assert any(any(s.endswith("#v0 .dface .win") for s in ss) and "background: var(--cb-face)" in b for m, ss, b in _cabinet_rules(css)), "the code-count window too"
+    hh = dict(p); hh.update(_block_all(".retro")); hh.update(_block_all(':root[data-skin="retro"] .stage-pad.retro'))
+    assert hh["--g-face"] == "var(--meter-face)" and hh["--g-win"] == "var(--win-bg)", "the Handheld keeps its own faces and windows"
