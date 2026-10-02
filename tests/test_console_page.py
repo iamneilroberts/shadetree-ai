@@ -324,6 +324,9 @@ def test_handheld_alert_repeats_the_notices_inside_the_frame_using_tokens_only()
     assert "background: var(--msg-bg)" in body and "color: var(--amber)" in body  # the --amber on --msg-bg pair is held by TEXT_PAIRS
 
 
+_DESKTOP = ("(min-width: 601px)", "(min-width: 601px) and (max-width: 900px)", "(min-width: 701px)")  # the cabinet is desktop only: wider than a phone
+
+
 def _cabinet_rules(css):
     return [r for r in _css_rules(css) if any(".dcab" in s or ".dface" in s for s in r[1])]
 
@@ -341,7 +344,7 @@ def test_cabinet_chrome_is_retro_desktop_only():
             assert flat in ("display: none;", "display: none"), f"{sels} outside the Retro skin may only be display: none"
             assert all(re.search(r"\.dcab \.(plate|screw|bench)$", s) for s in sels), f"{sels}: only plate, screw and bench are hidden unscoped"
         else:
-            assert media == "(min-width: 601px)", f"{sels} gives the cabinet a look outside the desktop media query: {media}"
+            assert media in _DESKTOP, f"{sels} gives the cabinet a look outside the desktop media queries: {media}"
             assert all(s.startswith(':root[data-skin="retro"] ') for s in sels), f"{sels} is not scoped to the Retro skin"
     scoped = " ".join(" ".join(r[1]) for r in rules if r[0])
     for needle in (".dcab::before", ".dcab::after", ".dface", ".dface > .plate", ".screw", ".bench", ".rocker", ".dcab.max"):
@@ -351,7 +354,12 @@ def test_cabinet_chrome_is_retro_desktop_only():
         assert needle in hidden, f"{needle} is hidden by default"
 
 
-FACE_OVERRIDES = {  # what sits directly on the light cabinet face (not inside its own panel/card) and so needs a face-safe colour
+def _steel(p):
+    """The cabinet body's colours, top to bottom: the hammertone steel gradient's stops (Retro, desktop)."""
+    return [p["--cb-steel-hi"], p["--cb-steel"], p["--cb-steel-lo"]]
+
+
+FACE_OVERRIDES = {  # what sits directly on the cabinet's steel body (not inside its own panel/card) and so needs a steel-safe colour
     "h3.sec": "text", "#o_note": "text", "#d_table > .note": "text", ".more": "text", "table.rd th": "text", "table.rd td .at": "text", ".dash": "text",
     "tr.scen td:first-child": "marker",
 }
@@ -367,17 +375,16 @@ def _face_override(css, frag):
 
 
 @pytest.mark.parametrize("theme", ["dark", "light"])
-def test_text_and_marker_directly_on_the_light_cabinet_face_are_readable(theme):
+def test_text_and_marker_directly_on_the_cabinet_steel_are_readable(theme):
     p, css = _palette("retro", theme), _css()
-    face = re.findall(r"#[0-9a-fA-F]{6}", p["--face"])
-    assert len(face) == 2
+    face = _steel(p)
     for frag, kind in FACE_OVERRIDES.items():
         tok = _face_override(css, frag)
-        assert tok, f"{frag}: a Retro desktop override gives it a face-safe colour"
+        assert tok, f"{frag}: a Retro desktop override gives it a steel-safe colour"
         need = 4.5 if kind == "text" else 3.0
         assert all(_contrast(p[tok], f) >= need for f in face), f"{frag}: {tok} {p[tok]} on the face is below {need}:1"
     if theme == "dark":
-        assert any(_contrast(p["--muted"], f) < 4.5 for f in face), "sanity: the page's --muted is unreadable on the face in Retro dark"
+        assert any(_contrast(p["--meter-ink2"], f) < 4.5 for f in face), "sanity: the old light-face ink is unreadable on the dark steel"
     assert not any(s.endswith(".dface .note") for _, ss, _ in _cabinet_rules(css) for s in ss), "a blanket .dface .note would darken notes inside the dark panels"
 
 
@@ -418,7 +425,7 @@ def _bar_tok(rules, skin, media_ok, candidates):
 _BAR = "table.rd tbody td:first-child"
 _BAR_CONTEXTS = [  # (where, skins, media, a plain row's candidate selectors, a scenario row's extra selectors or None, background)
     ("Dashboard cabinet (Retro desktop)", {"retro"}, {None, "(min-width: 601px)"}, [_BAR, _R + "#v0 .dface " + _BAR],
-     ["#d_table tr.scen td:first-child", _R + "#v0 .dface #d_table tr.scen td:first-child"], "face"),
+     ["#d_table tr.scen td:first-child", _R + "#v0 .dface #d_table tr.scen td:first-child"], "steel"),
     ("Dashboard on the page (Plain, or a phone)", {"plain", "retro"}, {None}, [_BAR], ["#d_table tr.scen td:first-child"], "--bg"),
     ("Handheld table on the device face", {"plain", "retro"}, {None, "(min-width: 601px)"}, [_BAR, ".retro .hh " + _BAR], None, "face"),
 ]
@@ -432,7 +439,7 @@ def test_the_neutral_row_bar_is_fainter_than_the_scenario_marker_on_every_surfac
     for where, skins, media, plain, scen, back in _BAR_CONTEXTS:
         if skin not in skins:
             continue
-        backs = face if back == "face" else [p[back]]
+        backs = face if back == "face" else _steel(p) if back == "steel" else [p[back]]
         neutral = _bar_tok(rules, skin, media, plain)
         marker = _bar_tok(rules, skin, media, plain + scen) if scen else "--meter-zone"  # the Handheld has no scenario rows: the cabinet marker on the same face is the reference
         assert neutral and marker and neutral != marker, f"{where}: neutral {neutral}, marker {marker}"
@@ -444,7 +451,7 @@ def test_the_neutral_row_bar_is_fainter_than_the_scenario_marker_on_every_surfac
 
 
 # ---- feedback wave: text inside the Retro cabinet and the Handheld is readable on its own card --------
-_CAB = [["body"], [_R + ".dcab .dface"]]  # the Dashboard: page ink, then the cabinet face's dark ink (Retro, desktop only)
+_CAB = [["body"], [_R + "#v0 .dface"]]  # the Dashboard: page ink, then the cabinet body's engraving ink (Retro, desktop only)
 _HH = [["body"], [".retro"], [".retro .hh-in"]]  # the Handheld: page ink, the device ink, the light face's ink
 _DGAUGE, _HGAUGE = [[".gauge"]], [[".gauge", ".retro .hh .gauge"]]  # a gauge card on the Dashboard, and in the Handheld
 
@@ -515,18 +522,27 @@ def test_text_in_the_cabinet_and_the_handheld_reads_on_its_own_card(skin, theme)
         while (m := re.fullmatch(r"var\((--[\w-]+)\)", p[k])):
             p[k] = p[m.group(1)]
     face = re.findall(r"#[0-9a-fA-F]{6}", p["--face"])
+    cab = dict(p)  # inside the Retro cabinet body the page tokens point at the engraving colours
+    if skin == "retro":
+        cab.update(_block_all(_R + "#v0 .dface"))
+        for k in cab:
+            while (m := re.fullmatch(r"var\((--[\w-]+)\)", cab[k])):
+                cab[k] = cab[m.group(1)]
     low = []
     for where, chain, bg in _INK_CASES:
+        q = cab if chain[:2] == _CAB else p
         ink = _effective_ink(rules, skin, chain)
         assert ink, f"{where}: no text colour anywhere in its chain"
-        if bg == "hhface" or (bg == "face" and skin == "retro"):
+        if bg == "hhface":
             backs = face  # the light device face (its two gradient stops)
+        elif bg == "face" and skin == "retro":
+            backs = _steel(p)  # the cabinet's steel body
         elif bg == "face":
             backs = [p["--bg"]]  # Plain has no cabinet: the page
         else:
-            backs = [p[t] for t in (_decl_tok(rules, s, skin, "background") for s in bg) if t and re.fullmatch(r"#[0-9a-fA-F]{6}", p[t])][:1]
+            backs = [q[t] for t in (_decl_tok(rules, s, skin, "background") for s in bg) if t and re.fullmatch(r"#[0-9a-fA-F]{6}", q[t])][:1]
         assert backs, f"{where}: no opaque background found in {bg}"
-        low += [(where, ink, p[ink], b, round(_contrast(p[ink], b), 2)) for b in backs if _contrast(p[ink], b) < 4.5]
+        low += [(where, ink, q[ink], b, round(_contrast(q[ink], b), 2)) for b in backs if _contrast(q[ink], b) < 4.5]
     assert low == [], f"{skin}/{theme}: text below 4.5:1 on its card: {low}"
     assert _decl_tok(rules, ".gauge", skin, "color"), "the gauge card sets its own text colour, so it reads in any container"
 
@@ -579,3 +595,24 @@ def test_touch_controls_are_44px_and_the_topbar_height_follows_the_menu_button()
 def test_open_menu_leaves_room_to_scroll_the_handheld_nav_above_the_replay_bar():
     narrower = _css()[_css().index("@media (max-width: 430px)"):]
     assert re.search(r"body:has\(#v5\.is-active\):has\(\.topbar\.menu-open\):has\(\.rbar:not\(\[hidden\]\)\) \.stage \{ padding-bottom: var\(--rbar-h\); \}", narrower[:narrower.index("\n  }")])
+
+
+# ---- 1970s shop-cabinet port (2026-10-02): plate, fonts, black meter faces, CRT table, test selector ----
+def test_cabinet_plate_reads_shadetree_model_br_549():
+    cab = HTML[HTML.index('class="dcab"'):HTML.index('id="v5"')]
+    plate = re.search(r'<div class="plate">(.*?)</div></div>', cab, re.S).group(1)
+    assert "<b>SHADETREE</b>" in plate and "Model BR-549 &middot; Engine Analyzer" in plate and "SER. 0709" in plate
+    assert "7-A" not in HTML, "the old model number is gone everywhere on the page"
+
+
+def test_cabinet_fonts_are_embedded_data_uris_and_the_stencil_set_uses_them():
+    faces = re.findall(r'@font-face \{ font-family: "([^"]+)"; font-style: normal; font-weight: ([\d ]+); src: url\(data:font/woff2;base64,[A-Za-z0-9+/=]{2000,}\) format\("woff2"\); \}', HTML)
+    assert sorted(faces) == [("Archivo Narrow", "400 700"), ("Cabinet Mono", "400"), ("Cabinet Stencil", "400"), ("Cabinet Stencil", "700")]
+    assert HTML.count("@font-face") == 4, "only the weights the cabinet uses"
+    root = _block_all(":root")
+    assert root["--cb-stencil"].startswith('"Cabinet Stencil"') and root["--cb-label"].startswith('"Archivo Narrow"') and root["--cb-mono"].startswith('"Cabinet Mono"')
+    cab = [(s, b) for m, ss, b in _cabinet_rules(_css()) if m for s in ss]
+    uses = lambda frag, tok: any(s.endswith(frag) and "var(" + tok + ")" in b for s, b in cab)
+    assert uses("#v0 .dface", "--cb-label"), "labels and body text in Archivo Narrow"
+    assert uses(".plate .np b", "--cb-stencil") and uses(".panel > .ptitle", "--cb-stencil") and uses("#v0 .dface h3.sec", "--cb-stencil"), "plate and legends in the stencil"
+    assert "SIL OFL 1.1" in HTML[:HTML.index(":root {")] and resources.files("obd_reader.web").joinpath("FONTS-OFL.txt").is_file()

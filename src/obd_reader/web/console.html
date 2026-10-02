@@ -41,11 +41,23 @@
     --g-face: var(--meter-face); --g-rim: var(--meter-rim); --g-ink: var(--meter-ink); --g-ink2: var(--meter-ink2); --g-needle: var(--meter-needle);
     --g-z-ok: var(--meter-z-ok); --g-z-watch: var(--meter-z-watch); --g-z-out: var(--meter-zone); --g-seg: var(--code-amber); --g-ok: var(--led-g); --g-warn: var(--led-y); --g-bad: var(--led-r);
     --g-win: var(--win-bg); --g-led-off: var(--led-off); --g-glow: var(--glow);
+    /* the Dashboard cabinet, dark: grey hammertone steel, dark steel end cheeks, light engraving */
+    --cb-steel: #34383b; --cb-steel-hi: #40454a; --cb-steel-lo: #25282b; --cb-seam: #1b1d1f; --cb-line: #5b6064; --cb-engrave: #dedbd2; --cb-engrave-soft: #bbb7ad;
+    --cb-trim: #1c1e20; --cb-trim-hi: #2a2d30; --cb-trim-ink: #dedbd2; --cb-chrome-1: #d9dce0; --cb-chrome-2: #80868b; --cb-chrome-3: #3e4246; --cb-chrome-4: #24272a; --cb-vent: #0a0b0c;
+    --cb-plate-1: #c9ccd0; --cb-plate-2: #989da2; --cb-plate-ink: #111213; --cb-sticker: #d6bc3a; --cb-sticker-ink: #15120a;
+    --cb-ok: #86d895; --cb-warn: #f0b75a; --cb-bad: #ff9a8a; --cb-accent: #dfb066; --cb-on-accent: #15120a;
+    --cb-cheek: linear-gradient(90deg, rgba(0,0,0,.55), rgba(0,0,0,0) 32%, rgba(0,0,0,0) 68%, rgba(0,0,0,.55)), repeating-linear-gradient(0deg, #2a2d30 0 3px, #151719 3px 6px);
   }
   :root[data-skin="retro"][data-theme="light"] {
     --bg: #efe9dc; --panel: #f8f4ea; --panel2: #e6dfcf; --line: #c9bca3; --ink: #1d1410; --muted: #5b4e3f;
     --cyan: #8e2a24; --amber: #805300; --ok: #186b31; --bad: #b3170b; --on-accent: #fff6e6; --banner: #e3b04b; --msg-bg: #fbeed0;
     --g-rim: #5f5944;   /* a darker rim on the pale meter face in light mode */
+    /* the Dashboard cabinet, light: beige hammertone steel, wood end cheeks, dark engraving */
+    --cb-steel: #cdc5ae; --cb-steel-hi: #ddd6c2; --cb-steel-lo: #b8af96; --cb-seam: #8d846e; --cb-line: #9a9178; --cb-engrave: #25231f; --cb-engrave-soft: #403b31;
+    --cb-trim: #2e3134; --cb-trim-hi: #3c4044; --cb-trim-ink: #e8e3d5; --cb-chrome-1: #f6f7f8; --cb-chrome-2: #aab0b5; --cb-chrome-3: #62676c; --cb-chrome-4: #3b3f43; --cb-vent: #1b1c1d;
+    --cb-plate-1: #eceeef; --cb-plate-2: #c3c7ca; --cb-plate-ink: #1b1c1d; --cb-sticker: #f0d44a; --cb-sticker-ink: #1d1a10;
+    --cb-ok: #174a1f; --cb-warn: #5e3200; --cb-bad: #7a1a0f; --cb-accent: #8e2619; --cb-on-accent: #fff6e6;
+    --cb-cheek: linear-gradient(90deg, rgba(0,0,0,.38), rgba(0,0,0,0) 28%, rgba(0,0,0,0) 72%, rgba(0,0,0,.42)), repeating-linear-gradient(91deg, #6e4328 0 2px, #7d4f31 2px 5px, #603920 5px 6px, #865837 6px 10px, #6a4026 10px 13px);
   }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.45 var(--mono); }
@@ -122,6 +134,11 @@
     --screw: radial-gradient(circle at 35% 30%, #f1f1ee, #7d8288); --screw-slot: #454a4f; --rocker: linear-gradient(#5a5c60, #2b2c2f); --rocker-bd: #1b1c1e; --rocker-ink: #f1ead4; --rocker-sh: #101112;
     --nav-on: #e3b04b; --nav-on-bd: #a5782a; --on-amber: #241a06; --on-red: #1a0503; --crow-line: #2a2320; --cdesc: #f3ecd8; --chint: #b9ae94; --wait-ink: #a9aaad; --hlive-off: #ff8a7a;
     --meter-face: #f6f5ef; --meter-rim: #7d765f; --meter-zone: #c9382a; --meter-z-ok: #25793d; --meter-z-watch: #a86b00; --meter-ink: #2a2723; --meter-ink2: #5b5547; --meter-needle: #b22a1c;
+    /* the Retro Dashboard cabinet (1970s shop analyzer): meter faces, CRT table and fonts, the same in both themes; its steel, chrome and engraving follow the theme (the Retro token blocks) */
+    --cb-face: #000; --cb-silk: #f0ece1; --cb-silk-dim: #8f8b82; --cb-needle: #ff7a1a; --cb-redzone: #e0412b; --cb-rim: #62676c; --cb-cap-1: #2c2e30; --cb-cap-2: #111213; --cb-lamp: #ffad2f;
+    --crt-fg: #ffb547; --crt-muted: #c08a3a; --crt-rule: #333333; --crt-rule-strong: #6a6a6a; --crt-head-fg: #f2efe6;
+    --cb-stencil: "Cabinet Stencil", "Arial Black", sans-serif; --cb-label: "Archivo Narrow", "Arial Narrow", Arial, sans-serif; --cb-mono: "Cabinet Mono", ui-monospace, "DejaVu Sans Mono", monospace;
+    --cb-noise: url("data:image/svg+xml,%3Csvg xmlns='http%3A//www.w3.org/2000/svg' width='260' height='260'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.045' numOctaves='3' seed='9'/%3E%3CfeColorMatrix values='1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 0 0 0 0 .26'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   }
   .retro { font: 14px/1.45 var(--sil); color: var(--retro-ink);
            --g-face: var(--meter-face); --g-rim: var(--meter-rim); --g-ink: var(--meter-ink); --g-ink2: var(--meter-ink2); --g-needle: var(--meter-needle); --g-z-ok: var(--meter-z-ok); --g-z-watch: var(--meter-z-watch); --g-z-out: var(--meter-zone); }
@@ -147,32 +164,109 @@
   .retro .lampbox.lit .lens.grn, #v0 .lampbox.lit .lens.grn { background: var(--lens-grn-lit); box-shadow: 0 0 12px var(--led-g); }
   .retro .lampbox b, #v0 .lampbox b { display: block; color: inherit; }
   .retro .lampbox em, #v0 .lampbox em { display: block; font-style: normal; font-weight: 400; letter-spacing: .04em; text-transform: none; font-size: 11px; opacity: .85; }
-  /* Dashboard cabinet: the instrument-panel look as the Retro skin of the Dashboard, desktop only; Plain and a phone keep the plain page (chrome hidden, wrapper adds nothing) */
+  /* Dashboard cabinet: the Retro skin of the Dashboard on a desktop is a 1970s roll-around engine analyzer. End cheeks (.dcab::before/::after, wood
+     in light, dark steel in dark) frame a hammertone steel body (.dface) with a chrome handle (::before) and a kick plate on casters (::after); the
+     nameplate sits between vents with a calibration sticker; controls, lamps and panels are engraved groups; labels and body in Archivo Narrow,
+     plate and legends in the stencil face, digits in the mono face. Inside the body the page tokens are re-pointed at the engraving colours.
+     Plain and a phone keep the plain page (chrome hidden, wrapper adds nothing). */
   .dcab .plate, .dcab .screw, .dcab .bench { display: none; }
   @media (min-width: 601px) {
-    :root[data-skin="retro"] .dcab { position: relative; padding: 0 30px; }
-    :root[data-skin="retro"] .dcab::before, :root[data-skin="retro"] .dcab::after { content: ""; position: absolute; top: 0; bottom: 0; width: 26px; border-radius: 5px; background: var(--rail-rivet), var(--rail-tex), var(--rail); box-shadow: inset 0 0 0 1px var(--rail-edge), inset 0 0 10px rgba(0,0,0,.5), 0 2px 6px rgba(0,0,0,.5); }
-    :root[data-skin="retro"] .dcab::before { left: 0; }
-    :root[data-skin="retro"] .dcab::after { right: 0; }
+    :root[data-skin="retro"] .dcab { position: relative; padding: 30px 24px 64px; }
+    :root[data-skin="retro"] .dcab::before, :root[data-skin="retro"] .dcab::after { content: ""; position: absolute; top: 30px; bottom: 64px; width: 24px; background: var(--cb-cheek); }
+    :root[data-skin="retro"] .dcab::before { left: 0; border-radius: 8px 0 0 0; }
+    :root[data-skin="retro"] .dcab::after { right: 0; border-radius: 0 8px 0 0; }
     :root[data-skin="retro"] .dcab.max { --ghost: .05; --glow: 1px; }
-    :root[data-skin="retro"] .dcab .dface { position: relative; background: var(--face); border: 3px solid var(--face-bd); border-radius: 6px; padding: 14px; color: var(--face-ink); box-shadow: inset 0 1px 0 rgba(255,255,255,.35), 0 8px 22px rgba(0,0,0,.55); }
-    :root[data-skin="retro"] .dcab .dface > .plate { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 6px 12px; margin-bottom: 12px; background: var(--plate-bg); color: var(--plate-ink); border-radius: 3px; font: 700 14px var(--sil); letter-spacing: .22em; text-transform: uppercase; }
-    :root[data-skin="retro"] .dcab .dface > .plate small { font: 700 11px var(--sil); letter-spacing: .14em; color: var(--plate-ink2); }
-    :root[data-skin="retro"] .dcab .dface > .screw { display: block; position: absolute; width: 12px; height: 12px; border-radius: 50%; background: var(--screw); box-shadow: 0 1px 2px rgba(0,0,0,.5); }
-    :root[data-skin="retro"] .dcab .dface > .screw::after { content: ""; position: absolute; left: 2px; right: 2px; top: 5px; height: 2px; background: var(--screw-slot); transform: rotate(35deg); }
-    :root[data-skin="retro"] .dcab .dface > .screw:nth-of-type(1) { left: 8px; top: 8px; }
-    :root[data-skin="retro"] .dcab .dface > .screw:nth-of-type(2) { right: 8px; top: 8px; }
-    :root[data-skin="retro"] .dcab .dface > .screw:nth-of-type(3) { left: 8px; bottom: 8px; }
-    :root[data-skin="retro"] .dcab .dface > .screw:nth-of-type(4) { right: 8px; bottom: 8px; }
-    :root[data-skin="retro"] .dcab .dface > .bench { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px; padding: 8px 10px; background: var(--bench); border: 1px solid var(--pan-bd); border-radius: 4px; }
-    :root[data-skin="retro"] .dcab .dface > .bench .lab { font: 700 11.5px var(--sil); letter-spacing: .16em; text-transform: uppercase; color: var(--face-ink); }
-    :root[data-skin="retro"] .dcab .dface .rocker { appearance: none; border: 2px solid var(--rocker-bd); background: var(--rocker); color: var(--rocker-ink); border-radius: 4px; padding: 6px 12px; font: 700 12px var(--sil); letter-spacing: .1em; text-transform: uppercase; cursor: pointer; box-shadow: 0 2px 0 var(--rocker-sh); }
-    :root[data-skin="retro"] .dcab .dface .rocker:active { transform: translateY(1px); box-shadow: 0 1px 0 var(--rocker-sh); }
-    :root[data-skin="retro"] #v0 .dface h3.sec, :root[data-skin="retro"] #v0 .dface #o_note, :root[data-skin="retro"] #v0 .dface #d_table > .note { color: var(--ink2); }   /* text on the light face uses the face ink, not the page's light ink (notes inside the dark panels keep theirs) */
-    :root[data-skin="retro"] #v0 .dface table.rd th, :root[data-skin="retro"] #v0 .dface table.rd td .at, :root[data-skin="retro"] #v0 .dface table.rd .dash { color: var(--ink2); }
-    :root[data-skin="retro"] #v0 .dface table.rd tbody td:first-child { box-shadow: inset 3px 0 0 var(--pan-bd); }   /* on the light face the neutral row bar is a faint grey, weaker than the scenario marker below */
-    :root[data-skin="retro"] #v0 .dface #d_table tr.scen td:first-child { box-shadow: inset 3px 0 0 var(--meter-zone); }
-    :root[data-skin="retro"] #v0 .dface .more { color: var(--face-ink); }
+    :root[data-skin="retro"] #v0 .dface { position: relative; display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr); gap: 18px; align-items: start; padding: 18px 18px 22px;
+      border-inline: 1px solid var(--cb-seam); color: var(--cb-engrave); font: 15px/1.45 var(--cb-label); box-shadow: 0 10px 30px rgba(0,0,0,.28);
+      background: var(--cb-noise), linear-gradient(180deg, var(--cb-steel-hi), var(--cb-steel) 12%, var(--cb-steel) 97%, var(--cb-steel-lo)); background-blend-mode: soft-light, normal;
+      --ink: var(--cb-engrave); --muted: var(--cb-engrave-soft); --line: var(--cb-line); --panel: var(--cb-steel); --panel2: var(--cb-steel-hi); --ok: var(--cb-ok); --amber: var(--cb-warn); --bad: var(--cb-bad);
+      --cyan: var(--cb-accent); --on-accent: var(--cb-on-accent); --sil: var(--cb-label); --cond: var(--cb-label); --mono: var(--cb-mono); }
+    :root[data-skin="retro"] #v0 .dface::before { content: ""; position: absolute; top: -30px; left: 50%; width: min(58%, 520px); height: 30px; transform: translateX(-50%); pointer-events: none;
+      background: linear-gradient(180deg, var(--cb-chrome-1), var(--cb-chrome-2) 55%, var(--cb-chrome-3)) left 0 top 8px / 100% 11px no-repeat,
+        linear-gradient(90deg, var(--cb-chrome-3), var(--cb-chrome-1), var(--cb-chrome-3)) left 18px top 17px / 14px 13px no-repeat,
+        linear-gradient(90deg, var(--cb-chrome-3), var(--cb-chrome-1), var(--cb-chrome-3)) right 18px top 17px / 14px 13px no-repeat; }
+    :root[data-skin="retro"] #v0 .dface::after { content: "Lock casters before testing" / ""; position: absolute; left: -25px; right: -25px; bottom: -64px; height: 64px; padding-top: 11px; pointer-events: none;
+      text-align: center; font: 600 11px/12px var(--cb-label); letter-spacing: .2em; text-transform: uppercase; color: var(--cb-trim-ink);
+      background: radial-gradient(circle, var(--cb-chrome-1) 0 4px, var(--cb-chrome-3) 5px 7px, var(--cb-cap-2) 8px 16px, transparent 16.5px) left 9% top 28px / 34px 34px no-repeat,
+        radial-gradient(circle, var(--cb-chrome-1) 0 4px, var(--cb-chrome-3) 5px 7px, var(--cb-cap-2) 8px 16px, transparent 16.5px) right 9% top 28px / 34px 34px no-repeat,
+        linear-gradient(180deg, var(--cb-trim-hi), var(--cb-trim)) left 0 top 0 / 100% 34px no-repeat; }
+    :root[data-skin="retro"] #v0 .dface > * { grid-column: 1 / -1; min-width: 0; }
+    :root[data-skin="retro"] #v0 .dface > .scenbar { grid-column: 1; grid-row: 2 / span 2; }
+    :root[data-skin="retro"] #v0 .dface > .lamps { grid-column: 2; grid-row: 2; }
+    :root[data-skin="retro"] #v0 .dface > .bench { grid-column: 2; grid-row: 3; }
+    /* nameplate: vents | brushed plate | vents | sticker */
+    :root[data-skin="retro"] #v0 .dface > .plate { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto; gap: 18px; align-items: center; }
+    :root[data-skin="retro"] #v0 .dface > .plate::before, :root[data-skin="retro"] #v0 .dface > .plate::after { content: ""; grid-row: 1; grid-column: 1; height: 50px; border-radius: 3px; background: repeating-linear-gradient(180deg, var(--cb-vent) 0 6px, transparent 6px 11px); }
+    :root[data-skin="retro"] #v0 .dface > .plate::after { grid-column: 3; }
+    :root[data-skin="retro"] #v0 .dface > .plate .np { grid-column: 2; grid-row: 1; padding: 14px 26px 12px; border-radius: 4px; color: var(--cb-plate-ink); text-align: center;
+      background: repeating-linear-gradient(90deg, rgba(255,255,255,.18) 0 1px, rgba(0,0,0,0) 1px 3px), linear-gradient(180deg, var(--cb-plate-1), var(--cb-plate-2)); box-shadow: inset 0 0 0 1px rgba(0,0,0,.25), 0 2px 3px rgba(0,0,0,.25); }
+    :root[data-skin="retro"] #v0 .dface > .plate .np b { display: block; font: 400 clamp(20px, 3vw, 30px)/1 var(--cb-stencil); letter-spacing: .16em; }
+    :root[data-skin="retro"] #v0 .dface > .plate .np > span { display: block; margin-top: 7px; font: 700 14px/1.15 var(--cb-label); letter-spacing: .2em; text-transform: uppercase; }
+    :root[data-skin="retro"] #v0 .dface > .plate .np small { display: flex; justify-content: center; flex-wrap: wrap; gap: 4px 14px; margin-top: 8px; font: 600 11px/1.2 var(--cb-label); letter-spacing: .14em; text-transform: uppercase; }
+    :root[data-skin="retro"] #v0 .dface > .plate .sticker { grid-column: 4; grid-row: 1; width: 118px; padding: 6px 8px 7px; background: var(--cb-sticker); color: var(--cb-sticker-ink); transform: rotate(-3deg); border-radius: 2px;
+      box-shadow: 0 1px 2px rgba(0,0,0,.3); font: 600 10.5px/1.25 var(--cb-label); letter-spacing: .06em; text-transform: uppercase; }
+    :root[data-skin="retro"] #v0 .dface > .plate .sticker b { display: block; font: 400 15px/1 var(--cb-stencil); letter-spacing: .08em; margin-bottom: 4px; padding-bottom: 3px; border-bottom: 1.5px solid var(--cb-sticker-ink); }
+    :root[data-skin="retro"] #v0 .dface > .plate .sticker span { display: flex; justify-content: space-between; gap: 6px; } :root[data-skin="retro"] #v0 .dface > .plate .sticker em { font-style: normal; }
+    :root[data-skin="retro"] #v0 .dface > .screw { display: block; position: absolute; width: 10px; height: 10px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, var(--cb-chrome-1), var(--cb-chrome-2) 55%, var(--cb-chrome-4)); box-shadow: 0 1px 1px rgba(0,0,0,.35); }
+    :root[data-skin="retro"] #v0 .dface > .screw::after { content: ""; position: absolute; left: 1px; right: 1px; top: 4.25px; height: 1.5px; background: var(--cb-chrome-4); transform: rotate(35deg); }
+    :root[data-skin="retro"] #v0 .dface > .screw:nth-of-type(1) { left: 6px; top: 6px; }
+    :root[data-skin="retro"] #v0 .dface > .screw:nth-of-type(2) { right: 6px; top: 6px; }
+    :root[data-skin="retro"] #v0 .dface > .screw:nth-of-type(3) { left: 6px; bottom: 6px; }
+    :root[data-skin="retro"] #v0 .dface > .screw:nth-of-type(4) { right: 6px; bottom: 6px; }
+    /* engraved groups: the selector, the lamps, the Display bench and every panel; the legend is engraved in the stencil face */
+    :root[data-skin="retro"] #v0 .dface > .scenbar, :root[data-skin="retro"] #v0 .dface > .lamps, :root[data-skin="retro"] #v0 .dface > .bench { position: relative; margin: 0; padding: 36px 14px 14px; border: 1.5px solid var(--cb-engrave-soft); border-radius: 4px; background: transparent; }
+    :root[data-skin="retro"] #v0 .dface > .scenbar::before, :root[data-skin="retro"] #v0 .dface > .lamps::before, :root[data-skin="retro"] #v0 .dface > .bench .lab { position: absolute; top: 11px; left: 14px; font: 400 13px/1 var(--cb-stencil); letter-spacing: .14em; text-transform: uppercase; color: var(--cb-engrave); }
+    :root[data-skin="retro"] #v0 .dface > .scenbar::before { content: "Test selector"; }
+    :root[data-skin="retro"] #v0 .dface > .lamps::before { content: "Status"; }
+    :root[data-skin="retro"] #v0 .dface > .scenbar { flex-wrap: wrap; align-items: flex-start; }
+    :root[data-skin="retro"] #v0 .dface > .scenbar #d_edit { position: absolute; top: 6px; right: 8px; }
+    :root[data-skin="retro"] #v0 .dface .panel, :root[data-skin="retro"] #v0 .dface .attn, :root[data-skin="retro"] #v0 .dface .tile { background: transparent; color: var(--cb-engrave); border: 1.5px solid var(--cb-engrave-soft); border-radius: 4px; }
+    :root[data-skin="retro"] #v0 .dface .panel { margin-bottom: 0; overflow: visible; }
+    :root[data-skin="retro"] #v0 .dface .panel + .panel { margin-top: 18px; }
+    :root[data-skin="retro"] #v0 .dface .tile { border-left-width: 4px; }
+    :root[data-skin="retro"] #v0 .dface .tile:not(.watch):not(.out):not(.neutral):not(.idle) { border-left-color: var(--cb-ok); }
+    :root[data-skin="retro"] #v0 .dface .tile.watch { border-left-color: var(--cb-warn); } :root[data-skin="retro"] #v0 .dface .tile.out { border-left-color: var(--cb-bad); }
+    :root[data-skin="retro"] #v0 .dface .tile.neutral, :root[data-skin="retro"] #v0 .dface .tile.idle { border-left-color: var(--cb-line); }
+    :root[data-skin="retro"] #v0 .dface .tile .big { font: 400 40px/1 var(--cb-mono); }
+    :root[data-skin="retro"] #v0 .dface .panel > .ptitle { background: transparent; color: var(--cb-engrave); border-bottom: 0; padding: 11px 14px 0; font: 400 13px var(--cb-stencil); letter-spacing: .14em; }
+    :root[data-skin="retro"] #v0 .dface .panel > .ptitle .pnote { font: 600 11px var(--cb-label); letter-spacing: .1em; text-transform: uppercase; color: var(--cb-engrave-soft); }
+    :root[data-skin="retro"] #v0 .dface #d_ready_mount { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 18px; }
+    :root[data-skin="retro"] #v0 .dface #d_ready_mount .panel + .panel { margin-top: 0; }
+    :root[data-skin="retro"] #v0 .dface .win, :root[data-skin="retro"] #v0 .dface .clist { background: var(--cb-face); border-color: var(--cb-chrome-3); }
+    :root[data-skin="retro"] #v0 .dface .mono { font-family: var(--cb-mono); }
+    /* pushbuttons: chrome bezel, black cap, a pilot lamp that lights on the chosen one (scenario tabs, the edit pencil, Clarity) */
+    :root[data-skin="retro"] #v0 .dface .stabs { gap: 10px; }
+    :root[data-skin="retro"] #v0 .dface .stab, :root[data-skin="retro"] #v0 .dface .rocker, :root[data-skin="retro"] #v0 .dface #d_edit { appearance: none; position: relative; border: 4px solid transparent; border-radius: 5px; padding: 15px 12px 8px; cursor: pointer;
+      background: linear-gradient(180deg, var(--cb-cap-1), var(--cb-cap-2)) padding-box, linear-gradient(145deg, var(--cb-chrome-1), var(--cb-chrome-2) 45%, var(--cb-chrome-3) 70%, var(--cb-chrome-2)) border-box;
+      color: var(--cb-silk); font: 700 12.5px/1.1 var(--cb-label); letter-spacing: .14em; text-transform: uppercase; box-shadow: 0 2px 3px rgba(0,0,0,.3); }
+    :root[data-skin="retro"] #v0 .dface .stab::before, :root[data-skin="retro"] #v0 .dface .rocker::before, :root[data-skin="retro"] #v0 .dface #d_edit::before { content: ""; position: absolute; top: 4px; left: 50%; width: 20px; margin-left: -10px; height: 3px; border-radius: 2px; background: color-mix(in srgb, var(--cb-lamp) 22%, var(--cb-cap-2)); }
+    :root[data-skin="retro"] #v0 .dface .stab.is-active::before, :root[data-skin="retro"] #v0 .dface #d_edit[aria-pressed="true"]::before, :root[data-skin="retro"] #v0 .dcab.max .dface .rocker::before { background: var(--cb-lamp); box-shadow: 0 0 6px var(--cb-lamp); }
+    :root[data-skin="retro"] #v0 .dface .stab:hover, :root[data-skin="retro"] #v0 .dface .stab.is-active { color: var(--cb-silk); }
+    :root[data-skin="retro"] #v0 .dface .stab:active, :root[data-skin="retro"] #v0 .dface .rocker:active, :root[data-skin="retro"] #v0 .dface #d_edit:active { transform: translateY(1px); box-shadow: inset 0 2px 3px rgba(0,0,0,.7); }
+    :root[data-skin="retro"] #v0 .dface #d_edit { padding: 13px 9px 5px; font-size: 14px; letter-spacing: 0; }
+    /* status lamps: chrome-ringed lenses, engraved label and state under each */
+    :root[data-skin="retro"] #v0 .dface > .lamps { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px 6px; }
+    :root[data-skin="retro"] #v0 .dface .lampbox { flex-direction: column; justify-content: flex-start; gap: 9px; padding: 0; text-align: center; background: transparent; color: var(--cb-engrave); font: 600 11.5px/1.15 var(--cb-label); letter-spacing: .1em; }
+    :root[data-skin="retro"] #v0 .dface .lampbox em { margin-top: 3px; font: 600 11px/1.2 var(--cb-label); letter-spacing: .06em; text-transform: uppercase; color: var(--cb-engrave-soft); opacity: 1; }
+    :root[data-skin="retro"] #v0 .dface .lens { width: 30px; height: 30px; margin: 6px auto 0; border: 1px solid var(--cb-chrome-4); box-shadow: 0 0 0 4px var(--cb-chrome-2), 0 0 0 5px var(--cb-chrome-4), 0 3px 4px 5px rgba(0,0,0,.3); }
+    :root[data-skin="retro"] #v0 .dface .lampbox.lit .lens.red { box-shadow: 0 0 0 4px var(--cb-chrome-2), 0 0 0 5px var(--cb-chrome-4), 0 0 16px 6px var(--led-r); }
+    :root[data-skin="retro"] #v0 .dface .lampbox.lit .lens.amb { box-shadow: 0 0 0 4px var(--cb-chrome-2), 0 0 0 5px var(--cb-chrome-4), 0 0 16px 6px var(--led-y); }
+    :root[data-skin="retro"] #v0 .dface .lampbox.lit .lens.grn { box-shadow: 0 0 0 4px var(--cb-chrome-2), 0 0 0 5px var(--cb-chrome-4), 0 0 16px 6px var(--led-g); }
+    :root[data-skin="retro"] #v0 .dface > .bench { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+    :root[data-skin="retro"] #v0 .dface h3.sec, :root[data-skin="retro"] #v0 .dface #o_note, :root[data-skin="retro"] #v0 .dface #d_table > .note { color: var(--cb-engrave); }   /* text directly on the steel: the engraving colour */
+    :root[data-skin="retro"] #v0 .dface h3.sec { margin: 0 0 10px; font: 400 13px var(--cb-stencil); letter-spacing: .14em; }
+    :root[data-skin="retro"] #v0 .dface table.rd th, :root[data-skin="retro"] #v0 .dface table.rd td .at, :root[data-skin="retro"] #v0 .dface table.rd .dash { color: var(--cb-engrave-soft); }
+    :root[data-skin="retro"] #v0 .dface table.rd tbody td:first-child { box-shadow: inset 3px 0 0 var(--cb-line); }   /* the neutral row bar, fainter than the scenario marker below */
+    :root[data-skin="retro"] #v0 .dface #d_table tr.scen td:first-child { box-shadow: inset 3px 0 0 var(--cb-accent); }
+    :root[data-skin="retro"] #v0 .dface .more { margin-top: 0; color: var(--cb-engrave); font: 600 14px var(--cb-label); letter-spacing: .06em; }
+  }
+  @media (min-width: 601px) and (max-width: 900px) {
+    :root[data-skin="retro"] #v0 .dface { grid-template-columns: minmax(0, 1fr); }
+    :root[data-skin="retro"] #v0 .dface > .scenbar, :root[data-skin="retro"] #v0 .dface > .lamps, :root[data-skin="retro"] #v0 .dface > .bench { grid-column: 1; grid-row: auto; }
+    :root[data-skin="retro"] #v0 .dface > .plate { grid-template-columns: minmax(0, 1fr) auto; }
+    :root[data-skin="retro"] #v0 .dface > .plate::before, :root[data-skin="retro"] #v0 .dface > .plate::after { display: none; }
+    :root[data-skin="retro"] #v0 .dface > .plate .np { grid-column: 1; } :root[data-skin="retro"] #v0 .dface > .plate .sticker { grid-column: 2; }
+    :root[data-skin="retro"] #v0 .dface > .lamps { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   }
   .retro .mono, #v0 .mono { font-family: ui-monospace, "DejaVu Sans Mono", Menlo, Consolas, monospace; }
   #v0 .cwrap { display: grid; grid-template-columns: 150px 1fr; gap: 12px; }
@@ -438,7 +532,7 @@
 <main class="stage">
   <section class="view is-active" id="v0" role="tabpanel"><div class="sumbar" id="d_sum" role="status"></div><div class="dcab"><div class="dface">
     <span class="screw"></span><span class="screw"></span><span class="screw"></span><span class="screw"></span>
-    <div class="plate"><span>Shadetree Model 7-A &middot; Engine Analyzer</span><small>SER. 0709</small></div>
+    <div class="plate"><div class="np"><b>SHADETREE</b><span>Model BR-549 &middot; Engine Analyzer</span><small><span>SER. 0709</span><span>12 V DC neg. gnd</span><span>Read-only &middot; never clears codes</span></small></div><div class="sticker" aria-hidden="true"><b>Calibrated</b><span><em>Date</em><em>09-26</em></span><span><em>Due</em><em>03-27</em></span><span><em>Tech</em><em>No. 07</em></span></div></div>
     <div class="scenbar">
       <div class="stabs" id="d_tabs" role="tablist" aria-label="Scenarios"></div>
       <select class="b ssel" id="d_sel" aria-label="Scenario"></select>
