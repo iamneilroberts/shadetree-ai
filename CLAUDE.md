@@ -2,7 +2,7 @@
 
 Name chosen 2026-09-28 (provisional). PyPI dist/CLI: `shadetree-ai`; Python import package stays `obd_reader` for now; repo directory is still `obd-reader`.
 
-Read-only OBD-II diagnostic assistant. Design: `docs/design.md` (source of truth). Status (2026-09-30): Phases 1–3a and the live console are built and merged (687 tests, main pushed). Not built: reference store, playbooks, legacy-protocol decode. Hardware-verified only on the OBDLink EX bench and one 2024 Ridgeline scan; Mode 06, 29-bit ECU headers, and the console on a real adapter are still unverified. See README "What works today".
+Read-only OBD-II diagnostic assistant. Design: `docs/design.md` (source of truth). Status (2026-09-30): Phases 1–3a and the live console are built and merged (701 tests, main pushed). Not built: reference store, playbooks, legacy-protocol decode. Hardware-verified only on the OBDLink EX bench and one 2024 Ridgeline scan; Mode 06, 29-bit ECU headers, and the console on a real adapter are still unverified. See README "What works today".
 
 ## Decisions (do not relitigate without a real flaw)
 - Users: Austin (older cars, laptop on bench, own Claude subscription) and Neil (2024 Ridgeline, 2023 Highlander — CAN only). **Public repo, MIT** (github.com/iamneilroberts/shadetree-ai, made public 2026-09-29): never commit real snapshots/transcripts (VINs), secrets, or share-alike/NC/proprietary data.
