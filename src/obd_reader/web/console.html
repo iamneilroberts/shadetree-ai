@@ -258,7 +258,10 @@
   table.rd th, table.rd td { text-align: right; padding: 3px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
   table.rd th { font: 700 11.5px var(--cond); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
   table.rd th:first-child, table.rd td.n { text-align: left; white-space: normal; }
-  table.rd td.n .q { width: 18px; height: 18px; font-size: 11px; margin-left: 6px; vertical-align: middle; }
+  table.rd td { vertical-align: top; }   /* every value sits on the row's first line, the when under it, so a row reads straight across */
+  table.rd td.n .nw { display: flex; align-items: flex-start; gap: 6px; }   /* the name wraps in its own space; the ? stays beside it, never on a line of its own */
+  table.rd td.n .nw span { flex: 1 1 auto; min-width: 0; }
+  table.rd td.n .q { width: 18px; height: 18px; font-size: 11px; flex: none; margin: 0; }
   table.rd td .at { display: block; font-size: 10.5px; color: var(--muted); }
   table.rd tbody td:first-child { box-shadow: inset 3px 0 0 var(--line); }   /* every row has the same left bar; the Dashboard's scenario rows recolour it */
   @media (max-width: 430px) { table.rd th, table.rd td { padding: 3px 4px; } }
@@ -727,7 +730,12 @@
   }
   function gotRuns(j) {
     runsBy = { examples: (j && j.examples) || [], mine: (j && j.runs) || [] };
-    $('rp_src').value = runsBy.examples.length ? 'examples' : 'mine';
+    var srcSel = $('rp_src'), mineFirst = runsBy.mine.length > 0;
+    srcSel.textContent = '';
+    (mineFirst ? [['mine', 'My runs'], ['examples', 'Examples']] : [['examples', 'Examples'], ['mine', 'My runs']]).forEach(function (o) {
+      var op = el('option', '', o[1]); op.value = o[0]; srcSel.appendChild(op);
+    });
+    srcSel.value = mineFirst ? 'mine' : (runsBy.examples.length ? 'examples' : 'mine');
     fillRuns();
   }
   ['rp_src', 'rp_make', 'rp_model', 'rp_year'].forEach(function (id) { $(id).addEventListener('change', fillRuns); });
@@ -938,7 +946,7 @@
   function fmtAge(a) { return a === null || a === undefined ? '' : (a < 10 ? a.toFixed(1) + ' s' : a < 60 ? Math.round(a) + ' s' : fmtRunT(a)) + ' ago'; }
   function makeX(it) {   // one table row per reading: name (unit) and ?, now, min, max, average, std, samples; min, max and samples carry a small second line
     var root = el('tr', 'xr'), n = el('td', 'n'), nm = el('span'), v = [], at = [];
-    root.setAttribute('data-key', it.key); n.appendChild(nm); n.appendChild(qbtn(it.key)); root.appendChild(n);
+    root.setAttribute('data-key', it.key); var nw = el('div', 'nw'); nw.appendChild(nm); nw.appendChild(qbtn(it.key)); n.appendChild(nw); root.appendChild(n);
     for (var i = 0; i < 6; i++) { var td = el('td'); v.push(td.appendChild(el('span'))); at.push(td.appendChild(el('span', 'at'))); root.appendChild(td); }
     return { root: root, nm: nm, v: v, at: at };
   }
