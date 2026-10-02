@@ -275,7 +275,7 @@
   #v0 h3.sec { font: 700 12px var(--cond); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin: 18px 0 8px; }
   #v0 h3.sec:first-child { margin-top: 0; }
   #v0 .tiles { display: grid; gap: 12px; grid-template-columns: repeat(5, 1fr); }
-  #v0 .tile { background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--ok); border-radius: 8px; padding: 10px 12px; position: relative; min-width: 0; }
+  #v0 .tile { background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-left: 4px solid var(--ok); border-radius: 8px; padding: 10px 12px; position: relative; min-width: 0; }
   #v0 .tile.watch { border-left-color: var(--amber); } #v0 .tile.out { border-left-color: var(--bad); }
   #v0 .tile.neutral { border-left-color: var(--line); } #v0 .tile.idle { border-left-color: var(--line); opacity: .65; }
   #v0 .tile h3 { font: 700 12px var(--cond); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin: 0 0 6px; padding-right: 26px; }
@@ -284,7 +284,7 @@
   #v0 .tile.watch .sub { color: var(--amber); } #v0 .tile.out .sub { color: var(--bad); }
   #v0 svg.spark { width: 100%; height: 34px; display: block; margin-top: 6px; }
   #v0 svg.spark polyline { fill: none; stroke: var(--cyan); stroke-width: 1.6; }
-  #v0 .attn { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
+  #v0 .attn { background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; }   /* the panel, tile and attention cards carry their own ink, not the cabinet face's dark ink */
   #v0 .attn:empty { display: none; }
   #v0 .orow { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-top: 1px solid var(--line); }
   #v0 .orow:first-child { border-top: 0; }
@@ -307,7 +307,7 @@
   #rp_err:empty { display: none; }
   button.b:disabled { opacity: .45; cursor: not-allowed; }
   /* shared parts: Panel (card with a title plate), Gauge (dial, bar, seven-segment), PID table (table.rd above) */
-  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; margin-bottom: 12px; overflow: hidden; min-width: 0; }
+  .panel { background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; margin-bottom: 12px; overflow: hidden; min-width: 0; }
   .panel > .ptitle { display: flex; align-items: center; gap: 8px; padding: 6px 12px; background: var(--pn-plate-bg); color: var(--pn-plate-ink);
                      border-bottom: 1px solid var(--line); font: 700 12px var(--cond); letter-spacing: .12em; text-transform: uppercase; }
   .panel > .ptitle .pname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -326,7 +326,7 @@
   .edrow span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
   @media (max-width: 600px) { .edrow { flex-wrap: wrap; } .edrow span { flex-basis: 100%; } }
   .qbtn[aria-pressed="true"] { background: var(--cyan); border-color: var(--cyan); color: var(--on-accent); }
-  .gauge { background: var(--panel2); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; min-width: 0; }
+  .gauge { background: var(--panel2); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; min-width: 0; }   /* its own ink: the card is page-coloured inside the light cabinet face and the Handheld face */
   .gauge.watch { border-color: var(--amber); } .gauge.out { border-color: var(--bad); } .gauge.dim .gface { opacity: .4; }
   .gauge .gtop { display: flex; align-items: center; gap: 6px; font: 700 11.5px var(--cond); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
   .gauge .gname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -341,7 +341,6 @@
   .gauge .gval { font: 700 20px var(--cond); font-variant-numeric: tabular-nums; margin-top: 4px; } .gauge .gval:empty { display: none; }
   .gauge .gnote { color: var(--muted); font-size: 12px; min-height: 18px; }
   .gauge.watch .gnote { color: var(--amber); } .gauge.out .gnote { color: var(--bad); }
-  .retro .hh .gauge { color: var(--ink); }   /* Handheld gauge cards are page-coloured on the light face: page ink, not the face ink */
 </style>
 </head>
 <body>

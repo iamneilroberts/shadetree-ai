@@ -383,6 +383,95 @@ def test_every_pid_table_row_has_the_same_left_bar_and_scenario_rows_only_recolo
         assert len(decl) == 1 and re.fullmatch(r"box-shadow: inset 3px 0 0 var\(--[\w-]+\)", decl[0]) and "--line" not in decl[0], f"{s}: .scen only recolours the bar"
 
 
+# ---- feedback wave: text inside the Retro cabinet and the Handheld is readable on its own card --------
+_R = ':root[data-skin="retro"] '
+_CAB = [["body"], [_R + ".dcab .dface"]]  # the Dashboard: page ink, then the cabinet face's dark ink (Retro, desktop only)
+_HH = [["body"], [".retro"], [".retro .hh-in"]]  # the Handheld: page ink, the device ink, the light face's ink
+_DGAUGE, _HGAUGE = [[".gauge"]], [[".gauge", ".retro .hh .gauge"]]  # a gauge card on the Dashboard, and in the Handheld
+
+
+def _decl_tok(rules, sel, skin, prop):
+    """The token in the last `prop: var(--x)` of a rule listing exactly `sel` (desktop width); Retro-scoped rules only in Retro."""
+    if skin != "retro" and sel.startswith(_R):
+        return None
+    tok = None
+    for media, sels, body in rules:
+        if media in (None, "(min-width: 601px)") and sel in sels:
+            for m in re.finditer(r"(?<![-\w])" + prop + r":\s*var\((--[\w-]+)\)", body):
+                tok = m.group(1)
+    return tok
+
+
+def _effective_ink(rules, skin, chain):
+    """The inherited text colour: the innermost element of `chain` (outer to inner, each a list of its selectors in rising precedence) that sets one."""
+    for element in reversed(chain):
+        for sel in reversed(element):
+            if tok := _decl_tok(rules, sel, skin, "color"):
+                return tok
+    return None
+
+
+_INK_CASES = [  # (where, chain, background: selectors inner to outer whose background is the card, or "face")
+    ("Dashboard gauge value", _CAB + [[".panel"]] + _DGAUGE + [[".gauge .gval"]], [".gauge"]),
+    ("Dashboard gauge name", _CAB + [[".panel"]] + _DGAUGE + [[".gauge .gtop"], [".gauge .gname"]], [".gauge"]),
+    ("Dashboard gauge note", _CAB + [[".panel"]] + _DGAUGE + [[".gauge .gnote"]], [".gauge"]),
+    ("Dashboard gauge watch note", _CAB + [[".panel"]] + _DGAUGE + [[".gauge .gnote", ".gauge.watch .gnote"]], [".gauge"]),
+    ("Dashboard gauge out note", _CAB + [[".panel"]] + _DGAUGE + [[".gauge .gnote", ".gauge.out .gnote"]], [".gauge"]),
+    ("Handheld gauge value", _HH + _HGAUGE + [[".gauge .gval"]], [".gauge"]),
+    ("Handheld gauge name", _HH + _HGAUGE + [[".gauge .gtop"], [".gauge .gname"]], [".gauge"]),
+    ("Handheld gauge note", _HH + _HGAUGE + [[".gauge .gnote"]], [".gauge"]),
+    # the rest of the cabinet, by the same method
+    ("panel title", _CAB + [[".panel"], [".panel > .ptitle"]], [".panel > .ptitle", ".panel"]),
+    ("panel note (no gauges)", _CAB + [[".panel"], ["#v0 .note"]], [".panel"]),
+    ("gauge editor row", _CAB + [[".panel"], [".edbox"], [".edrow span"]], [".panel"]),
+    ("scenario tab", _CAB + [[".stab"]], [".stab"]), ("active scenario tab", _CAB + [[".stab", ".stab.is-active"]], [".stab.is-active"]),
+    ("edit pencil", _CAB + [[".qbtn"]], [".qbtn"]),
+    ("lamp", _CAB + [["#v0 .lampbox"]], ["#v0 .lampbox"]), ("lit lamp", _CAB + [["#v0 .lampbox", "#v0 .lampbox.lit"]], ["#v0 .lampbox"]),
+    ("codes count caption", _CAB + [[".panel"], ["#v0 .cntbox small"]], [".panel"]),
+    ("codes footnote", _CAB + [[".panel"], ["#v0 .cfoot"]], [".panel"]),
+    ("code description", _CAB + [[".panel"], ["#v0 .clist"], ["#v0 .cdesc"]], ["#v0 .clist"]),
+    ("code hint", _CAB + [[".panel"], ["#v0 .clist"], ["#v0 .chint"]], ["#v0 .clist"]),
+    ("health tile value", _CAB + [["#v0 .tile"], [".big"]], ["#v0 .tile"]),
+    ("health tile title", _CAB + [["#v0 .tile"], ["h3", "#v0 .tile h3"]], ["#v0 .tile"]),
+    ("health tile unit", _CAB + [["#v0 .tile"], [".unit"]], ["#v0 .tile"]),
+    ("health tile subtitle", _CAB + [["#v0 .tile"], ["#v0 .tile .sub"]], ["#v0 .tile"]),
+    ("attention name", _CAB + [["#v0 .attn"], ["#v0 .orow"], ["#v0 .orow .nm"]], ["#v0 .attn"]),
+    ("attention value", _CAB + [["#v0 .attn"], ["#v0 .orow"], ["#v0 .orow .val"]], ["#v0 .attn"]),
+    ("attention reason", _CAB + [["#v0 .attn"], ["#v0 .orow"], ["#v0 .orow .why"]], ["#v0 .attn"]),
+    ("help button", _CAB + [[".q"]], [".q"]),
+    ("Dashboard table cell", _CAB + [["table.rd td"]], "face"),
+    ("Dashboard table head", _CAB + [["table.rd th", _R + "#v0 .dface table.rd th"]], "face"),
+    ("Health heading", _CAB + [["h3", "#v0 h3.sec", _R + "#v0 .dface h3.sec"]], "face"),
+    ("Handheld table cell", _HH + [["table.rd td"]], "hhface"),
+    ("Handheld table head", _HH + [["table.rd th", ".retro .hh table.rd th"]], "hhface"),
+    ("Handheld All readings button", _HH + [[".retro .hh-tbl"]], [".retro .hh-tbl"]),
+]
+
+
+@pytest.mark.parametrize("skin,theme", [("plain", "dark"), ("plain", "light"), ("retro", "dark"), ("retro", "light")])
+def test_text_in_the_cabinet_and_the_handheld_reads_on_its_own_card(skin, theme):
+    rules, p = _css_rules(_css()), _palette(skin, theme)
+    p.update(_block_all(".retro"))  # the device tokens (only the gauge-face ones differ inside .retro, and gauge faces are not text here)
+    for k in p:
+        while (m := re.fullmatch(r"var\((--[\w-]+)\)", p[k])):
+            p[k] = p[m.group(1)]
+    face = re.findall(r"#[0-9a-fA-F]{6}", p["--face"])
+    low = []
+    for where, chain, bg in _INK_CASES:
+        ink = _effective_ink(rules, skin, chain)
+        assert ink, f"{where}: no text colour anywhere in its chain"
+        if bg == "hhface" or (bg == "face" and skin == "retro"):
+            backs = face  # the light device face (its two gradient stops)
+        elif bg == "face":
+            backs = [p["--bg"]]  # Plain has no cabinet: the page
+        else:
+            backs = [p[t] for t in (_decl_tok(rules, s, skin, "background") for s in bg) if t and re.fullmatch(r"#[0-9a-fA-F]{6}", p[t])][:1]
+        assert backs, f"{where}: no opaque background found in {bg}"
+        low += [(where, ink, p[ink], b, round(_contrast(p[ink], b), 2)) for b in backs if _contrast(p[ink], b) < 4.5]
+    assert low == [], f"{skin}/{theme}: text below 4.5:1 on its card: {low}"
+    assert _decl_tok(rules, ".gauge", skin, "color"), "the gauge card sets its own text colour, so it reads in any container"
+
+
 # ---- console stage 3: the replay bar is pinned to the bottom on a phone -----------------------------
 def _rbar_problems(css):
     """Everything wrong with the phone replay-bar rules in `css` (empty when they hold)."""
