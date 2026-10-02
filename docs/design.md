@@ -123,12 +123,14 @@ Two artifacts per scan:
     "duration_s": 30, "rate_hz": 2,
     "series": {"06": {"name": "stft_b1", "unit": "%", "samples": [[0.0, 1.6], [0.5, 2.3]]}}
   },
+  "undecoded": [{"pid": "66", "reply": "ok", "raw": ["0301F401E0"]}],
   "user_context": {"symptoms": "rough idle when cold", "recent_work": ""},
+  "replies": [{"cmd": "03", "reply": "nrc:22", "ms": 41.0}],
   "warnings": ["VIN unsupported via Mode 09; entered manually"]
 }
 ```
 
-Rules: unsupported ≠ error (`NO DATA` and negative responses map to `unsupported`); every decoded value keeps its `raw` hex; snapshots contain a VIN, so they stay local and are gitignored except synthetic fixtures.
+Rules: unsupported ≠ error (`NO DATA` and negative responses map to `unsupported`); `replies` records each scan request's `elm.classify` class (`ok | no_data | nrc:<code> | wrong_sid | adapter_error | garbled`) and latency, and any class other than ok or no_data is warned; `undecoded` keeps the raw data bytes of advertised Mode 01 PIDs that have no decoder (cap 32); every decoded value keeps its `raw` hex; snapshots contain a VIN, so they stay local and are gitignored except synthetic fixtures.
 
 ## 7. MCP tools (defined once, in `tools.py`)
 
