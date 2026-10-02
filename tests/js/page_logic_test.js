@@ -91,7 +91,7 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
   const all = statesFor(10, idle).concat(statesFor(45, idle, 10, 4), statesFor(60, rev, 55, 22));
   const env = makeEnv(all);
   for (let k = 0; k < 10; k++) await env.tick();
-  assert(/LIVE/.test(env.el('chipLive').innerHTML), 'live chip');
+  assert(/SIMULATED/.test(env.el('chipLive').innerHTML) && !/LIVE/.test(env.el('chipLive').innerHTML), 'a demo run says SIMULATED, never LIVE');
   assert.strictEqual(env.el('pause').textContent, 'Stop sampling');
   env.handlers['go_idle:click']();
   for (let k = 0; k < 45; k++) await env.tick();
@@ -106,7 +106,7 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
   assert.strictEqual(env.el('st_cmp').className, 'step done');
 
   // 2) lean engine: high at idle, fading at 2500 rpm
-  const lidle = (s, t) => Object.assign(idle(), { '07': 16 }), lrev = (s, t) => Object.assign(rev(), { '07': 3 });
+  const lidle = (s, t) => Object.assign(idle(), { '07': 16, '09': 15 }), lrev = (s, t) => Object.assign(rev(), { '07': 3, '09': 2 });   // both banks lean: a verdict needs every bank to agree
   const env2 = makeEnv(statesFor(10, lidle).concat(statesFor(45, lidle, 10, 4), statesFor(60, lrev, 55, 22)));
   for (let k = 0; k < 10; k++) await env2.tick();
   env2.handlers['go_idle:click']();
@@ -224,11 +224,11 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
   for (let k = 0; k < 3; k++) await hh.tick();
   assert.strictEqual(hh.el('h_n').textContent, '3 CODES');
   assert(/P0117/.test(hh.el('h_codes').innerHTML) && /Reads colder than real/.test(hh.el('h_codes').innerHTML) && !/<img/.test(hh.el('h_codes').innerHTML), 'handheld cards');
-  assert.strictEqual(hh.el('h_live').textContent, 'LIVE'); assert.strictEqual(hh.el('h_miltxt').textContent, 'Check engine ON');
+  assert.strictEqual(hh.el('h_live').textContent, 'SIMULATED'); assert.strictEqual(hh.el('h_miltxt').textContent, 'Check engine ON');
   assert(/Check engine \(MIL\)/.test(hh.el('h_lamps').innerHTML) && /Sampling/.test(hh.el('h_lamps').innerHTML), 'the Lamps strip in Live');
   const hhWait = makeEnv(withCodes(3, { read: false, note: null }, 'idle'), 'v5');
   for (let k = 0; k < 3; k++) await hhWait.tick();
-  assert.strictEqual(hhWait.el('h_n').textContent, '-- CODES'); assert.strictEqual(hhWait.el('h_live').textContent, 'IDLE');
+  assert.strictEqual(hhWait.el('h_n').textContent, '-- CODES'); assert.strictEqual(hhWait.el('h_live').textContent, 'NOT SAMPLING');
   assert.strictEqual(hhWait.el('h_miltxt').textContent, 'Check engine ?'); assert(/START SAMPLING TO READ CODES/.test(hhWait.el('h_codes').innerHTML));
 
   // 4) car chip: partial-VIN key, seen-before count, honest notes, never markup
@@ -299,7 +299,7 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
 
   const okEnv = await ovEnv(base);
   assert.deepStrictEqual(['trims', 'ect', 'volts', 'load', 'map'].map(k => tile(okEnv, k).className), ['tile', 'tile', 'tile', 'tile neutral', 'tile neutral'], 'healthy: normal tiles, no-threshold tiles neutral');
-  assert.strictEqual(okEnv.el('o_note').textContent, 'Nothing out of range');
+  assert.strictEqual(okEnv.el('o_note').textContent, 'No flags in the 6 readings assessed');
   assert.strictEqual(part(tile(okEnv, 'load'), 'sub'), 'live');
   const wEnv = await ovEnv(() => Object.assign(base(), { '06': 13, '42': 12.1 }));
   assert.strictEqual(tile(wEnv, 'trims').className, 'tile watch'); assert.strictEqual(part(tile(wEnv, 'trims'), 'big'), '13.0');
@@ -338,9 +338,9 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
   assert.strictEqual(noHelp.el('o_note').textContent, 'Health ranges not loaded, so nothing is checked');
   noHelp.setHelp(OVF); noHelp.advance(6000);
   for (let k = 0; k < 4; k++) await noHelp.tick();
-  assert.strictEqual(noHelp.el('o_note').textContent, 'Nothing out of range', 'the page retries loading the ranges');
+  assert.strictEqual(noHelp.el('o_note').textContent, 'No flags in the 6 readings assessed', 'the page retries loading the ranges');
   const gone = await ovEnv((s) => { const b = base(); if (s > 3) delete b['04']; return b; });
-  assert.strictEqual(tile(gone, 'load').className, 'tile neutral', 'an extra not seen for over 10 s keeps its last value');
+  assert.strictEqual(tile(gone, 'load').className, 'tile stale', 'an extra not seen for over 10 s keeps its last value, marked not current');
   assert.strictEqual(part(tile(gone, 'load'), 'sub'), 'last seen 11 s ago');
   const slow = await ovEnv((s) => { const b = base(); if (s > 20) delete b['04']; return b; }, st => Object.assign(st, { hz_measured: 0.5 }));
   assert.strictEqual(part(tile(slow, 'load'), 'sub'), 'live', 'on a slow bus 4 s is under three sweeps, so still live');
@@ -377,7 +377,7 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
   rp1.handlers['rb_exit:click'](); assert.strictEqual(lastPost().body.action, 'exit');
   const ended = makeEnv(rstates(REPLAY({ playing: false, ended: true, pos: 370 })), 'v0');
   for (let k = 0; k < 4; k++) await ended.tick();
-  assert(/REPLAY . PAUSED/.test(ended.el('chipLive').innerHTML) && ended.el('chipLive').className === 'chip paused', 'a paused replay says so');
+  assert(/REPLAY . ENDED/.test(ended.el('chipLive').innerHTML) && ended.el('chipLive').className === 'chip paused', 'an ended replay says so');
   assert.strictEqual(ended.el('rb_play').textContent, 'Replay'); assert.strictEqual(ended.el('rb_time').textContent, '6:10 / 6:10');
   const evilName = makeEnv(rstates(REPLAY({ name: '<img src=x onerror=1>' })), 'v0');
   for (let k = 0; k < 4; k++) await evilName.tick();
@@ -645,7 +645,7 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
   for (const v of ['v0', 'v3', 'v5', 'v6']) {   // a render error would surface as DISCONNECTED (poll's catch)
     const e = makeEnv(statesFor(3, idle), v, OVF, [], { 'shadetree.skin': 'retro', 'shadetree.theme': 'light' });
     for (let k = 0; k < 3; k++) await e.tick();
-    assert(/LIVE/.test(e.el('chipLive').innerHTML), 'Retro light renders ' + v);
+    assert(/SIMULATED/.test(e.el('chipLive').innerHTML), 'Retro light renders ' + v);
   }
   // Panel: a card with a title plate; the title is text, never markup
   const pn = makeEnv(statesFor(2, idle)); await pn.tick();
@@ -672,7 +672,7 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
   const b1 = gbox(g1, [{ pid: '05', form: 'dial' }, { pid: '07', form: 'bar' }, { pid: '42', form: 'seven' }, { pid: '0D', form: 'dial' }, { pid: '0D', form: 'bar' }, { pid: '5C', form: 'dial' }, { pid: '05', form: 'dial' }]);
   assert.deepStrictEqual(b1.children.map(c => c.getAttribute('data-key')), ['05:dial', '07:bar', '42:seven', '0D:dial', '0D:bar', '5C:seven'], 'in order, a repeat drawn once, no range: seven-segment');
   const ect = gk(b1, '05:dial');
-  assert.strictEqual(ect.className, 'gauge dial'); assert.strictEqual(gpart(ect, 'gnote').textContent, 'normal'); assert.strictEqual(gpart(ect, 'gval').textContent, '90 °C');
+  assert.strictEqual(ect.className, 'gauge dial'); assert.strictEqual(gpart(ect, 'gnote').textContent, '10 s: normal'); assert.strictEqual(gpart(ect, 'gval').textContent, '90 °C');
   assert(/class="z-ok"/.test(gpart(ect, 'gface').innerHTML) && /class="z-watch"/.test(gpart(ect, 'gface').innerHTML) && /class="z-out"/.test(gpart(ect, 'gface').innerHTML), 'coolant dial has its bands');
   assert(/class="dn"/.test(gpart(ect, 'gface').innerHTML), 'and a needle');
   assert(findQ(ect, '05'), 'every gauge has its ? help');
@@ -690,14 +690,14 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
   }
   assert(/\.gauge\.dim \.gface\s*\{/.test(html) && !/\.gauge\.dim\s*\{/.test(html), 'only the face is dimmed, so the note keeps full contrast');
   const g2 = await gOver({ '07': 15 }), trim = gk(gbox(g2, [{ pid: '07', form: 'bar' }]), '07:bar');
-  assert.strictEqual(trim.className, 'gauge bar watch'); assert.strictEqual(gpart(trim, 'gnote').textContent, 'watch');
+  assert.strictEqual(trim.className, 'gauge bar watch'); assert.strictEqual(gpart(trim, 'gnote').textContent, '10 s: watch');
   assert(/class="g/.test(gpart(trim, 'gface').innerHTML) && /class="y/.test(gpart(trim, 'gface').innerHTML) && !/class="r/.test(gpart(trim, 'gface').innerHTML), 'lit from 0 through ok into watch');
   const g3 = await gOver({ '0C': 0, '42': 12.6 }), off = gk(gbox(g3, [{ pid: '42', form: 'dial' }]), '42:dial');
-  assert.strictEqual(gpart(off, 'gnote').textContent, 'normal', 'engine off: judged on the engine-off range');
+  assert.strictEqual(gpart(off, 'gnote').textContent, '10 s: normal', 'engine off: judged on the engine-off range');
   const g4 = await gOver({}, null, null), nh = gk(gbox(g4, [{ pid: '05', form: 'dial' }]), '05:dial');
   assert(!/class="z-/.test(gpart(nh, 'gface').innerHTML) && gpart(nh, 'gnote').textContent === '', 'help not loaded: no bands, no verdict');
   const g5 = await gOver({}, null, OVF, { 'shadetree.units': 'us' }), us = gk(gbox(g5, [{ pid: '05', form: 'dial' }]), '05:dial');
-  assert.strictEqual(gpart(us, 'gval').textContent, '194 °F', 'the value follows Units'); assert.strictEqual(gpart(us, 'gnote').textContent, 'normal', 'and is judged in metric');
+  assert.strictEqual(gpart(us, 'gval').textContent, '194 °F', 'the value follows Units'); assert.strictEqual(gpart(us, 'gnote').textContent, '10 s: normal', 'and is judged in metric');
   const g6 = await gOver({}, st => { st.channels['99'] = { name: '"><img src=x onerror=1>', unit: '', samples: [[st.seq, st.now, 3]] }; return st; });
   const gEvil = gk(gbox(g6, [{ pid: '99', form: 'dial', lo: 0, hi: 10 }]), '99:dial');
   assert(!/<img/.test(gpart(gEvil, 'gface').innerHTML) && /&lt;img/.test(gpart(gEvil, 'gface').innerHTML), 'a channel name is escaped in the dial label');
@@ -828,7 +828,7 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
     const hot = await dash({}, {}, statesFor(30, () => Object.assign(base(), { '05': 118 })));
     assert.ok(!tileKeys(hot).includes('ect'), 'no coolant tile');
     assert.deepStrictEqual(hot.el('o_attn').children.map(c => c.getAttribute('data-key')), ['05'], 'a hot engine is still listed under Needs attention'); assert.strictEqual(hot.el('o_note').textContent, '');
-    assert.strictEqual(g.el('o_note').textContent, 'Nothing out of range', 'the note still judges every health reading');
+    assert.strictEqual(g.el('o_note').textContent, 'No flags in the 6 readings assessed', 'the note still judges every health reading');
   }
   // Dashboard honesty: a PID not in the run is dimmed, never a zero; a run with no channels says so
   {
@@ -1032,7 +1032,7 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
     for (let k = 0; k < 6; k++) await e.tick();
     const m = e.parts().lampModel();
     assert.deepStrictEqual(Array.from(m).map(x => x.id), ['mil', 'ltft1', 'ltft2', 'ect', 'samp']);
-    assert.strictEqual(m[0].on, true); assert.strictEqual(m[0].e, 'ON'); assert.strictEqual(m[4].e, '2.5 Hz');
+    assert.strictEqual(m[0].on, true); assert.strictEqual(m[0].e, 'ON'); assert.strictEqual(m[4].e, 'simulated · 2.5 Hz');
     assert.ok(byId(e, 'd_codes_mount', 'd_cnt'), 'the count window is on the Dashboard');
     const codes = byId(e, 'd_codes_mount', 'd_codes');
     assert.ok(/P0171/.test(codes.innerHTML));
@@ -1046,8 +1046,8 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
     assert.ok(/NO CODES STORED/.test(byId(none, 'd_codes_mount', 'd_codes').innerHTML)); assert.strictEqual(none.parts().lampModel()[0].e, 'off');
     const lean = makeEnv(statesFor(6, () => ({ '0C': 700, '05': 40, '06': 2, '07': 14, '08': 2, '09': -13 })), 'v0', OVF); for (let k = 0; k < 6; k++) await lean.tick();
     const ml = lean.parts().lampModel();
-    assert.ok(ml[1].on && ml[1].e === 'LEAN: outside ±10 %', 'trim above +10 lights LTFT 1'); assert.ok(ml[2].on && /RICH/.test(ml[2].e), 'trim below -10 lights LTFT 2');
-    assert.ok(ml[3].on && ml[3].e === 'reads cold', 'coolant at 40 C reads cold');
+    assert.ok(ml[1].on && ml[1].e === 'LEAN 14.0 %: watch', 'trim above +10 lights LTFT 1, as the gauge says watch'); assert.ok(ml[2].on && /RICH/.test(ml[2].e), 'trim below -10 lights LTFT 2');
+    assert.ok(!ml[3].on && ml[3].e === 'normal', 'coolant follows the shared range (this fixture has no low bound; the shipped one flags 40 C, see 19)');
   }
 
   {   // a stale #v4 (the removed Analyzer): the page has no such id, so the fragment is ignored and the Dashboard stays the only active view
@@ -1055,7 +1055,7 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
     const st = makeEnv(statesFor(4, base), 'v0', OVF, [], {}, { hash: '#v4', absent: ['v4'], views });
     for (let k = 0; k < 4; k++) await st.tick();
     assert.deepStrictEqual(views.filter(v => v.className.split(' ').includes('is-active')).map(v => v.id), ['v0'], 'the Dashboard is still the one active view');
-    assert.ok(/LIVE/.test(st.el('chipLive').innerHTML) && st.el('d_lamps').innerHTML.includes('Check engine'), 'and it renders');
+    assert.ok(/SIMULATED/.test(st.el('chipLive').innerHTML) && st.el('d_lamps').innerHTML.includes('Check engine'), 'and it renders');
     const good = ['v0', 'v3', 'v5', 'v6'].map(id => { const v = makeNode(id, {}); v.className = id === 'v0' ? 'view is-active' : 'view'; return v; });
     makeEnv(statesFor(1, base), 'v0', OVF, [], {}, { hash: '#v5', views: good });
     assert.deepStrictEqual(good.filter(v => v.className.split(' ').includes('is-active')).map(v => v.id), ['v5'], 'a real #v5 still opens Handheld (the harness can see a switch)');
@@ -1169,7 +1169,7 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
     const demo = await alertEnv(statesFor(3, base), {}, (e) => { e.el('demoBanner').textContent = demoText; });
     assert.ok(!demo.hidden && demo.textContent.includes('simulated engine, no car connected'), 'demo: ' + demo.textContent);
     const rep = await alertEnv(statesFor(3, base).map(st => Object.assign(quiet(st), { replay: { name: 'run.json', playing: true, ended: false, speed: 1, pos: 1, duration: 10 } })));
-    assert.ok(!rep.hidden && rep.textContent.includes('Replay: run.json · not a live car'), 'replay: ' + rep.textContent);
+    assert.ok(!rep.hidden && rep.textContent.includes('Replay: run.json · recorded car, not live'), 'replay: ' + rep.textContent);
     const ex = await alertEnv(statesFor(3, base).map(quiet), { search: '?t=abc&example=x.json', postReply: (url) => (/\/api\/replay/.test(url) ? { ok: false, status: 404, j: { error: 'no' } } : null) });
     assert.ok(!ex.hidden && ex.textContent.includes('Example not found: x.json'), 'example: ' + ex.textContent);
     const msg = await alertEnv(statesFor(3, base).map(st => Object.assign(quiet(st), { message: 'Adapter <b>lost</b>' })));
@@ -1224,6 +1224,107 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
     assert.ok(Math.abs(needle(100)[0] - 110) < 1e-6, 'mid value points straight up on the unchanged scale');
     assert.ok(needle(0)[0] < 110 && needle(200)[0] > 110, 'low end left, high end right');
     const mins = nt(P, 0, 124.27, 5, 1); assert.deepStrictEqual(mins.minors.slice(0, 3), [6.25, 12.5, 18.75], 'three minors between majors');
+  }
+
+  {   // 19) trust fixes: one assessment for lamps, gauges, tiles and attention; missing, old and replayed data never look healthy or live
+    const OVC = { pids: Object.assign({}, OVF.pids, { '05': mk('Coolant', { ok: [60, 105], out: [null, 112] }) }), mode06: {} };   // the shipped coolant range
+    const real = (st) => Object.assign(st, { demo: false });
+    const lampE = (e, id) => Array.from(e.parts().lampModel()).find(x => x.id === id);
+    const byId = (e, root, id) => { let r = null; walk(e.el(root), n => { if (n.id === id) r = n; }); return r; };
+    const codesHtml = (e) => byId(e, 'd_codes_mount', 'd_codes').innerHTML;
+    // 1. lamps and gauges agree: LTFT -18.8 is watch (amber) on both, -25 out of range (red) on both
+    const ag = await gOver({ '07': -18.8, '09': -25 }), ab = gbox(ag, [{ pid: '07', form: 'bar' }, { pid: '09', form: 'bar' }]);
+    assert.ok(gk(ab, '07:bar').className.includes('watch') && lampE(ag, 'ltft1').on && lampE(ag, 'ltft1').cls === 'amb' && /RICH -18\.8 %: watch/.test(lampE(ag, 'ltft1').e), 'watch is an amber lamp: ' + lampE(ag, 'ltft1').e);
+    assert.ok(gk(ab, '09:bar').className.includes('out') && lampE(ag, 'ltft2').cls === 'red' && /out of range/.test(lampE(ag, 'ltft2').e), 'out of range is red on both');
+    assert.strictEqual(ag.parts().assess('07').s, 'watch');
+    const nd = makeEnv([{ status: 'idle', demo: false, channels: {}, stats: {}, seq: 0, codes: { read: false, note: null } }], 'v0', OVF); await nd.tick();
+    ['ltft1', 'ltft2', 'ect'].forEach(id => assert.ok(!lampE(nd, id).on && lampE(nd, id).e === 'not available', id + ': ' + lampE(nd, id).e));
+    const inline = await gOver({}, st => { delete st.channels['08']; delete st.channels['09']; return st; });
+    assert.strictEqual(lampE(inline, 'ltft2').e, 'not available', 'no bank 2 in the run: not available, never "within range"');
+    const cold = await gOver({ '05': 41 }, null, OVC), cg = gk(gbox(cold, [{ pid: '05', form: 'dial' }]), '05:dial');
+    assert.ok(cg.className.includes('watch') && lampE(cold, 'ect').cls === 'amb' && /cold 41 °C: watch/.test(lampE(cold, 'ect').e), 'cold coolant: ' + lampE(cold, 'ect').e);
+    const hot = await gOver({ '05': 125 }, null, OVC);
+    assert.ok(lampE(hot, 'ect').cls === 'red' && /hot 125 °C: out of range/.test(lampE(hot, 'ect').e), 'hot coolant: ' + lampE(hot, 'ect').e);
+    // 6. the gauge says which window its words describe; units on digits; labels for status readings; lambda keeps 2 decimals
+    const steady = await gOver({});
+    assert.strictEqual(gpart(gk(gbox(steady, [{ pid: '05', form: 'dial' }]), '05:dial'), 'gnote').textContent, '10 s: normal');
+    assert.strictEqual(gpart(gk(gbox(steady, [{ pid: '42', form: 'seven' }]), '42:seven'), 'gval').textContent, 'V', 'seven-segment digits keep their unit');
+    const spk = await gOver({}, st => { if (st.seq === 30) st.channels['05'].samples[0][2] = 125; return st; }), sg = gk(gbox(spk, [{ pid: '05', form: 'dial' }]), '05:dial');
+    assert.strictEqual(gpart(sg, 'gnote').textContent, 'now: out of range · 10 s: normal'); assert.ok(sg.className.includes('out'), 'the gauge shows 125, so it is coloured by it');
+    assert.ok(spk.parts().assess('05').s === 'ok' && spk.parts().assess('05').now === 'out', 'the sustained state is still the 10 s one');
+    const lam = await gOver({}, st => { st.channels['24'] = { name: 'o2_b1s1_lambda', unit: 'ratio', labels: null, samples: [[st.seq, st.now, 0.96]] };
+      st.channels['03'] = { name: 'fuel_system_status', unit: null, labels: { '2': 'Closed loop' }, samples: [[st.seq, st.now, 2]] }; return st; });
+    const lb = gbox(lam, [{ pid: '24', form: 'seven' }, { pid: '03', form: 'seven' }]);
+    assert.ok(/aria-label="0.96"/.test(gpart(gk(lb, '24:seven'), 'gface').innerHTML), 'lambda 0.96 is not rounded to 1.0');
+    assert.strictEqual(gpart(gk(lb, '03:seven'), 'gval').textContent, 'Closed loop', 'a status reading shows its label'); assert.ok(!/aria-label/.test(gpart(gk(lb, '03:seven'), 'gface').innerHTML), 'not a number');
+    lam.docHandlers.click({ target: findQ(gk(lb, '24:seven'), '24') }); assert.ok(/now 0\.96/.test(flat(lam.el('helpPanel'))), 'help keeps 2 decimals: ' + flat(lam.el('helpPanel')));
+    // 3. stopped, lost server or a dropped reading: values kept, no health claim, a banner says which
+    const stp = await gOver({ '07': -18.8 }, st => (st.seq === 30 ? Object.assign(st, { status: 'stopped' }) : st));
+    assert.ok(stp.parts().assess('07').s === 'stale' && !lampE(stp, 'ltft1').on && lampE(stp, 'ltft1').e === 'not current', 'stopped: ' + lampE(stp, 'ltft1').e);
+    assert.strictEqual(gpart(gk(gbox(stp, [{ pid: '05', form: 'dial' }]), '05:dial'), 'gnote').textContent, 'not current');
+    assert.ok(!stp.el('lostBanner').hidden && /Sampling stopped/.test(stp.el('lostBanner').textContent) && /last readings, not current/.test(stp.el('lostBanner').textContent));
+    const ls = makeEnv(statesFor(5, base).map(real), 'v5', OVF); for (let k = 0; k < 5; k++) await ls.tick();
+    assert.strictEqual(ls.el('h_live').textContent, 'LIVE', 'a live car sampling says LIVE'); assert.strictEqual(ls.el('lostBanner').hidden, true);
+    ls.sandbox.fetch = () => Promise.reject(new Error('down')); await ls.tick();
+    assert.strictEqual(ls.el('h_live').textContent, 'NO LINK'); assert.ok(!ls.el('lostBanner').hidden && /Lost contact/.test(ls.el('lostBanner').textContent));
+    assert.ok(/Lost contact/.test(ls.el('h_alert').textContent), 'repeated inside the Handheld frame');
+    assert.ok(ls.parts().assess('05').s === 'stale' && ls.parts().assess('05').v === 90, 'the last reading is kept but not current');
+    const drop = await gOver({}, st => { if (st.seq > 3) st.channels['07'].samples = []; return st; });
+    assert.ok(drop.parts().assess('07').s === 'stale' && drop.parts().assess('05').s === 'ok', 'one reading not seen for over 10 s is not current, the rest are');
+    // 4. one source state: the demo says SIMULATED, playback REPLAY, idle NOT SAMPLING; the Sampling lamp is never green in playback
+    const dmo = makeEnv(statesFor(3, base), 'v5', OVF); for (let k = 0; k < 3; k++) await dmo.tick();
+    assert.ok(dmo.el('h_live').textContent === 'SIMULATED' && /SIMULATED/.test(dmo.el('chipLive').innerHTML) && !/LIVE/.test(dmo.el('chipLive').innerHTML), 'the demo never says LIVE');
+    assert.ok(lampE(dmo, 'samp').on && /simulated/.test(lampE(dmo, 'samp').e));
+    const rps = makeEnv(statesFor(3, base).map(st => Object.assign(real(st), { replay: { name: 'r.json', duration: 10, pos: 1.2, speed: 1, playing: false, ended: false, demo: true } })), 'v5', OVF);
+    for (let k = 0; k < 3; k++) await rps.tick();
+    assert.strictEqual(rps.el('h_live').textContent, 'REPLAY · PAUSED'); assert.ok(!lampE(rps, 'samp').on && /replay/.test(lampE(rps, 'samp').e), 'no lit sampling lamp in playback');
+    assert.ok(/recorded simulation/.test(rps.el('replayBanner').textContent), rps.el('replayBanner').textContent);
+    const idl = makeEnv([{ status: 'idle', demo: false, channels: {}, stats: {}, seq: 0, codes: { read: false, note: null } }], 'v5', OVF); await idl.tick();
+    assert.strictEqual(idl.el('h_live').textContent, 'NOT SAMPLING');
+    // 2. unanswered is not empty: no green zero, no "lamp off", no passed Mode 06
+    const CLEAR = { read: true, note: null, mil: false, unanswered: [], stored: [], pending: [], permanent: [] };
+    const cdE = async (codes, m06, view = 'v0', fn = base, store = NOGAUGES()) => {
+      const e = makeEnv(statesFor(30, fn).map(st => Object.assign(real(st), { codes, mode06: m06 || { read: false, note: null } })), view, OVF, [], store);
+      for (let k = 0; k < 32; k++) await e.tick(); return e;
+    };
+    const silent = await cdE({ read: false, note: 'the car did not answer the trouble-code requests', mil: null });
+    assert.ok(/DID NOT ANSWER/.test(codesHtml(silent)) && silent.el('chipLamp').textContent === 'check engine: ?' && lampE(silent, 'mil').e === 'unknown');
+    const PART = { read: true, note: null, mil: null, unanswered: ['pending', 'mil'], stored: [], pending: [], permanent: [] };
+    const part1 = await cdE(PART);
+    assert.ok(/NO ANSWER FOR PENDING CODES/.test(codesHtml(part1)), codesHtml(part1)); assert.strictEqual(lampE(part1, 'mil').e, 'no answer');
+    assert.ok(/no answer: pending/.test(part1.el('chipCodes').textContent), part1.el('chipCodes').textContent);
+    assert.strictEqual(part1.el('d_codes_mount').hidden, true, 'no codes: the Codes panel collapses (the summary bar says why)');
+    const part1h = await cdE(PART, null, 'v5');
+    assert.ok(!part1h.el('h_n').className.includes('zero') && part1h.el('h_miltxt').textContent === 'Check engine ?', 'Handheld: no green zero, lamp unknown');
+    const m6 = await cdE(CLEAR, { read: true, note: null, mids: ['01'], results: [] }, 'v6');
+    assert.ok(m6.el('m6_count').textContent === 'no results' && m6.el('m6_count').className === 'tag', 'no results is neutral, never "0 outside limits" in green');
+    const m6n = await cdE(CLEAR, { read: false, note: 'the car did not answer Mode 06 (no supported monitors reported)', mids: [], results: [] }, 'v6');
+    assert.ok(/did not answer Mode 06/.test(flat(m6n.el('m6'))) && m6n.el('m6_count').textContent === '');
+    // 5. the summary bar: source, lamp, distinct codes, readings, one next action, in every scenario
+    const sb = await cdE({ read: true, note: null, mil: true, unanswered: [], stored: [{ code: 'P0117', desc: 'd', hint: '' }], pending: [{ code: 'P0117', desc: 'd', hint: '' }, { code: 'P0175', desc: 'x', hint: '' }], permanent: [] });
+    const sbh = sb.el('d_sum').innerHTML;
+    ['Live car · sampling', 'Check engine ON', '2 codes', 'No flags in the 6 readings assessed', 'Next: review the codes below'].forEach(t => assert.ok(sbh.includes(t), t + ' in ' + sbh));
+    assert.ok(sb.el('d_sum').className === 'sumbar bad' && sb.el('d_codes_mount').hidden === false, 'codes: the panel shows');
+    assert.strictEqual(sb.el('o_note').textContent, 'No flags in the 6 readings assessed');
+    const ok = await cdE(CLEAR);
+    assert.ok(/No codes stored/.test(ok.el('d_sum').innerHTML) && /Check engine off/.test(ok.el('d_sum').innerHTML) && ok.el('d_sum').className === 'sumbar ok', ok.el('d_sum').innerHTML);
+    const out = await cdE(CLEAR, null, 'v0', () => Object.assign(base(), { '07': -25 }), { 'shadetree.scenario': 'fuel' });
+    assert.ok(/1 out of range/.test(out.el('d_sum').innerHTML) && /Next: look at LTFT bank 1 first/.test(out.el('d_sum').innerHTML), out.el('d_sum').innerHTML);
+    const idleBar = makeEnv([{ status: 'idle', demo: false, channels: {}, stats: {}, seq: 0, codes: { read: false, note: null } }], 'v0', OVF); await idleBar.tick();
+    assert.ok(/Next: press Start sampling, or load a replay/.test(idleBar.el('d_sum').innerHTML) && /Codes not read/.test(idleBar.el('d_sum').innerHTML), idleBar.el('d_sum').innerHTML);
+    assert.ok(/id="d_sum"/.test(html.slice(html.indexOf('id="v0"'), html.indexOf('id="d_panel"'))), 'the bar sits above the gauges');
+    // Guided test: an unmatched pattern is "not classified", never "no large error"; no citations to playbooks that are not built
+    const guided = async (fi, fr) => {
+      const e = makeEnv(statesFor(10, fi).concat(statesFor(45, fi, 10, 4), statesFor(60, fr, 55, 22)), 'v3');
+      for (let k = 0; k < 10; k++) await e.tick(); e.handlers['go_idle:click']();
+      for (let k = 0; k < 45; k++) await e.tick(); e.handlers['go_rev:click']();
+      for (let k = 0; k < 45; k++) await e.tick(); return e.el('verdict').innerHTML;
+    };
+    const high = await guided(() => Object.assign(idle(), { '07': 25, '09': 25 }), () => Object.assign(rev(), { '07': 25, '09': 25 }));
+    assert.ok(/Pattern not classified/.test(high) && !/No large/.test(high) && /bank 1 LTFT 25\.0 % idle, 25\.0 % at 2500 rpm/.test(high), high);
+    const noRev = await guided(idle, idle);
+    assert.ok(/Pattern not classified/.test(noRev) && /averaged 700 rpm/.test(noRev), 'both captures at idle: ' + noRev);
+    assert.ok(!/ref:playbook/.test(html) && /\[general knowledge, unverified\]/.test(env.el('verdict').innerHTML), 'unbuilt playbook ids are gone');
   }
 
   console.log('page logic OK');

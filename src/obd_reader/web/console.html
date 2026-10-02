@@ -342,12 +342,15 @@
   .gauge .leds i.z { box-shadow: inset 0 -2px 0 var(--g-ink2); }
   .gauge .gval { font: 700 20px var(--cond); font-variant-numeric: tabular-nums; margin-top: 4px; } .gauge .gval:empty { display: none; }
   .gauge .gnote { color: var(--muted); font-size: 12px; min-height: 18px; }
-  .gauge.watch .gnote { color: var(--amber); } .gauge.out .gnote { color: var(--bad); }
+  .gauge.watch .gnote { color: var(--amber); } .gauge.out .gnote { color: var(--bad); } .gauge.stale .gface { opacity: .55; }
+  .sumbar { display: flex; flex-wrap: wrap; gap: 4px 18px; margin: 0 0 10px; padding: 8px 12px; background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-left: 5px solid var(--line); border-radius: 6px; font: 700 14px var(--cond); }
+  .sumbar.bad { border-left-color: var(--bad); } .sumbar.warn { border-left-color: var(--amber); } .sumbar.ok { border-left-color: var(--ok); } .sumbar .on { color: var(--bad); }
 </style>
 </head>
 <body>
 <div class="banner" id="demoBanner" hidden>Demo &mdash; simulated engine, no car connected</div>
 <div class="banner" id="replayBanner" hidden></div>
+<div class="banner" id="lostBanner" hidden></div>
 <header class="topbar" id="topbar">
   <div class="brand">shadetree-ai console</div>
   <button type="button" class="b menubtn" id="menuBtn" aria-expanded="false" aria-controls="viewNav menuStatus">Menu</button>
@@ -409,7 +412,7 @@
 </div>
 
 <main class="stage">
-  <section class="view is-active" id="v0" role="tabpanel"><div class="dcab"><div class="dface">
+  <section class="view is-active" id="v0" role="tabpanel"><div class="sumbar" id="d_sum" role="status"></div><div class="dcab"><div class="dface">
     <span class="screw"></span><span class="screw"></span><span class="screw"></span><span class="screw"></span>
     <div class="plate"><span>Shadetree Model 7-A &middot; Engine Analyzer</span><small>SER. 0709</small></div>
     <div class="scenbar">
@@ -438,7 +441,7 @@
       <div>
         <div class="card" style="margin-bottom:10px"><h3>Guided test</h3>
           <div style="font:700 16px var(--cond)">Rich condition: fuel trim check</div>
-          <div style="color:var(--muted);font-size:12.5px;margin-top:4px">playbook <span class="cite">[ref:playbook:rich-condition-v1]</span>
+          <div style="color:var(--muted);font-size:12.5px;margin-top:4px">draft playbook, not in a reference store yet <span class="cite">[general knowledge, unverified]</span>
             <span class="tag warn">model_drafted &middot; unreviewed</span></div></div>
         <div class="step active" id="st_idle"><div class="hd"><span class="n">1</span>Warm idle</div>
           <p>Engine warm, A/C off, hands off the throttle. Records 15 s of trims and manifold pressure.</p>
@@ -495,7 +498,7 @@
       <div id="m6"></div></div>
   </section>
 </main>
-<p class="foot">Values come from one shared sampler, so Claude and this page see the same numbers. The &plusmn;10 % trim window used for the OUTSIDE tag is general knowledge, unverified. The guided test is a draft, unreviewed playbook.</p>
+<p class="foot">Values come from one shared sampler, so Claude and this page see the same numbers. Normal, watch and out of range are general rules of thumb, not limits for your car [general knowledge, unverified]. The guided test is a draft, unreviewed playbook.</p>
 
 <div id="helpPanel" role="dialog" aria-live="polite"></div>
 <script>
@@ -628,12 +631,16 @@
       rows += '<tr><td>' + names[id] + '</td>' + keys.map(function (k) { return '<td>' + fmt(k === 'map' ? cv('0B', results[id][k]) : results[id][k], k === 'rpm' ? 0 : 1) + '</td>'; }).join('') + '</tr>';
     });
     $('results').innerHTML = rows || '<tr><td colspan="7" style="text-align:center;color:var(--muted)">No captures yet</td></tr>';
-    var v = $('verdict');
-    if (results.idle && results.rev && results.idle.ltft1 !== null && results.rev.ltft1 !== null) {
-      var i = results.idle.ltft1, r = results.rev.ltft1, txt;
-      if (i < -10 && r < -10) txt = 'Long-term trim stays strongly negative at higher load (manifold pressure) on both banks. That argues against a vacuum leak, which fades as load (manifold pressure) rises <span class="cite">[ref:playbook:rich-condition-v1#step-4]</span>. Next: check coolant temperature plausibility <span class="cite">[ref:playbook:rich-condition-v1#step-2]</span>.';
-      else if (i > 10 && r < i - 8) txt = 'Long-term trim is high at idle and falls as load (manifold pressure) rises: consistent with an unmetered air leak <span class="cite">[ref:playbook:rich-condition-v1#step-4]</span>.';
-      else txt = 'No large long-term trim error in this run.';
+    var v = $('verdict'), I = results.idle, R = results.rev,
+        banks = I && R ? [['ltft1', 1], ['ltft2', 2]].filter(function (b) { return I[b[0]] !== null && R[b[0]] !== null; }) : [];
+    if (banks.length) {   // every bank must agree, at a real 2500 rpm hold
+      var kinds = banks.map(function (b) { var i = I[b[0]], r = R[b[0]]; return i < -10 && r < -10 ? 'rich' : i > 10 && r < i - 8 ? 'leak' : null; }),
+          held = R.rpm !== null && R.rpm >= 2300 && R.rpm <= 2700, one = held && kinds.every(function (k) { return k && k === kinds[0]; }) ? kinds[0] : null,
+          on = ' on bank ' + banks.map(function (b) { return b[1]; }).join(' and '), gk = ' <span class="cite">[general knowledge, unverified]</span>', txt;
+      if (one === 'rich') txt = 'Long-term trim stays strongly negative at 2500 rpm' + on + '. That argues against a vacuum leak, which fades as load rises. Next: check coolant temperature plausibility.' + gk;
+      else if (one === 'leak') txt = 'Long-term trim is high at idle and falls at 2500 rpm' + on + ': consistent with an unmetered air leak.' + gk;
+      else txt = 'Pattern not classified: ' + (held ? '' : 'the 2500 rpm capture averaged ' + fmt(R.rpm, 0) + ' rpm; ') + banks.map(function (b) { return 'bank ' + b[1] + ' LTFT ' + fmt(I[b[0]], 1) + ' % idle, ' + fmt(R[b[0]], 1) + ' % at 2500 rpm'; }).join('; ') +
+        '. Not a pattern this draft knows.';
       v.innerHTML = '<b>Reading of this run</b> <span class="tag warn">draft, unreviewed</span><br>' + txt; v.style.display = 'block';
       $('st_cmp').className = 'step done';
     } else { v.style.display = 'none'; $('st_cmp').className = 'step'; }
@@ -649,7 +656,7 @@
     var r = state && state.replay;
     $('replayBanner').hidden = !r; $('rbar').hidden = !r;
     if (!r) { $('pause').disabled = false; $('save').disabled = false; return; }
-    $('replayBanner').textContent = 'Replay: ' + r.name + ' · not a live car';
+    $('replayBanner').textContent = 'Replay: ' + r.name + (r.demo ? ' · recorded simulation, not a car' : ' · recorded car, not live');
     $('pause').disabled = true; $('save').disabled = true; $('pause').textContent = 'Live sampling off';
     $('simctl').hidden = true;
     $('rb_play').textContent = r.playing ? 'Pause' : r.ended ? 'Replay' : 'Play';
@@ -727,33 +734,43 @@
   $('rb_seek').addEventListener('input', function () { seeking = true; var d = state && state.replay ? state.replay.duration : 0; $('rb_time').textContent = mmss(Number($('rb_seek').value)) + ' / ' + mmss(d); });
   $('rb_seek').addEventListener('change', function () { var pos = Number($('rb_seek').value); var done = function () { seeking = false; }; replayCtl({ action: 'seek', pos: pos }).then(done, done); });
   $('rb_exit').addEventListener('click', function () { replayCtl({ action: 'exit' }); });
+  /* one source/playback state for every label */
+  var lost = false, FRESH_S = 10;
+  function source() {
+    var st = state || {}, r = st.replay, ph = lost ? 'lost' : r ? (r.playing ? 'playing' : r.ended ? 'ended' : 'paused') : st.status || 'idle';
+    return { kind: r ? (r.demo ? 'Recorded simulation' : 'Recorded car') : st.demo ? 'Simulated' : 'Live car', phase: ph, fresh: !lost && st.status === 'running', sampling: ph === 'running',
+             word: { lost: 'NO LINK', playing: 'REPLAY', paused: 'REPLAY \u00b7 PAUSED', ended: 'REPLAY \u00b7 ENDED', stopped: 'STOPPED', error: 'ERROR', idle: 'NOT SAMPLING' }[ph] || (st.demo ? 'SIMULATED' : 'LIVE') };
+  }
+  function renderLost() {
+    var st = state || {}, ph = source().phase, b = $('lostBanner'), has = lastSeq > 0 && !st.replay,
+        t = ph === 'lost' ? 'Lost contact with the console server (is shadetree-ai still running?)' : !has ? '' : ph === 'error' ? 'Adapter error' : ph === 'stopped' ? 'Sampling stopped' : '';
+    b.textContent = t && (lastSeq > 0 ? t + ' \u2014 showing the last readings, not current' : t); b.hidden = !t;
+  }
   function chips() {
-    var st = state || { status: 'disconnected' }, live = $('chipLive'), label = { running: 'LIVE', stopped: 'STOPPED', error: 'ERROR', idle: 'NOT SAMPLING', disconnected: 'DISCONNECTED' }[st.status] || 'UNKNOWN';
-    live.className = 'chip ' + (st.status === 'running' ? 'live' : st.status === 'error' || st.status === 'disconnected' ? 'err' : st.status === 'stopped' ? 'paused' : 'idle');
-    if (st.replay) { label = st.replay.playing ? 'REPLAY' : 'REPLAY \u00b7 PAUSED'; live.className = 'chip ' + (st.replay.playing ? 'live' : 'paused'); }
-    live.innerHTML = '<b>' + label + '</b>';
+    var st = state || {}, src = source(), live = $('chipLive'), ph = src.phase;
+    live.className = 'chip ' + (ph === 'running' || ph === 'playing' ? 'live' : ph === 'error' || ph === 'lost' ? 'err' : ph === 'idle' ? 'idle' : 'paused');
+    live.innerHTML = '<b>' + src.word + '</b>';
     var ad = st.adapter || {};
     // adapter and ECU text is untrusted: show it as text, never as markup
     $('chipConn').textContent = (ad.chip || ad.ati || 'no adapter') + (ad.protocol ? ' · ' + ad.protocol : '');
     var v = st.vehicle;
     $('chipCar').textContent = !v ? 'car ?' : v.key ? 'car ' + v.key + ' · ' + (st.replay ? 'replay' : v.known ? 'seen ' + v.runs + (v.runs === 1 ? ' time' : ' times') : 'new') : (v.note || 'car ?');
-    var cd = st.codes || {};
-    $('chipLamp').textContent = 'check engine: ' + (cd.read ? (cd.mil ? 'ON' : 'off') : '?');
+    var cd = st.codes || {}, miss = codeMiss(cd);
+    $('chipLamp').textContent = 'check engine: ' + (cd.mil === true ? 'ON' : cd.mil === false ? 'off' : '?');
     $('chipCodes').textContent = !cd.read ? 'codes not read'
-      : (cd.stored && cd.stored.length ? cd.stored.length + ' stored' : 'none stored') + (cd.pending && cd.pending.length ? ' \u00b7 ' + cd.pending.length + ' pending' : '');
+      : (cd.stored && cd.stored.length ? cd.stored.length + ' stored' : miss.indexOf('stored') < 0 ? 'none stored' : 'stored: no answer') + (cd.pending && cd.pending.length ? ' \u00b7 ' + cd.pending.length + ' pending' : '') + (miss.length ? ' \u00b7 no answer: ' + miss.join(', ') : '');
     $('rate').textContent = st.hz_measured ? st.hz_measured.toFixed(1) + ' Hz' : '—';
     var age = st.since_last_sample === null || st.since_last_sample === undefined ? null : st.since_last_sample + (st.status === 'running' ? (performance.now() - fetchedAt) / 1000 : 0);
     $('age').textContent = age === null ? '—' : age.toFixed(1) + ' s ago';
     var sl = st.seconds_left; $('autostop').textContent = sl === null || sl === undefined ? '—' : Math.floor(sl / 60) + ':' + ('0' + Math.floor(sl % 60)).slice(-2);
     $('pause').textContent = st.status === 'running' ? 'Stop sampling' : 'Start sampling';
     $('simctl').hidden = !st.demo; $('demoBanner').hidden = !st.demo; $('demoBtn').hidden = st.status === 'running'; $('capAll').disabled = st.status === 'running';
-    renderReplay();
-    if (st.message) showMsg(st.message); else if (st.status !== 'disconnected') showMsg('');
-    if (st.status === 'disconnected') showMsg('Lost contact with the console server. Is shadetree-ai still running?');
+    renderReplay(); renderLost();
+    showMsg(st.message || '');
     hhAlert();
   }
   function hhAlert() {   // the page's notices, repeated as text inside the Handheld frame (a phone hides the page's own banners there)
-    var seen = {}, lines = ['demoBanner', 'replayBanner', 'msg', 'exNote'].map(function (id) { var n = $(id); return n.hidden ? '' : n.textContent; })
+    var seen = {}, lines = ['demoBanner', 'replayBanner', 'lostBanner', 'msg', 'exNote'].map(function (id) { var n = $(id); return n.hidden ? '' : n.textContent; })
       .filter(function (t) { return t && !seen[t] && (seen[t] = true); });
     $('h_alert').textContent = lines.join('\n'); $('h_alert').hidden = !lines.length;
   }
@@ -804,7 +821,8 @@
   }
   function cv(pid, v) { var c = convFor(pid); return v === null || v === undefined || !c ? v : c[1](v); }
   function dpFor(pid, dp) { var c = convFor(pid); return c ? c[2] : dp; }
-  function fmtPid(pid, v) { var c = convFor(pid); return c ? c[1](v).toFixed(c[2]) : fmtAny(v); }
+  function fmtPid(pid, v) { var c = convFor(pid); return c ? c[1](v).toFixed(c[2]) : isRatio(pid) ? v.toFixed(2) : fmtAny(v); }
+  function isRatio(pid) { return !chFor(pid) && !!xs[pid] && xs[pid].unit === 'ratio'; }
   function unitOf(pid) { var c = convFor(pid); if (c) return c[0]; c = chFor(pid); var u = c ? c.unit : xs[pid] && xs[pid].unit; return u === 'C' ? '\u00b0C' : (u || ''); }
   function pidName(pid) { var c = chFor(pid); return c ? c.name : xs[pid] ? xs[pid].name.replace(/_/g, ' ') : pid; }
   function fmtAny(v) { return Math.abs(v) >= 100 || v % 1 === 0 ? String(Math.round(v * 10) / 10) : v.toFixed(1); }
@@ -825,6 +843,14 @@
     function inside(r) { return (r[0] === null || v >= r[0]) && (r[1] === null || v <= r[1]); }
     return inside(w.ok) ? 'ok' : inside(w.out) ? 'watch' : 'out';
   }
+  // the one judgement for every display (spec 2026-10-02): s na/stale/neutral/ok/watch/out on the 10 s median, now on the latest sample
+  function assess(pid) {
+    var v = latest(pid), sr = series(pid);
+    if (v === null || v === undefined) return { s: 'na', now: 'na', v: null, m: null };
+    if (!source().fresh || !sr.length || sr[sr.length - 1].t < tNow - FRESH_S) return { s: 'stale', now: 'stale', v: v, m: null };
+    var w = watchFor(pid), m = winMedian(pid);
+    return { s: judge(m, w), now: judge(v, w), v: v, m: m };
+  }
   // update the nodes in box by key instead of rebuilding them: a ? button replaced between mouse-down and mouse-up loses the click
   function keyed(box, items, make, update) {
     var nodes = box._nodes = box._nodes || {}, order = items.map(function (i) { return i.key; }), sig = order.join('|');
@@ -840,9 +866,8 @@
   }
   function liveLine(key) {
     if (key.indexOf('m06:') === 0) return '';
-    var v = latest(key); if (v === null || v === undefined) return 'not reported by this car';
-    var u = unitOf(key), s = judge(winMedian(key), watchFor(key));
-    return 'now ' + fmtPid(key, v) + (u ? ' ' + u : '') + (s === 'ok' ? ': normal' : s === 'watch' ? ': watch' : s === 'out' ? ': out of range' : '');
+    var a = assess(key), u = unitOf(key); if (a.v === null) return 'not reported by this car';
+    return 'now ' + fmtPid(key, a.v) + (u ? ' ' + u : '') + (a.s === 'stale' ? ': not current' : WORD[a.s] ? ': ' + WORD[a.s] + ' (10 s)' : '');
   }
   function closeHelp() { $('helpPanel').className = ''; helpKey = null; }
   function openHelp(btn, key) {
@@ -913,9 +938,10 @@
     var msig = JSON.stringify(m); if (box._msig === msig) return; box._msig = msig;   // results do not change after the read; rebuilding would drop clicks
     box.textContent = '';
     if (!m.read) { box.appendChild(el('p', 'note', m.note || 'Start sampling to read the test results.')); $('m6_count').textContent = ''; return; }
-    var bad = res.filter(function (r) { return r.within_limits === false; }).length;
-    $('m6_count').textContent = res.length + ' tests \u00b7 ' + bad + ' outside limits';
-    $('m6_count').className = 'tag ' + (bad ? 'warn' : 'ok');
+    var bad = res.filter(function (r) { return r.within_limits === false; }).length, good = res.some(function (r) { return r.within_limits === true; });
+    $('m6_count').textContent = res.length ? res.length + ' tests \u00b7 ' + bad + ' outside limits' : 'no results';
+    $('m6_count').className = 'tag' + (bad ? ' warn' : good ? ' ok' : '');
+    if (!res.length) box.appendChild(el('p', 'note', 'The car listed ' + (m.mids || []).length + ' monitors but returned no test results.'));
     var by = {};
     res.forEach(function (r) { (by[r.mid] = by[r.mid] || []).push(r); });
     Object.keys(by).sort().forEach(function (mid) {
@@ -945,7 +971,7 @@
     '06': { lo: -25, hi: 25, dp: 1 }, '07': { lo: -25, hi: 25, dp: 1 }, '08': { lo: -25, hi: 25, dp: 1 }, '09': { lo: -25, hi: 25, dp: 1 },
     '0E': { lo: -20, hi: 50, dp: 1, majors: 7 }, '0F': { lo: -40, hi: 80, dp: 0, majors: 6 }, '44': { lo: 0.5, hi: 1.5, dp: 2, majors: 5 } };
   var FORMS = ['dial', 'bar', 'seven'];
-  var SEGCOL = { ok: 'var(--g-ok)', watch: 'var(--g-warn)', out: 'var(--g-bad)', neutral: 'var(--g-seg)', none: 'var(--g-seg)' };
+  var SEGCOL = { ok: 'var(--g-ok)', watch: 'var(--g-warn)', out: 'var(--g-bad)', neutral: 'var(--g-seg)', none: 'var(--g-seg)', stale: 'var(--g-seg)' };
   function gaugeZones(w, lo, hi) {   // a watch range as bands on [lo, hi]: ok inside w.ok, watch between ok and out, out beyond out (judge's rule); null ends are open
     if (!w || !Array.isArray(w.ok) || !Array.isArray(w.out)) return [];
     var o0 = w.out[0] === null ? lo : w.out[0], k0 = w.ok[0] === null ? lo : w.ok[0], k1 = w.ok[1] === null ? hi : w.ok[1], o1 = w.out[1] === null ? hi : w.out[1];
@@ -966,13 +992,15 @@
   function gaugeModel(spec) {   // spec { pid, form: 'dial'|'bar'|'seven', lo?, hi? } (metric) -> what the gauge shows now; values and bands in display units
     var pid = spec.pid, d = GAUGE[pid] || {}, lo = typeof spec.lo === 'number' ? spec.lo : d.lo, hi = typeof spec.hi === 'number' ? spec.hi : d.hi,
         ranged = typeof lo === 'number' && typeof hi === 'number' && hi > lo, form = !ranged ? 'seven' : FORMS.indexOf(spec.form) >= 0 ? spec.form : 'dial',
-        chs = (state && state.channels) || {}, present = !!chs[pid], v = present ? latest(pid) : null, has = v !== null && v !== undefined,
-        med = winMedian(pid), s = has ? judge(med === null ? v : med, watchFor(pid)) : 'none', c = chFor(pid);
-    return { key: pid + ':' + form, pid: pid, form: form, present: present, s: s, v: has ? cv(pid, v) : null,
-             dp: dpFor(pid, d.dp !== undefined ? d.dp : c ? c.dp : 1), lo: ranged ? cv(pid, lo) : null, hi: ranged ? cv(pid, hi) : null,
+        chs = (state && state.channels) || {}, present = !!chs[pid], a = assess(pid), v = a.v, has = v !== null, c = chFor(pid),
+        s = a.s === 'na' ? 'none' : RANK[a.now] > RANK[a.s] ? a.now : a.s,   // worse of now and 10 s
+        lab = has && chs[pid].labels ? chs[pid].labels[String(Math.round(v))] || null : null, noans = ((state && state.unsupported) || []).indexOf(pid) >= 0;
+    return { key: pid + ':' + form, pid: pid, form: form, present: present, s: s, v: has ? cv(pid, v) : null, lab: lab,
+             dp: dpFor(pid, d.dp !== undefined ? d.dp : c ? c.dp : isRatio(pid) ? 2 : 1), lo: ranged ? cv(pid, lo) : null, hi: ranged ? cv(pid, hi) : null,
              zones: ranged ? gaugeZones(watchFor(pid), lo, hi).map(function (z) { return { from: cv(pid, z.from), to: cv(pid, z.to), s: z.s }; }) : [],
              majors: d.majors || 5, div: d.div || 1, centre: CENTRE[pid] === 1,
-             note: !present ? (Object.keys(chs).length ? 'not in this run' : 'not sampling') : !has ? 'waiting' : WORD[s] };
+             note: !present ? (Object.keys(chs).length ? 'not in this run' : 'not sampling') : !has ? (noans ? 'no answer from the car' : 'waiting')
+               : a.s === 'stale' ? 'not current' : !WORD[a.s] ? '' : a.now !== a.s ? 'now: ' + WORD[a.now] + ' · 10 s: ' + WORD[a.s] : '10 s: ' + WORD[a.s] };
   }
   function segDigits(it) {   // enough digits for the range and the value, so the display does not clip to 9s
     function need(x) { return x === null ? 0 : String(Math.round(Math.abs(x))).length + it.dp + (x < 0 ? 1 : 0); }
@@ -989,11 +1017,12 @@
     '06': 'STFT bank 1', '07': 'LTFT bank 1', '08': 'STFT bank 2', '09': 'LTFT bank 2', '44': 'Target lambda', '0E': 'Spark advance', '0F': 'Intake air' };   // short gauge titles (the value line shows the unit)
   function updGauge(nd, it) {
     var u = unitOf(it.pid), name = pidName(it.pid), full = name.charAt(0).toUpperCase() + name.slice(1);
-    nd.root.className = 'gauge ' + it.form + (it.present ? '' : ' dim') + (it.s === 'watch' || it.s === 'out' ? ' ' + it.s : '');
+    nd.root.className = 'gauge ' + it.form + (it.present ? '' : ' dim') + (it.s === 'watch' || it.s === 'out' || it.s === 'stale' ? ' ' + it.s : '');
     nd.name.textContent = GTITLE[it.pid] || full; nd.name.setAttribute('title', full + (u ? ' (' + u + ')' : ''));
     nd.note.textContent = it.note;
-    nd.val.textContent = it.form === 'seven' ? '' : fmt(it.v, it.dp) + (u && it.v !== null ? ' ' + u : '');
-    if (it.form === 'dial') nd.face.innerHTML = dialSvg(it.v, it.lo, it.hi, it.majors, it.zones, name, it.div);   // numbers and fixed markup; the name is escaped
+    nd.val.textContent = it.lab || (it.form === 'seven' ? u : fmt(it.v, it.dp) + (u && it.v !== null ? ' ' + u : ''));
+    if (it.lab) { nd.face.className = 'gface'; nd.face.innerHTML = ''; }
+    else if (it.form === 'dial') nd.face.innerHTML = dialSvg(it.v, it.lo, it.hi, it.majors, it.zones, name, it.div);   // numbers and fixed markup; the name is escaped
     else if (it.form === 'bar') nd.face.innerHTML = '<div class="leds">' + ledStrip(it.v, it.lo, it.hi, it.zones, 21, it.centre) + '</div>';
     else { nd.face.className = 'gface led'; nd.face.setAttribute('style', '--c:' + SEGCOL[it.s]); seven(nd.face, it.v, segDigits(it), it.dp, SEGCOL[it.s], 72); }
   }
@@ -1014,15 +1043,18 @@
     return { root: root, body: body };
   }
   /* shared parts: Lamps strip (MIL, trims, coolant, sampling) and Codes panel */
+  var LAMPW = { na: 'not available', stale: 'not current', neutral: 'not assessed', ok: 'normal' };
+  function lamp(id, pid, b, low, high) {   // amber watch, red out, else off
+    var a = assess(pid), bad = a.s === 'watch' || a.s === 'out', w = watchFor(pid), under = bad && w.ok[0] !== null && a.m < w.ok[0];
+    return { id: id, on: bad, cls: a.s === 'out' ? 'red' : 'amb', b: b, e: bad ? (under ? low : high) + ' ' + fmt(cv(pid, a.m), dpFor(pid, pid === '05' ? 0 : 1)) + ' ' + unitOf(pid) + ': ' + WORD[a.s] : LAMPW[a.s] };
+  }
   function lampModel() {
-    var r = retroCommon(), st = state || {}, l1 = last.ltft1 !== null && Math.abs(last.ltft1) > 10, l2 = last.ltft2 !== null && Math.abs(last.ltft2) > 10,
-        cold = last.ect !== null && last.ect < 60, run = st.status === 'running';
+    var r = retroCommon(), st = state || {}, src = source(), run = src.sampling;
     return [
-      { id: 'mil', on: r.mil, cls: 'red', b: 'Check engine (MIL)', e: r.mil ? 'ON' : (r.c.read ? 'off' : 'unknown') },
-      { id: 'ltft1', on: l1, cls: 'red', b: 'LTFT bank 1', e: l1 ? trimText(last.ltft1) : 'within range' },
-      { id: 'ltft2', on: l2, cls: 'red', b: 'LTFT bank 2', e: l2 ? trimText(last.ltft2) : 'within range' },
-      { id: 'ect', on: cold, cls: 'amb', b: 'Coolant', e: cold ? 'reads cold' : 'warm' },
-      { id: 'samp', on: run, cls: 'grn', b: 'Sampling', e: run ? (st.hz_measured ? st.hz_measured.toFixed(1) + ' Hz' : 'starting') : 'not sampling' }
+      { id: 'mil', on: r.mil, cls: 'red', b: 'Check engine (MIL)', e: r.mil ? 'ON' : r.c.mil === false ? 'off' : (r.c.unanswered || []).indexOf('mil') >= 0 ? 'no answer' : 'unknown' },
+      lamp('ltft1', '07', 'LTFT bank 1', 'RICH', 'LEAN'), lamp('ltft2', '09', 'LTFT bank 2', 'RICH', 'LEAN'), lamp('ect', '05', 'Coolant', 'cold', 'hot'),
+      { id: 'samp', on: run, cls: 'grn', b: 'Sampling', e: run ? (st.demo ? 'simulated · ' : '') + (st.hz_measured ? st.hz_measured.toFixed(1) + ' Hz' : 'starting')
+        : src.phase === 'lost' ? 'connection lost' : st.replay ? 'off: replay ' + src.phase : 'not sampling' }
     ];
   }
   function lampsHtml(m) { return m.map(function (x) { return ledLamp('', x.on, x.cls, x.b, x.e); }).join(''); }
@@ -1036,8 +1068,9 @@
   }
   function renderCodes(cp) {
     var r = retroCommon();
-    seven(cp.cnt, r.c.read ? r.list.length : null, 2, 0, r.list.length ? 'var(--seg-red)' : 'var(--led-g)', 64);
-    cp.list.innerHTML = r.list.length ? codeRows(r.list, 'cab') : '<div class="cnone' + (r.c.read ? '' : ' wait') + '">' + codeEmpty(r.c, r.live) + '</div>';
+    seven(cp.cnt, r.c.read ? r.n : null, 2, 0, r.n ? 'var(--seg-red)' : r.clear ? 'var(--led-g)' : 'var(--g-seg)', 64);
+    cp.list.innerHTML = r.list.length ? codeRows(r.list, 'cab') : '<div class="cnone' + (r.clear ? '' : ' wait') + '">' + codeEmpty(r.c, r.live) + '</div>';
+    $('d_codes_mount').hidden = !r.list.length;
   }
   var BUILTIN = [
     { id: 'general', name: 'General', gauges: [['0C','dial'],['0D','dial'],['05','dial'],['04','bar'],['11','bar'],['0B','bar'],['42','seven'],['06','seven']] },
@@ -1167,7 +1200,7 @@
     var sc = curScenario(), specs = ED.on ? ED.draft : specsFor(sc), chs = (state && state.channels) || {}, ids = Object.keys(chs).sort(), mine = {};
     if (ED.on && (!ED.box || ED.sig !== ids.join())) drawEditor();   // the editor is rebuilt on actions and when the PIDs in the run change, not every poll
     DB.p.name.textContent = sc.name; DB.none.textContent = specs.length ? '' : 'No gauges. Add one or Reset.'; DB.none.hidden = specs.length > 0;
-    gauges(DB.g, specs); renderLamps($('d_lamps')); renderCodes(DB.cp);
+    renderSummary($('d_sum')); gauges(DB.g, specs); renderLamps($('d_lamps')); renderCodes(DB.cp);
     specs.forEach(function (s) { mine[s.pid] = true; });   // keys are two-hex-digit PIDs (cleanSpecs), so a plain object is safe
     pidRows(DB.rows, ids); DB.tnote.textContent = ids.length ? '' : 'No readings yet.'; DB.tnote.hidden = ids.length > 0;
     Array.prototype.forEach.call(DB.rows.children, function (r) { r.classList.toggle('scen', mine[r.getAttribute('data-key')] === true); });
@@ -1186,7 +1219,7 @@
   var ROW_NAME = { '06': 'Short-term trim, bank 1', '07': 'Long-term trim, bank 1', '08': 'Short-term trim, bank 2', '09': 'Long-term trim, bank 2',
                    '05': 'Coolant temperature', '42': 'Battery voltage' };
   var ATTN = ['06', '07', '08', '09', '05', '42'];
-  var RANK = { none: 0, neutral: 1, ok: 2, watch: 3, out: 4 };
+  var RANK = { none: 0, na: 0, stale: 1, neutral: 1, ok: 2, watch: 3, out: 4 };
   var WORD = { ok: 'normal', watch: 'watch', out: 'out of range', neutral: '', none: 'not reported' };
   function sparkSvg(s) {
     if (s.length < 2) return '';
@@ -1199,15 +1232,14 @@
   function tileModel(t, run) {
     var main = null, mv = null, worst = 'none';
     t.pids.forEach(function (p) {
-      var v = run ? winMedian(p) : latest(p);
-      if ((v === null || v === undefined) && run && !chFor(p)) v = latest(p);   // a rotating extra not seen for over 10 s keeps its last value
+      var a = assess(p), v = !run || a.s === 'stale' ? a.v : a.m;
       if (v === null || v === undefined) return;
-      var s = run ? judge(v, watchFor(p)) : 'none';
+      var s = run ? a.s : 'none';
       if (RANK[s] > RANK[worst]) worst = s;
       if (main === null || Math.abs(v) > Math.abs(mv)) { main = p; mv = v; }
     });
     var cls = !run || main === null ? 'idle' : worst === 'ok' ? '' : worst, sub;
-    if (!run) sub = 'not sampling';
+    if (!run) sub = lost ? 'not current' : 'not sampling';
     else if (main === null) sub = 'not reported';
     else if (t.key === 'load') {
       var s2 = series('04'), age = s2.length ? tNow - s2[s2.length - 1].t : null, per = state && state.hz_measured ? 1 / state.hz_measured : 1;
@@ -1248,17 +1280,46 @@
     var g = {}; specs.forEach(function (s) { g[s.pid] = true; });
     return TILES.filter(function (t) { return !t.pids.every(function (p) { return g[p] === true; }); });
   }
+  function judged() {
+    var n = { ok: 0, watch: 0, out: 0, stale: 0 }, worst = null;
+    Object.keys((state && state.channels) || {}).sort().forEach(function (p) {
+      if (!watchFor(p)) return;
+      var a = assess(p); if (n[a.s] !== undefined) n[a.s]++;
+      if ((a.s === 'watch' || a.s === 'out') && (!worst || RANK[a.s] > RANK[worst.s])) worst = { p: p, s: a.s };
+    });
+    return { n: n, worst: worst };
+  }
+  function noFlags(k) { return 'No flags in the ' + k + ' reading' + (k === 1 ? '' : 's') + ' assessed'; }
   function renderOverview(specs) {
-    var run = !!state && state.status === 'running', models = TILES.map(function (t) { return tileModel(t, run); }), keep = {};
+    var run = source().fresh, models = TILES.map(function (t) { return tileModel(t, run); }), keep = {};
     stripTiles(specs).forEach(function (t) { keep[t.key] = true; });
     keyed($('o_tiles'), models.filter(function (m) { return keep[m.key]; }), makeTile, updTile);
     $('o_health').hidden = $('o_tiles').hidden = !Object.keys(keep).length;
-    var rows = !run ? [] : ATTN.map(function (p) { var v = winMedian(p); return { key: p, v: v, s: judge(v, watchFor(p)) }; })
+    var rows = !run ? [] : ATTN.map(function (p) { var a = assess(p); return { key: p, v: a.m, s: a.s }; })
       .filter(function (r) { return r.s === 'watch' || r.s === 'out'; })
       .sort(function (a, b) { return RANK[b.s] - RANK[a.s] || ATTN.indexOf(a.key) - ATTN.indexOf(b.key); });
     keyed($('o_attn'), rows, makeRow, updRow);
-    var have = models.some(function (m) { return m.cls !== 'idle'; });
-    $('o_note').textContent = rows.length ? '' : !run ? 'Not sampling' : !helpLoaded() ? 'Health ranges not loaded, so nothing is checked' : have ? 'Nothing out of range' : 'Waiting for readings';
+    var k = judged().n.ok;
+    $('o_note').textContent = rows.length ? '' : !run ? (lost ? 'Not current: connection lost' : 'Not sampling') : !helpLoaded() ? 'Health ranges not loaded, so nothing is checked' : k ? noFlags(k) : 'Waiting for readings';
+  }
+  function summary() {
+    var st = state || {}, src = source(), r = retroCommon(), j = judged(), n = j.n, has = Object.keys(st.channels || {}).length > 0, miss = codeMiss(r.c);
+    var read = !has ? 'No readings' : !src.fresh ? 'Readings not current' : !helpLoaded() ? 'Ranges not loaded: readings not assessed'
+      : n.out || n.watch ? [n.out ? n.out + ' out of range' : '', n.watch ? n.watch + ' to watch' : ''].filter(String).join(' · ') : n.ok ? noFlags(n.ok) : 'Waiting for readings';
+    var codes = r.c.read ? (r.n ? r.n + (r.n === 1 ? ' code' : ' codes') + (miss.length ? ' · no answer: ' + miss.join(', ') : '') : r.clear ? 'No codes stored' : 'No answer for ' + miss.join(', ') + ' codes')
+      : r.c.note ? 'Codes: ' + r.c.note : src.sampling ? 'Reading codes…' : 'Codes not read';
+    var next = src.phase === 'lost' ? 'check that shadetree-ai is still running'
+      : !has && !st.replay && !src.sampling ? (st.demo ? 'press Demo, or load a replay' : 'press Start sampling, or load a replay')
+      : r.mil || r.n ? 'review the codes below'
+      : j.worst && src.fresh ? (j.worst.s === 'out' ? 'look at ' : 'keep an eye on ') + pidName(j.worst.p) + ' first'
+      : !src.fresh && !st.replay ? 'start sampling for current readings' : 'none from these readings';
+    return { level: r.mil || r.n || n.out ? 'bad' : n.watch || !src.fresh && has ? 'warn' : src.fresh && n.ok && r.clear && r.c.mil === false ? 'ok' : '',
+             parts: [src.kind + ' · ' + ({ running: 'sampling', error: 'adapter error', idle: 'not sampling', lost: 'connection lost' }[src.phase] || src.phase),
+                     r.mil ? 'Check engine ON' : r.c.mil === false ? 'Check engine off' : 'Check engine: unknown', codes, read, 'Next: ' + next], milOn: r.mil };
+  }
+  function renderSummary(box) {
+    var m = summary(), h = m.parts.map(function (t, i) { return '<span' + (i === 1 && m.milOn ? ' class="on"' : '') + '>' + esc(t) + '</span>'; }).join('');
+    box.className = 'sumbar' + (m.level ? ' ' + m.level : ''); if (box._sig !== h) { box._sig = h; box.innerHTML = h; }
   }
   $('o_more').addEventListener('click', function (e) { if (e.preventDefault) e.preventDefault(); show('v6'); });
   function renderUnits() {
@@ -1403,17 +1464,18 @@
     return out;
   }
   function codeEmpty(c, running) {   // markup-safe: callers put it in innerHTML, and a replay file's note is untrusted
-    if (c && c.read) return 'NO CODES STORED';
+    var miss = c ? codeMiss(c) : [];
+    if (c && c.read) return miss.length ? 'NO ANSWER FOR ' + miss.join(', ').toUpperCase() + ' CODES' : 'NO CODES STORED';
     if (c && c.note) return esc(String(c.note).toUpperCase());
     return running ? 'READING CODES...' : 'START SAMPLING TO READ CODES';
   }
-  function retroCommon() {
-    var st = state || {}, c = st.codes || { read: false, note: null }, list = c.read ? codeList(c) : [], live = st.status === 'running';
-    var stored = c.read ? (c.stored || []).length : 0, mil = !!(c.read && c.mil);
-    return { c: c, list: list, live: live, mil: mil, stored: stored };
+  function codeMiss(c) { return ((c.read && c.unanswered) || []).filter(function (k) { return k !== 'mil'; }); }
+  function retroCommon() {   // n distinct codes; clear: all lists answered, empty
+    var st = state || {}, c = st.codes || { read: false, note: null }, list = c.read ? codeList(c) : [], seen = {};
+    list.forEach(function (x) { seen[x.code] = 1; });
+    return { c: c, list: list, live: st.status === 'running', mil: c.mil === true, n: Object.keys(seen).length, clear: !!c.read && !list.length && !codeMiss(c).length };
   }
   function ledLamp(id, on, cls, b, e) { return '<div class="lampbox' + (on ? ' lit' : '') + '"><i class="lens ' + cls + '"></i><div><b>' + b + '</b><em>' + e + '</em></div></div>'; }
-  function trimText(v) { return v > 10 ? 'LEAN: outside \u00b110 %' : 'RICH: outside \u00b110 %'; }
   function renderHandheld() {   // the top strip, Codes (unchanged), and Live: lamps, the scenario's gauges (no editing here), every PID in the run
     var r = retroCommon(), st = state || {};
     if (!HB) {
@@ -1422,10 +1484,10 @@
     }
     var mil = $('h_mil'); mil.className = 'lens red';
     mil.style.cssText = 'width:18px;height:18px' + (r.mil ? ';background:var(--lens-red-lit);box-shadow:0 0 12px var(--led-r)' : '');
-    $('h_miltxt').textContent = r.mil ? 'Check engine ON' : (r.c.read ? 'Check engine off' : 'Check engine ?');
-    $('h_n').textContent = r.c.read ? r.list.length + (r.list.length === 1 ? ' CODE' : ' CODES') : '-- CODES'; $('h_n').className = 'n mono' + (r.c.read && !r.list.length ? ' zero' : '');
-    var lv = $('h_live'); lv.textContent = { running: 'LIVE', stopped: 'STOPPED', error: 'ERROR', idle: 'IDLE', disconnected: 'NO LINK' }[st.status] || '--'; lv.className = 'hlive ' + (st.status === 'running' ? 'on' : 'off');
-    $('h_codes').innerHTML = r.list.length ? codeRows(r.list, 'hh') + '<p class="cfoot">Meanings are plain-words drafts, unreviewed. Hints: general knowledge, unverified.</p>' : '<div class="cnone' + (r.c.read ? '' : ' wait') + '" style="padding:150px 0">' + codeEmpty(r.c, r.live) + '</div>';
+    $('h_miltxt').textContent = r.mil ? 'Check engine ON' : r.c.mil === false ? 'Check engine off' : 'Check engine ?';
+    $('h_n').textContent = r.c.read ? r.n + (r.n === 1 ? ' CODE' : ' CODES') : '-- CODES'; $('h_n').className = 'n mono' + (r.clear ? ' zero' : '');
+    var lv = $('h_live'), src = source(); lv.textContent = src.word; lv.className = 'hlive ' + (src.sampling ? 'on' : 'off');
+    $('h_codes').innerHTML = r.list.length ? codeRows(r.list, 'hh') + '<p class="cfoot">Meanings are plain-words drafts, unreviewed. Hints: general knowledge, unverified.</p>' : '<div class="cnone' + (r.clear ? '' : ' wait') + '" style="padding:150px 0">' + codeEmpty(r.c, r.live) + '</div>';
     var specs = specsFor(curScenario()), ids = Object.keys(st.channels || {}).sort();
     HB.none.textContent = specs.length ? '' : 'No gauges in this scenario. Edit it on the Dashboard.'; HB.none.hidden = specs.length > 0;
     renderLamps($('h_lamps')); gauges(HB.g, specs);
@@ -1455,8 +1517,8 @@
     var asked = lastSeq;
     fetch(api('/api/state?after=' + asked))
       .then(function (r) { if (!r.ok) throw new Error(String(r.status)); return r.json(); })
-      .then(function (st) { var again = ingest(st, asked); render(); return again; })
-      .catch(function () { state = { status: 'disconnected' }; chips(); })
+      .then(function (st) { lost = false; var again = ingest(st, asked); render(); return again; })
+      .catch(function () { lost = true; try { render(); } catch (x) { } })   // keep the last state, not current
       .then(function (again) { polling = false; if (again === true) poll(); });
   }
   function startRun() {
@@ -1505,7 +1567,7 @@
 
   renderResults(); render();
   window.addEventListener('resize', render);
-  setInterval(poll, 400);
+  setInterval(function () { poll(); if (state && !lost && performance.now() - fetchedAt > 5000) { lost = true; render(); } }, 400);   // a reply that hangs counts as lost too
   poll();
   // ?example=<file> replays that public example on load, as picking it under Examples does (same name rule as the server)
   var EXAMPLE = new URLSearchParams(location.search).get('example');
@@ -1529,7 +1591,7 @@
     })
     .catch(function () {});
   // the page test reaches the shared parts through this hook; a browser never defines it, so nothing is exposed
-  if (typeof window.__shadetreeParts === 'function') window.__shadetreeParts({ lampModel: lampModel, pickView: pickView, panel: panel, gaugeZones: gaugeZones, gauges: gauges, pidRows: pidRows, pidTableEl: pidTableEl,
+  if (typeof window.__shadetreeParts === 'function') window.__shadetreeParts({ lampModel: lampModel, assess: assess, pickView: pickView, panel: panel, gaugeZones: gaugeZones, gauges: gauges, pidRows: pidRows, pidTableEl: pidTableEl,
     gaugeModel: gaugeModel, niceTicks: niceTicks, dialSvg: dialSvg, segDigits: segDigits, BUILTIN: BUILTIN, stripTiles: stripTiles, cleanSpecs: cleanSpecs, scenarioList: scenarioList, loadSaved: loadSaved, saveSaved: saveSaved, specsFor: specsFor, editAdd: editAdd, editRemove: editRemove, editMove: editMove, editForm: editForm });
 })();
 </script>
