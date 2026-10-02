@@ -36,7 +36,7 @@ function makeEnv(states, viewId = 'v0', help = null, runs = [], store = {}, page
   const hhPanes = [...html.matchAll(/<div class="hh-pane" data-mode="(\w+)" id="(\w+)"( hidden)?>/g)].map(m => { const n = el(m[2]); n.dataset.mode = m[1]; n.hidden = !!m[3]; return n; });
   const hhNav = html.match(/<nav class="hh-nav">([\s\S]*?)<\/nav>/);
   const hhBtns = hhNav ? [...hhNav[1].matchAll(/<button data-mode="(\w+)"( class="on")?>/g)].map(m => { const b = makeNode('hh_' + m[1], handlers); b.dataset.mode = m[1]; b.className = m[2] ? 'on' : ''; return b; }) : [];
-  let timer = null, i = 0, now = 0;
+  let timer = null, i = 0, now = 0; const timeouts = [];
   const sandbox = {
     console, URLSearchParams, Promise, Math, Object, Array, Number, String, JSON, Date, parseInt, isFinite,
     document: { documentElement: el('html'), getElementById: (id) => ((page.absent || []).includes(id) ? null : el(id)),
@@ -47,6 +47,7 @@ function makeEnv(states, viewId = 'v0', help = null, runs = [], store = {}, page
     location: { search: page.search || '?t=abc', hash: page.hash || '' }, history: { replaceState() {} },
     performance: { now: () => now },
     setInterval: (fn) => { timer = fn; }, encodeURIComponent,
+    setTimeout: (fn, ms) => { timeouts.push({ fn, ms }); return timeouts.length; }, clearTimeout: (k) => { if (timeouts[k - 1]) timeouts[k - 1].fn = null; },   // run by env.timeouts()
     fetch: (url, opts) => {
       if (opts && opts.method === 'POST') {
         const body = JSON.parse(opts.body), r = page.postReply && page.postReply(url, body);
@@ -69,7 +70,7 @@ function makeEnv(states, viewId = 'v0', help = null, runs = [], store = {}, page
   vm.runInNewContext(js, sandbox);
   return {
     el, handlers, docHandlers, winH, posts, sandbox, store, hhBtns, parts: () => parts,
-    timer() { timer(); }, setHelp(h) { help = h; }, advance(ms) { now += ms; },
+    timer() { timer(); }, timeouts() { timeouts.splice(0).forEach(t => t.fn && t.fn()); }, pending: () => timeouts.filter(t => t.fn).length, setHelp(h) { help = h; }, advance(ms) { now += ms; },
     async tick() { timer(); await new Promise(r => setImmediate(r)); await new Promise(r => setImmediate(r)); }
   };
 }
@@ -1551,6 +1552,27 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
     }
     assert.ok(/<span class="chip liveoff" id="liveOff" title="Live sampling is off while a replay plays" hidden>live off<\/span>/.test(html), 'a plain span: not focusable, no button look');
     assert.ok(/<span class="chip" id="chipAge" hidden>/.test(html) && /<span class="chip" id="chipAuto" hidden>/.test(html), 'hidden until a capture samples');
+  }
+
+  {   // LAMP TEST lights every lamp while held and puts the real lamps back on release; a quick press flashes them; nothing changes underneath, nothing is posted
+    const st = statesFor(3, idle).map(x => Object.assign(x, { codes: { read: true, mil: true, stored: ['P0171'], pending: [] } }));
+    const e = makeEnv(st, 'v0', OVF, [], { 'shadetree.skin': 'retro' }); for (let k = 0; k < 3; k++) await e.tick();
+    const lit = () => e.el('d_lamps').className.split(' ').includes('lamp-test'), before = [e.el('d_lamps').innerHTML, e.el('d_sum').innerHTML], n = e.posts.length;
+    assert.ok(/aria-label="Lamp test: light all status lamps"/.test(html) && /<button class="ltest" id="d_ltest" type="button"/.test(html), 'a labelled button');
+    assert.ok(!/aria-live/.test(html.slice(html.indexOf('id="d_lamps"'), html.indexOf('id="d_ltest"'))), 'the lamp row is not a live region');
+    e.handlers['d_ltest:pointerdown']({}); assert.ok(lit(), 'held: lit');
+    e.advance(900); e.handlers['d_ltest:pointerup']();
+    assert.ok(!lit() && e.pending() === 0, 'a long hold: back on release, no flash after');
+    e.handlers['d_ltest:pointerleave'](); assert.ok(!lit(), 'leaving afterwards changes nothing');
+    e.handlers['d_ltest:pointerdown']({}); e.advance(100); e.handlers['d_ltest:pointerup']();
+    assert.ok(lit() && e.pending() === 1, 'a quick click: lit for a moment'); e.timeouts(); assert.ok(!lit(), 'then back');
+    e.handlers['d_ltest:keydown']({ key: ' ' }); assert.ok(lit(), 'Space held: lit'); e.handlers['d_ltest:keydown']({ key: ' ', repeat: true });
+    e.advance(700); e.handlers['d_ltest:keyup'](); assert.ok(!lit(), 'released');
+    e.handlers['d_ltest:keydown']({ key: 'Enter' }); e.advance(700); e.handlers['d_ltest:blur'](); assert.ok(!lit(), 'focus leaving releases it');
+    e.handlers['d_ltest:keydown']({ key: 'a' }); assert.ok(!lit(), 'other keys do nothing');
+    await e.tick();
+    assert.deepStrictEqual([e.el('d_lamps').innerHTML, e.el('d_sum').innerHTML], before, 'the lamps and the summary are what the car says');
+    assert.ok(/lampbox lit/.test(e.el('d_lamps').innerHTML) && e.posts.length === n, 'MIL still lit from the data; nothing posted');
   }
 
   console.log('page logic OK');

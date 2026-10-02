@@ -241,14 +241,19 @@
     :root[data-skin="retro"] #v0 .dface .mono { font-family: var(--cb-mono); }
     /* pushbuttons: chrome bezel, black cap, a pilot lamp that lights on the chosen one (scenario tabs, the edit pencil) */
     :root[data-skin="retro"] #v0 .dface .stabs { gap: 10px; }
-    :root[data-skin="retro"] #v0 .dface .stab, :root[data-skin="retro"] #v0 .dface #d_edit { appearance: none; position: relative; border: 4px solid transparent; border-radius: 5px; padding: 15px 12px 8px; cursor: pointer;
+    :root[data-skin="retro"] #v0 .dface .stab, :root[data-skin="retro"] #v0 .dface #d_edit, :root[data-skin="retro"] #v0 .dface .ltest { appearance: none; position: relative; border: 4px solid transparent; border-radius: 5px; padding: 15px 12px 8px; cursor: pointer;
       background: linear-gradient(180deg, var(--cb-cap-1), var(--cb-cap-2)) padding-box, linear-gradient(145deg, var(--cb-chrome-1), var(--cb-chrome-2) 45%, var(--cb-chrome-3) 70%, var(--cb-chrome-2)) border-box;
       color: var(--cb-silk); font: 700 12.5px/1.1 var(--cb-label); letter-spacing: .14em; text-transform: uppercase; box-shadow: 0 2px 3px rgba(0,0,0,.3); }
-    :root[data-skin="retro"] #v0 .dface .stab::before, :root[data-skin="retro"] #v0 .dface #d_edit::before { content: ""; position: absolute; top: 4px; left: 50%; width: 20px; margin-left: -10px; height: 3px; border-radius: 2px; background: color-mix(in srgb, var(--cb-lamp) 22%, var(--cb-cap-2)); }
-    :root[data-skin="retro"] #v0 .dface .stab.is-active::before, :root[data-skin="retro"] #v0 .dface #d_edit[aria-pressed="true"]::before { background: var(--cb-lamp); box-shadow: 0 0 6px var(--cb-lamp); }
+    :root[data-skin="retro"] #v0 .dface .stab::before, :root[data-skin="retro"] #v0 .dface #d_edit::before, :root[data-skin="retro"] #v0 .dface .ltest::before { content: ""; position: absolute; top: 4px; left: 50%; width: 20px; margin-left: -10px; height: 3px; border-radius: 2px; background: color-mix(in srgb, var(--cb-lamp) 22%, var(--cb-cap-2)); }
+    :root[data-skin="retro"] #v0 .dface .stab.is-active::before, :root[data-skin="retro"] #v0 .dface #d_edit[aria-pressed="true"]::before, :root[data-skin="retro"] #v0 .dface:has(.lamp-test) .ltest::before { background: var(--cb-lamp); box-shadow: 0 0 6px var(--cb-lamp); }
     :root[data-skin="retro"] #v0 .dface .stab:hover, :root[data-skin="retro"] #v0 .dface .stab.is-active { color: var(--cb-silk); }
-    :root[data-skin="retro"] #v0 .dface .stab:active, :root[data-skin="retro"] #v0 .dface #d_edit:active { transform: translateY(1px); box-shadow: inset 0 2px 3px rgba(0,0,0,.7); }
+    :root[data-skin="retro"] #v0 .dface .stab:active, :root[data-skin="retro"] #v0 .dface #d_edit:active, :root[data-skin="retro"] #v0 .dface .ltest:active { transform: translateY(1px); box-shadow: inset 0 2px 3px rgba(0,0,0,.7); }
     :root[data-skin="retro"] #v0 .dface #d_edit { padding: 13px 9px 5px; font-size: 14px; letter-spacing: 0; }
+    :root[data-skin="retro"] #v0 .dface > .ltest { display: block; justify-self: end; align-self: start; margin: 4px 6px 0 0; padding: 11px 8px 4px; z-index: 1; font-size: 10px; letter-spacing: .12em; }
+    /* LAMP TEST: while held every lens lights in its own colour (a class on the row; the lamps' state underneath is untouched, nothing is announced) */
+    :root[data-skin="retro"] #v0 .dface .lamps.lamp-test .lampbox:nth-child(1) .lens { background: var(--lens-red-lit); box-shadow: 0 0 0 4px var(--cb-chrome-2), 0 0 0 5px var(--cb-chrome-4), 0 0 16px 6px var(--led-r); }
+    :root[data-skin="retro"] #v0 .dface .lamps.lamp-test .lampbox:nth-child(n+2):nth-child(-n+4) .lens { background: var(--lens-amb-lit); box-shadow: 0 0 0 4px var(--cb-chrome-2), 0 0 0 5px var(--cb-chrome-4), 0 0 16px 6px var(--led-y); }
+    :root[data-skin="retro"] #v0 .dface .lamps.lamp-test .lampbox:nth-child(5) .lens { background: var(--lens-grn-lit); box-shadow: 0 0 0 4px var(--cb-chrome-2), 0 0 0 5px var(--cb-chrome-4), 0 0 16px 6px var(--led-g); }
     /* status lamps: chrome-ringed lenses, engraved label and state under each */
     :root[data-skin="retro"] #v0 .dface > .lamps { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px 6px; }
     :root[data-skin="retro"] #v0 .dface .lampbox { flex-direction: column; justify-content: flex-start; gap: 10px; padding: 0; text-align: center; background: transparent; color: var(--cb-engrave); font: 600 10.5px/1.15 var(--cb-label); letter-spacing: .08em; }
@@ -435,7 +440,7 @@
     body:has(.rbar:not([hidden])) .stage { padding-bottom: var(--rbar-h); }   /* room under the pinned replay bar (Handheld's stage padding of 0 wins by specificity; its frame height reserves the bar instead) */
   }
   @media (max-width: 600px), (pointer: coarse) {   /* 44px touch targets; a ? keeps its look and gets a 44px hit area */
-    button.b, select.b, .vbtn, .stab, .qbtn, label.chip, .seg label { min-height: 44px; } .seg label { min-width: 44px; } label.chip { display: inline-flex; align-items: center; }
+    button.b, select.b, .vbtn, .stab, .qbtn, .ltest, label.chip, .seg label { min-height: 44px; } .seg label { min-width: 44px; } label.chip { display: inline-flex; align-items: center; }
     .q { position: relative; } .q::after { content: ""; position: absolute; inset: calc(50% - 22px); }
   }
   .banner[hidden], [hidden] { display: none !important; }
@@ -710,6 +715,7 @@
     </div>
     <div id="d_panel"></div>
     <div class="lamps" id="d_lamps"></div>
+    <button class="ltest" id="d_ltest" type="button" aria-label="Lamp test: light all status lamps" title="Lamp test: hold to light every status lamp (a click lights them for a moment); readings are not touched">Lamp test</button>
     <div id="d_codes_mount"></div>
     <div id="d_ready_mount"></div>
     <div id="d_strip">
@@ -1800,6 +1806,19 @@
     place();
   }
   $('optBtn').addEventListener('click', function () { setOpt(!OPT); });
+  /* LAMP TEST: lit while held (pointer or Space/Enter), back to the real lamps on release; a quick press lights them for 1.5 s. Only a class on the
+     lamp row changes: no reading, assessment, summary or request */
+  var LT = null, ltAt = null;   // ltAt: when the press began, null when not pressed
+  function ltLit(on) { $('d_lamps').classList.toggle('lamp-test', on); }
+  function ltDown(e) { if (e && e.repeat) return; clearTimeout(LT); LT = null; ltAt = performance.now(); ltLit(true); }
+  function ltUp() {
+    if (ltAt === null) return;
+    var quick = performance.now() - ltAt < 400; ltAt = null;
+    if (quick) LT = setTimeout(function () { LT = null; ltLit(false); }, 1500); else ltLit(false);
+  }
+  $('d_ltest').addEventListener('pointerdown', ltDown);
+  $('d_ltest').addEventListener('keydown', function (e) { if (e.key === ' ' || e.key === 'Enter') ltDown(e); });
+  ['pointerup', 'pointerleave', 'pointercancel', 'blur', 'keyup'].forEach(function (t) { $('d_ltest').addEventListener(t, ltUp); });
   function render() {
     place();
     renderUnits();
