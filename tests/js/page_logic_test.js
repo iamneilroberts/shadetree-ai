@@ -679,8 +679,8 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
   const gbox = (e, specs) => { const b = e.el('gbox_' + Math.random()); e.parts().gauges(b, specs); return b; };
   const gk = (b, key) => b.children.find(c => c.getAttribute('data-key') === key);
   const gpart = (g, cls) => g.children.find(c => c.className.split(' ')[0] === cls);
-  const b1 = gbox(g1, [{ pid: '05', form: 'dial' }, { pid: '07', form: 'bar' }, { pid: '42', form: 'seven' }, { pid: '0D', form: 'dial' }, { pid: '0D', form: 'bar' }, { pid: '5C', form: 'dial' }, { pid: '05', form: 'dial' }]);
-  assert.deepStrictEqual(b1.children.map(c => c.getAttribute('data-key')), ['05:dial', '07:bar', '42:seven', '0D:dial', '0D:bar', '5C:seven'], 'in order, a repeat drawn once, no range: seven-segment');
+  const b1 = gbox(g1, [{ pid: '05', form: 'dial' }, { pid: '07', form: 'bar' }, { pid: '42', form: 'seven' }, { pid: '0D', form: 'dial' }, { pid: '0D', form: 'bar' }, { pid: '2F', form: 'dial' }, { pid: '05', form: 'dial' }]);
+  assert.deepStrictEqual(b1.children.map(c => c.getAttribute('data-key')), ['05:dial', '07:bar', '42:seven', '0D:dial', '0D:bar', '2F:seven'], 'in order, a repeat drawn once, no range: seven-segment');
   const ect = gk(b1, '05:dial');
   assert.strictEqual(ect.className, 'gauge dial'); assert.strictEqual(gpart(ect, 'gnote').textContent, '10 s: normal'); assert.strictEqual(gpart(ect, 'gval').textContent, '90 °C');
   assert(/class="z-ok"/.test(gpart(ect, 'gface').innerHTML) && /class="z-watch"/.test(gpart(ect, 'gface').innerHTML) && /class="z-out"/.test(gpart(ect, 'gface').innerHTML), 'coolant dial has its bands');
@@ -691,7 +691,7 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
   const bs = gbox(gs, [{ pid: '0C', form: 'seven' }, { pid: '99', form: 'seven' }]);
   assert(/aria-label="2500"/.test(gpart(gk(bs, '0C:seven'), 'gface').innerHTML), 'rpm 2500 shown in full: ' + gpart(gk(bs, '0C:seven'), 'gface').innerHTML.slice(0, 80));
   assert(/aria-label="123.4"/.test(gpart(gk(bs, '99:seven'), 'gface').innerHTML), 'no-range 123.4 shown in full');
-  for (const key of ['0D:dial', '0D:bar', '5C:seven']) {   // not in this run: dimmed, said in words, and no needle, lit cell or digit
+  for (const key of ['0D:dial', '0D:bar', '2F:seven']) {   // not in this run: dimmed, said in words, and no needle, lit cell or digit
     const g = gk(b1, key), face = gpart(g, 'gface').innerHTML;
     assert(g.className.split(' ').includes('dim'), key + ' dimmed'); assert.strictEqual(gpart(g, 'gnote').textContent, 'not in this run', key);
     assert(!/class="dn"/.test(face) && !/class="[gyrn]/.test(face), key + ' has no needle and no lit cell');
@@ -782,7 +782,7 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
     assert.strictEqual(dStore['shadetree.scenario'], 'fuel', 'the choice is remembered');
     assert.strictEqual(dGauges(e).length, 8, 'Fuel trims: 8 gauges');
     assert.strictEqual(e.el('d_tabs').children[1].className, 'stab is-active'); assert.strictEqual(e.el('d_sel').value, 'fuel');
-    assert.deepStrictEqual(dRows(e).filter(r => r.className.split(' ').includes('scen')).map(r => r.getAttribute('data-key')), ['04', '06', '07', '08', '09', '0B', '0C'], 'the marks follow the scenario');
+    assert.deepStrictEqual(dRows(e).filter(r => r.className.split(' ').includes('scen')).map(r => r.getAttribute('data-key')), ['06', '07', '08', '09', '0C'], 'the marks follow the scenario (base() has no 03, 14 or 10)');
     e.el('d_sel').value = 'charging'; e.handlers['d_sel:change'](); await e.tick();
     assert.strictEqual(dGauges(e).length, 4, 'the dropdown switches too'); assert.strictEqual(dStore['shadetree.scenario'], 'charging');
     const cool = await dash({ 'shadetree.scenario': 'cooling' });
@@ -830,7 +830,7 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
     const P = g.parts(), gaugesOf = (id) => P.BUILTIN.filter(s => s.id === id)[0].gauges, keys = (id) => Array.from(P.stripTiles(gaugesOf(id))).map(t => t.key);
     assert.deepStrictEqual(keys('general'), ['trims']);
     assert.deepStrictEqual(keys('cooling'), ['trims', 'map'], 'Cooling: coolant, load and battery are gauges');
-    assert.deepStrictEqual(keys('idle'), ['trims', 'ect'], 'Idle has no coolant gauge, so the coolant tile stays; one trim gauge does not hide the trims tile');
+    assert.deepStrictEqual(keys('idle'), ['trims', 'volts'], 'Idle has coolant, load and MAP gauges but no battery; two trim gauges do not hide the trims tile');
     const cool = await dash({ 'shadetree.scen.general': JSON.stringify(gaugesOf('cooling')) });
     assert.deepStrictEqual(tileKeys(cool), ['trims', 'map'], 'an edited General follows its gauges');
     const all = await dash({ 'shadetree.scen.general': JSON.stringify(['06', '07', '08', '09', '05', '42', '04', '0B'].map(pid => ({ pid, form: 'seven' }))) });
@@ -863,6 +863,12 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
     const P = e.parts();
     assert.deepStrictEqual(Array.from(P.BUILTIN).map(s => s.id), ['general', 'fuel', 'cooling', 'idle', 'charging']);
     P.BUILTIN.forEach(s => { assert.ok(s.gauges.length >= 1 && s.gauges.length <= 8); });
+    const pidsOf = (id) => P.BUILTIN.filter(s => s.id === id)[0].gauges.map(g => g.pid).join(' ');
+    assert.strictEqual(pidsOf('fuel'), '06 07 08 09 03 14 10 0C', 'Fuel trims: the trims, then loop status, upstream O2, airflow and rpm');
+    assert.strictEqual(pidsOf('cooling'), '05 5C 0F 46 0C 04 0D 42', 'Cooling: coolant, oil, intake and outside air for a cold-start comparison, then load');
+    assert.strictEqual(pidsOf('idle'), '0C 0E 0B 04 06 08 05 11', 'Idle / misfire: rpm, timing, vacuum, load, both short-term trims, coolant, throttle');
+    const fs3 = P.gaugeModel({ pid: '03', form: 'dial' });
+    assert.strictEqual(fs3.form, 'seven', 'fuel system status has no range: it shows as a readout (its label when read)');
     const cl = J(P.cleanSpecs([
       { pid: '0c', form: 'bar' }, { pid: '0C', form: 'bar' }, { pid: 'constructor' }, { pid: '7' }, 5, null, { pid: '05', form: 'pie' },
       ...Array.from({ length: 10 }, (_, i) => ({ pid: '1' + i })) ]));

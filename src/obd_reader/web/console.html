@@ -992,7 +992,8 @@
   var GAUGE = { '0C': { lo: 0, hi: 7000, dp: 0, majors: 7, div: 1000 }, '0D': { lo: 0, hi: 200, dp: 0 }, '05': { lo: -20, hi: 130, dp: 0 },
     '04': { lo: 0, hi: 100, dp: 0 }, '11': { lo: 0, hi: 100, dp: 0 }, '0B': { lo: 0, hi: 250, dp: 0, majors: 6 }, '42': { lo: 10, hi: 16, dp: 1, majors: 6 },
     '06': { lo: -25, hi: 25, dp: 1 }, '07': { lo: -25, hi: 25, dp: 1 }, '08': { lo: -25, hi: 25, dp: 1 }, '09': { lo: -25, hi: 25, dp: 1 },
-    '0E': { lo: -20, hi: 50, dp: 1, majors: 7 }, '0F': { lo: -40, hi: 80, dp: 0, majors: 6 }, '44': { lo: 0.5, hi: 1.5, dp: 2, majors: 5 } };
+    '0E': { lo: -20, hi: 50, dp: 1, majors: 7 }, '0F': { lo: -40, hi: 80, dp: 0, majors: 6 }, '44': { lo: 0.5, hi: 1.5, dp: 2, majors: 5 },
+    '14': { lo: 0, hi: 1.2, dp: 2, majors: 6 }, '5C': { lo: -20, hi: 150, dp: 0 }, '46': { lo: -40, hi: 60, dp: 0 } };
   var FORMS = ['dial', 'bar', 'seven'];
   var SEGCOL = { ok: 'var(--g-ok)', watch: 'var(--g-warn)', out: 'var(--g-bad)', neutral: 'var(--g-seg)', none: 'var(--g-seg)', stale: 'var(--g-seg)' };
   function gaugeZones(w, lo, hi) {   // a watch range as bands on [lo, hi]: ok inside w.ok, watch between ok and out, out beyond out (judge's rule); null ends are open
@@ -1037,11 +1038,12 @@
     return { root: root, name: name, face: face, val: val, note: note };
   }
   var GTITLE = { '0C': 'Engine speed', '0D': 'Speed', '05': 'Coolant', '04': 'Engine load', '11': 'Throttle', '0B': 'MAP', '42': 'Battery',
-    '06': 'STFT bank 1', '07': 'LTFT bank 1', '08': 'STFT bank 2', '09': 'LTFT bank 2', '44': 'Target lambda', '0E': 'Spark advance', '0F': 'Intake air' };   // short gauge titles (the value line shows the unit)
+    '06': 'STFT bank 1', '07': 'LTFT bank 1', '08': 'STFT bank 2', '09': 'LTFT bank 2', '44': 'Target lambda', '0E': 'Spark advance', '0F': 'Intake air',
+    '03': 'Fuel system', '14': 'O2 B1S1', '10': 'Mass airflow', '5C': 'Oil temp', '46': 'Outside air' };   // short gauge titles (the value line shows the unit)
   function updGauge(nd, it) {
-    var u = unitOf(it.pid), name = pidName(it.pid), full = name.charAt(0).toUpperCase() + name.slice(1);
+    var u = unitOf(it.pid), name = pidName(it.pid), known = name !== it.pid, full = known ? name.charAt(0).toUpperCase() + name.slice(1) : pidTitle(it.pid, it.pid);   // not in the run: the short or help title, and the PID
     nd.root.className = 'gauge ' + it.form + (it.present ? '' : ' dim') + (it.s === 'watch' || it.s === 'out' || it.s === 'stale' ? ' ' + it.s : '');
-    nd.name.textContent = GTITLE[it.pid] || full; nd.name.setAttribute('title', full + (u ? ' (' + u + ')' : ''));
+    nd.name.textContent = GTITLE[it.pid] || full; nd.name.setAttribute('title', full + (u ? ' (' + u + ')' : known ? '' : ' (PID ' + it.pid + ')'));
     nd.note.textContent = it.note;
     nd.val.textContent = it.lab || (it.form === 'seven' ? u : fmt(it.v, it.dp) + (u && it.v !== null ? ' ' + u : ''));
     if (it.lab) { nd.face.className = 'gface'; nd.face.innerHTML = ''; }
@@ -1132,9 +1134,9 @@
   function renderReady(rp, fp) { setHtml(fp.body, ffHtml()); fp.root.hidden = !ffShown(); setHtml(rp.body, readyHtml()); }
   var BUILTIN = [
     { id: 'general', name: 'General', gauges: [['0C','dial'],['0D','dial'],['05','dial'],['04','bar'],['11','bar'],['0B','bar'],['42','seven'],['06','seven']] },
-    { id: 'fuel', name: 'Fuel trims', gauges: [['06','bar'],['07','bar'],['08','bar'],['09','bar'],['44','dial'],['0B','dial'],['0C','dial'],['04','seven']] },
-    { id: 'cooling', name: 'Cooling', gauges: [['05','dial'],['0F','dial'],['04','bar'],['0C','dial'],['0D','seven'],['42','seven']] },
-    { id: 'idle', name: 'Idle / misfire', gauges: [['0C','dial'],['04','bar'],['0B','bar'],['06','seven'],['0E','dial'],['11','bar'],['42','seven']] },
+    { id: 'fuel', name: 'Fuel trims', gauges: [['06','bar'],['07','bar'],['08','bar'],['09','bar'],['03','seven'],['14','bar'],['10','seven'],['0C','dial']] },   // trims, then what they mean: loop status, upstream O2, airflow, rpm
+    { id: 'cooling', name: 'Cooling', gauges: [['05','dial'],['5C','dial'],['0F','dial'],['46','dial'],['0C','dial'],['04','bar'],['0D','seven'],['42','seven']] },   // a cold start compares the four temperatures
+    { id: 'idle', name: 'Idle / misfire', gauges: [['0C','dial'],['0E','dial'],['0B','bar'],['04','bar'],['06','bar'],['08','bar'],['05','dial'],['11','bar']] },   // a bank that misfires reads lean: compare the short-term trims
     { id: 'charging', name: 'Charging / electrical', gauges: [['42','dial'],['0C','dial'],['04','bar'],['11','bar']] }
   ].map(function (s) { return { id: s.id, name: s.name, gauges: s.gauges.map(function (g) { return { pid: g[0], form: g[1] }; }) }; });
   var SCEN_MAX = 8, HEXPID = /^[0-9A-F]{2}$/;

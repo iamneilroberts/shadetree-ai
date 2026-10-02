@@ -28,6 +28,7 @@ Not seen on a real adapter or real phone: all of this was checked against the si
 
 ## Scenario gaps (2026-10-02, branch worktree-scenario-gaps)
 - Readiness monitors and the freeze frame on the console: the hub reads them once per run with the codes (readiness from the same 0101 answer; Mode 02 only when a stored code was read), saved runs store them, old files replay them as "not in this recording". Dashboard panels after Codes; Handheld's Codes pane lists both. The simulator now answers monitor bytes and a Mode 02 frame (rich, lean).
+- Richer built-in scenarios: Fuel trims (trims, fuel system status, O2 B1S1 voltage, MAF, rpm), Cooling (coolant, oil, intake, outside air, rpm, load, speed, battery), Idle / misfire (rpm, timing, MAP, load, both STFTs, coolant, throttle); help entries for 03, 10 and 14. Charging and General unchanged. No per-slot fallbacks (a car without MAF shows that gauge as not reported).
 
 ## Left over
 Open phone/Handheld polish (Clarity rocker stays on in Handheld after switching to Plain, lamps wrap at 390 px, replay bar fit at 360 px) and the real-car verification pass are listed in the 2026-10-02 stocktake handoff, not here. `ConsoleService` / MCP `open_console` still cannot pass `--scenarios`.
