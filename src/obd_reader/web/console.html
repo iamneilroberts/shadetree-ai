@@ -419,7 +419,7 @@
     <div class="lamps" id="d_lamps"></div>
     <div id="d_codes_mount"></div>
     <div id="d_strip">
-      <h3 class="sec">Health</h3>
+      <h3 class="sec" id="o_health">Health</h3>
       <div class="tiles" id="o_tiles"></div>
       <h3 class="sec">Needs attention</h3>
       <div class="attn" id="o_attn"></div>
@@ -1169,7 +1169,7 @@
     pidRows(DB.rows, ids); DB.tnote.textContent = ids.length ? '' : 'No readings yet.'; DB.tnote.hidden = ids.length > 0;
     Array.prototype.forEach.call(DB.rows.children, function (r) { r.classList.toggle('scen', mine[r.getAttribute('data-key')] === true); });
     $('d_strip').hidden = sc.id !== 'general';
-    if (sc.id === 'general') renderOverview();
+    if (sc.id === 'general') renderOverview(specs);
   }
   /* ---------- Overview ---------- */
   var TILES = [
@@ -1241,9 +1241,15 @@
     nd.val.textContent = fmt(cv(it.key, it.v), it.key === '05' ? dpFor('05', 0) : 1) + ' ' + unitOf(it.key);
     nd.why.textContent = e && typeof e === 'object' ? String(e.measures) : '';
   }
-  function renderOverview() {
-    var run = !!state && state.status === 'running', models = TILES.map(function (t) { return tileModel(t, run); });
-    keyed($('o_tiles'), models, makeTile, updTile);
+  function stripTiles(specs) {   // the health tiles the gauges do not already show: a tile hides when every one of its PIDs is a gauge in the scenario
+    var g = {}; specs.forEach(function (s) { g[s.pid] = true; });
+    return TILES.filter(function (t) { return !t.pids.every(function (p) { return g[p] === true; }); });
+  }
+  function renderOverview(specs) {
+    var run = !!state && state.status === 'running', models = TILES.map(function (t) { return tileModel(t, run); }), keep = {};
+    stripTiles(specs).forEach(function (t) { keep[t.key] = true; });
+    keyed($('o_tiles'), models.filter(function (m) { return keep[m.key]; }), makeTile, updTile);
+    $('o_health').hidden = $('o_tiles').hidden = !Object.keys(keep).length;
     var rows = !run ? [] : ATTN.map(function (p) { var v = winMedian(p); return { key: p, v: v, s: judge(v, watchFor(p)) }; })
       .filter(function (r) { return r.s === 'watch' || r.s === 'out'; })
       .sort(function (a, b) { return RANK[b.s] - RANK[a.s] || ATTN.indexOf(a.key) - ATTN.indexOf(b.key); });
@@ -1519,7 +1525,7 @@
     .catch(function () {});
   // the page test reaches the shared parts through this hook; a browser never defines it, so nothing is exposed
   if (typeof window.__shadetreeParts === 'function') window.__shadetreeParts({ lampModel: lampModel, pickView: pickView, panel: panel, gaugeZones: gaugeZones, gauges: gauges, pidRows: pidRows, pidTableEl: pidTableEl,
-    gaugeModel: gaugeModel, niceTicks: niceTicks, dialSvg: dialSvg, segDigits: segDigits, BUILTIN: BUILTIN, cleanSpecs: cleanSpecs, scenarioList: scenarioList, loadSaved: loadSaved, saveSaved: saveSaved, specsFor: specsFor, editAdd: editAdd, editRemove: editRemove, editMove: editMove, editForm: editForm });
+    gaugeModel: gaugeModel, niceTicks: niceTicks, dialSvg: dialSvg, segDigits: segDigits, BUILTIN: BUILTIN, stripTiles: stripTiles, cleanSpecs: cleanSpecs, scenarioList: scenarioList, loadSaved: loadSaved, saveSaved: saveSaved, specsFor: specsFor, editAdd: editAdd, editRemove: editRemove, editMove: editMove, editForm: editForm });
 })();
 </script>
 </body>

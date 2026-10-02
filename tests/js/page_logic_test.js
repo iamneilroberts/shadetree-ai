@@ -187,7 +187,8 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
   const a = statesFor(3, () => Object.assign(base0(), { '42': 15.4 }), 0, 0);    // run 1: seq 1..3, battery 15.4 V
   const b = statesFor(1, () => Object.assign(base0(), { '42': 12.1 }), 9, 1.2);  // run 2 already at seq 10, battery 12.1 V
   b[0].run = 2;
-  const env7 = makeEnv(a.concat(b), 'v0', { pids: { '42': { title: 'Battery', measures: 'x', use: [], typical: '', status: [], watch: { ok: [13.2, 14.8], out: [11.5, 15.5] } } }, mode06: {} });
+  const NOGAUGES = () => ({ 'shadetree.scen.general': '[]' });   // General with no gauges shows all five health tiles (the strip hides a tile its gauges repeat)
+  const env7 = makeEnv(a.concat(b), 'v0', { pids: { '42': { title: 'Battery', measures: 'x', use: [], typical: '', status: [], watch: { ok: [13.2, 14.8], out: [11.5, 15.5] } } }, mode06: {} }, [], NOGAUGES());
   for (let k = 0; k < 5; k++) await env7.tick();
   let vt = null; walk(env7.el('o_tiles'), n => { if (n.getAttribute('data-key') === 'volts') vt = n; });
   let vbig = null; walk(vt, n => { if (n.className === 'big') vbig = n; });
@@ -288,11 +289,11 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
                         '04': mk('Engine load'), '0B': mk('Manifold pressure') }, mode06: {} };
   const base = () => ({ '0C': 700, '05': 90, '06': 2, '07': 1, '08': 2, '09': 1, '0B': 36, '42': 14.2, '04': 28 });
   const ovEnv = async (fn, tweak) => {
-    const e = makeEnv(statesFor(30, fn).map(st => (tweak ? tweak(st) : st)), 'v0', OVF);
+    const e = makeEnv(statesFor(30, fn).map(st => (tweak ? tweak(st) : st)), 'v0', OVF, [], NOGAUGES());
     for (let k = 0; k < 32; k++) await e.tick();
     return e;
   };
-  const tile = (e, key) => { let r = null; walk(e.el('o_tiles'), n => { if (n.getAttribute('data-key') === key) r = n; }); return r; };
+  const tile =(e, key) => { let r = null; walk(e.el('o_tiles'), n => { if (n.getAttribute('data-key') === key) r = n; }); return r; };
   const part = (t, cls) => { let r = null; walk(t, n => { if (n.className === cls) r = n; }); return r.textContent; };
   const rowsOf = e => e.el('o_attn').children.map(c => c.getAttribute('data-key'));
 
@@ -466,7 +467,7 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
     hz_measured: 2.5, seconds_left: null, adapter: {}, replay: REPLAY(),
     channels: { '42': { name: 'control_module_voltage', unit: 'V', samples: Array.from({ length: n }, (_, i) => [i + 1, +(0.4 * (i + 1)).toFixed(3), v]) } } });
   const urls = [];
-  const sk = makeEnv([], 'v0', OVF);
+  const sk = makeEnv([], 'v0', OVF, [], NOGAUGES());
   await new Promise(r => setImmediate(r)); await new Promise(r => setImmediate(r));
   sk.sandbox.fetch = (url) => {
     urls.push(url);
@@ -502,7 +503,7 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
   const big = (e, key) => part(tile(e, key), 'big'), tunit = (e, key) => part(tile(e, key), 'unit');
   const rowVal = (e, key) => { let r = null; walk(e.el('o_attn'), n => { if (n.getAttribute('data-key') === key) r = n; }); return part(r, 'val'); };
   const toggle = async (e) => { e.handlers['unitsBtn:click'](); for (let k = 0; k < 2; k++) await e.tick(); };
-  const store = {};
+  const store = NOGAUGES();
   const um = await uEnv({ '05': 118 }, 'v0', store);
   assert.strictEqual(big(um, 'ect'), '118'); assert.strictEqual(tunit(um, 'ect'), '°C'); assert.strictEqual(um.el('unitsBtn').textContent, 'Units: Metric');
   assert.strictEqual(big(um, 'map'), '36'); assert.strictEqual(rowVal(um, '05'), '118 °C');
@@ -520,8 +521,9 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
   await toggle(um2); assert.strictEqual(big(um2, 'ect'), '90'); assert.strictEqual(store['shadetree.units'], 'metric');
   const noStore = makeEnv(uStates({}), 'v0', OVF, [], null);
   for (let k = 0; k < 32; k++) await noStore.tick();
-  assert.strictEqual(big(noStore, 'ect'), '90', 'without storage it starts metric');
-  await toggle(noStore); assert.strictEqual(big(noStore, 'ect'), '194', 'and still toggles');
+  const ectVal = (e) => { let r = null; walk(e.el('d_panel'), n => { if (n.getAttribute && n.getAttribute('data-key') === '05:dial') r = n; }); return part(r, 'gval'); };   // no storage: General's own gauges, so the coolant gauge (its tile is hidden)
+  assert.strictEqual(ectVal(noStore), '90 °C', 'without storage it starts metric');
+  await toggle(noStore); assert.strictEqual(ectVal(noStore), '194 °F', 'and still toggles');
 
   // All readings: one table row per channel (main channels and extras, speed included): name (unit), now, min, max, average
   const RSTATS = { '0D': { n: 9, min: 0, max: 112.65, avg: 50 }, '05': { n: 9, min: 20, max: 90, avg: 70 }, '0C': { n: 9, min: 650, max: 3200, avg: 1500.4 },
@@ -809,6 +811,24 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
     assert.strictEqual(fbN.textContent, 'Some very long reading name', 'a PID with no short title falls back to its name (the CSS ellipsis shortens it)');
     assert.strictEqual(fbN.getAttribute('title'), 'Some very long reading name'); assert.strictEqual(fbN.children.length, 0, 'text, not markup');
     const tbl = flat(sp.el('d_table')); assert.ok(/Vehicle speed \(mph\)/.test(tbl), 'the table keeps the full name and unit');
+  }
+  {   // the General health strip does not repeat the gauges: a tile hides when all its PIDs are gauges; Needs attention is unchanged
+    const tileKeys = (e) => e.el('o_tiles').children.map(t => t.getAttribute('data-key'));
+    const g = await dash();
+    assert.deepStrictEqual(tileKeys(g), ['trims'], 'General: coolant, battery, load and MAP are gauges already, so only Fuel trims shows');
+    assert.strictEqual(g.el('o_health').hidden, false, 'the Health heading shows while a tile does');
+    const P = g.parts(), gaugesOf = (id) => P.BUILTIN.filter(s => s.id === id)[0].gauges, keys = (id) => Array.from(P.stripTiles(gaugesOf(id))).map(t => t.key);
+    assert.deepStrictEqual(keys('general'), ['trims']);
+    assert.deepStrictEqual(keys('cooling'), ['trims', 'map'], 'Cooling: coolant, load and battery are gauges');
+    assert.deepStrictEqual(keys('idle'), ['trims', 'ect'], 'Idle has no coolant gauge, so the coolant tile stays; one trim gauge does not hide the trims tile');
+    const cool = await dash({ 'shadetree.scen.general': JSON.stringify(gaugesOf('cooling')) });
+    assert.deepStrictEqual(tileKeys(cool), ['trims', 'map'], 'an edited General follows its gauges');
+    const all = await dash({ 'shadetree.scen.general': JSON.stringify(['06', '07', '08', '09', '05', '42', '04', '0B'].map(pid => ({ pid, form: 'seven' }))) });
+    assert.deepStrictEqual(tileKeys(all), [], 'every tile is a gauge: no tiles'); assert.strictEqual(all.el('o_health').hidden, true, 'and the Health heading hides');
+    const hot = await dash({}, {}, statesFor(30, () => Object.assign(base(), { '05': 118 })));
+    assert.ok(!tileKeys(hot).includes('ect'), 'no coolant tile');
+    assert.deepStrictEqual(hot.el('o_attn').children.map(c => c.getAttribute('data-key')), ['05'], 'a hot engine is still listed under Needs attention'); assert.strictEqual(hot.el('o_note').textContent, '');
+    assert.strictEqual(g.el('o_note').textContent, 'Nothing out of range', 'the note still judges every health reading');
   }
   // Dashboard honesty: a PID not in the run is dimmed, never a zero; a run with no channels says so
   {
