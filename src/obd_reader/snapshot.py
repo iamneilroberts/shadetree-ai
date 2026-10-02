@@ -30,6 +30,13 @@ class Mode09Ids(_Model):
     ecu_names: list[str] = Field(default_factory=list)  # 090A, e.g. "ECM-EngineControl"
 
 
+class Reply(_Model):
+    """How one OBD request was answered during the scan (AT/ST commands are not classified)."""
+    cmd: str
+    reply: str               # elm.classify: ok | no_data | nrc:<code> | wrong_sid | adapter_error | garbled
+    ms: float | None = None  # send to reply, milliseconds (near 0 in replay)
+
+
 class Source(_Model):
     kind: Literal["live", "replay", "import"]
     adapter: Adapter = Field(default_factory=Adapter)
@@ -140,4 +147,5 @@ class Snapshot(_Model):
     ignition_type: Literal["spark", "compression"] | None = None
     live_sample: LiveSample | None = None
     user_context: UserContext = Field(default_factory=UserContext)
+    replies: list[Reply] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)

@@ -32,6 +32,12 @@ def test_snapshot_saved_before_mode09_and_battery_fields_still_loads():
     assert s.mode09.cal_ids == [] and s.source.adapter.supply_voltage is None
 
 
+def test_snapshot_saved_before_reply_classes_still_loads():
+    old = make().model_dump(mode="json")
+    del old["replies"]
+    assert Snapshot.model_validate(old).replies == []
+
+
 def test_json_round_trip():
     s = make(
         vehicle=Vehicle(vin="1HGCM82633A004352", vin_source="obd"),

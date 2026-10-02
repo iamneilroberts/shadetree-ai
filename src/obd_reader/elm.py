@@ -10,16 +10,20 @@ _LEN_LINE = re.compile(r"[0-9A-F]{3}")
 _FRAME_LINE = re.compile(r"[0-9A-F]+: ((?:[0-9A-F]{2} ?)+)")
 
 
+def _clean(lines: list[str]) -> list[str]:
+    lines = [ln.strip().upper() for ln in lines if ln.strip()]
+    # progress chatter, not errors: "SEARCHING...", K-line "BUS INIT: ...OK"
+    return [ln for ln in lines if not ln.startswith("SEARCHING")
+            and not (ln.startswith("BUS INIT") and ln.endswith("OK"))]
+
+
 def parse_all(lines: list[str], sid: int) -> list[bytes]:
     """One payload (starting at the response SID) per responding ECU.
 
     Handles single-frame lines and ISO-TP multi-frame blocks ("014", "0: ...").
     Returns [] for errors, negative responses, and garbled or truncated data.
     """
-    lines = [ln.strip().upper() for ln in lines if ln.strip()]
-    # progress chatter, not errors: "SEARCHING...", K-line "BUS INIT: ...OK"
-    lines = [ln for ln in lines if not ln.startswith("SEARCHING")
-             and not (ln.startswith("BUS INIT") and ln.endswith("OK"))]
+    lines = _clean(lines)
     if not lines or any(m in ln for ln in lines for m in ERROR_MARKERS):
         return []
 
@@ -42,6 +46,27 @@ def parse_all(lines: list[str], sid: int) -> list[bytes]:
                 out.append(candidate)
         i += 1
     return out
+
+
+def classify(lines: list[str], sid: int) -> str:
+    """Why a reply is or is not usable for a request whose response SID is `sid`:
+    "ok" (parse_all finds a payload), "no_data", "nrc:<code>" (7F negative response, first
+    ECU's code), "wrong_sid" (well-formed, but not an answer to this request), "adapter_error"
+    ("?", bus errors, or nothing printed at all) or "garbled"."""
+    if parse_all(lines, sid):
+        return "ok"
+    lines = _clean(lines)
+    if not lines:
+        return "adapter_error"
+    if all(ln == "NO DATA" for ln in lines):
+        return "no_data"
+    if any(m in ln for ln in lines for m in ERROR_MARKERS):
+        return "adapter_error"
+    frames = [ln.split() for ln in lines if _HEX_LINE.fullmatch(ln)]
+    for t in frames:
+        if t[0] == "7F" and t[1:2] == [f"{sid - 0x40:02X}"]:
+            return f"nrc:{t[2]}" if len(t) >= 3 else "garbled"
+    return "wrong_sid" if frames else "garbled"
 
 
 def parse_response(lines: list[str], sid: int) -> bytes | None:

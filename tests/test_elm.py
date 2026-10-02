@@ -1,7 +1,9 @@
 import pytest
 
+from hypothesis import given, strategies as st
+
 from obd_reader.elm import (
-    decode_dtc, decode_dtc_list, decode_supported, parse_all, parse_headers, parse_response,
+    classify, decode_dtc, decode_dtc_list, decode_supported, parse_all, parse_headers, parse_response,
 )
 
 VIN_A = ["014", "0: 49 02 01 31 48 47", "1: 43 4D 38 32 36 33 33", "2: 41 30 30 34 33 35 32"]
@@ -133,3 +135,40 @@ def test_decode_supported():
     for absent in ["02", "08", "09", "0A", "12", "14"]:
         assert absent not in pids
     assert decode_supported(0x20, bytes.fromhex("80000000")) == ["21"]
+
+
+@pytest.mark.parametrize(
+    "lines,sid,expected",
+    [
+        (["41 0C 1A F8"], 0x41, "ok"),
+        (["SEARCHING...", "41 00 B7 BC A8 93", "41 00 98 18 80 03"], 0x41, "ok"),
+        (VIN_A, 0x49, "ok"),
+        (["7F 01 12", "41 0C 1A F8"], 0x41, "ok"),          # one ECU refuses, another answers: usable
+        (["NO DATA"], 0x41, "no_data"),
+        (["SEARCHING...", "NO DATA"], 0x41, "no_data"),
+        (["7F 01 12"], 0x41, "nrc:12"),                     # negative response keeps its NRC
+        (["7F 09 31"], 0x49, "nrc:31"),
+        (["7F 03 22", "7F 03 11"], 0x43, "nrc:22"),         # first ECU's code
+        (["43 00"], 0x47, "wrong_sid"),                      # answered, but not the request we sent
+        (["7F 03 12"], 0x41, "wrong_sid"),                   # a refusal of some other request
+        (["?"], 0x41, "adapter_error"),
+        (["UNABLE TO CONNECT"], 0x41, "adapter_error"),
+        (["CAN ERROR"], 0x41, "adapter_error"),
+        (["BUS INIT: ...ERROR"], 0x41, "adapter_error"),
+        (["BUFFER FULL", "41 0C 1A F8"], 0x41, "adapter_error"),  # parse_all drops it too
+        ([], 0x41, "adapter_error"),                         # the adapter printed nothing
+        (["ZZ"], 0x41, "garbled"),
+        (["41 0"], 0x41, "garbled"),
+        (["014", "0: 49 02 01 31 48 47"], 0x49, "garbled"),  # truncated multi-frame
+        (["7F 01"], 0x41, "garbled"),                        # NRC with no code
+    ],
+)
+def test_classify(lines, sid, expected):
+    assert classify(lines, sid) == expected
+
+
+@given(st.lists(st.text(alphabet="0123456789ABCDEF :?.NODAT", max_size=24), max_size=5), st.integers(0x41, 0x4A))
+def test_classify_never_raises_and_ok_means_parse_all_has_a_payload(lines, sid):
+    got = classify(lines, sid)
+    assert got in {"ok", "no_data", "wrong_sid", "adapter_error", "garbled"} or got.startswith("nrc:")
+    assert (got == "ok") == bool(parse_all(lines, sid))

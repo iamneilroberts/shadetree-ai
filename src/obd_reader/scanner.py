@@ -1,15 +1,37 @@
 """Minimal read-only scan: VIN, protocol, supported PIDs, DTCs, MIL."""
+import time
 from datetime import datetime, timezone
 
 from obd_reader import __version__
 from obd_reader.adapter import identify, init_adapter
-from obd_reader.elm import ERROR_MARKERS, decode_dtc, decode_dtc_list, decode_supported, parse_all, parse_headers
+from obd_reader.elm import (
+    ERROR_MARKERS, classify, decode_dtc, decode_dtc_list, decode_supported, parse_all, parse_headers,
+)
 from obd_reader.pids import PIDS, decode_pid
 from obd_reader.readiness import parse_readiness
 from obd_reader.snapshot import (
-    VIN_RE, Dtc, Dtcs, Ecu, FreezeFrame, Mil, Mode09Ids, PidValue, Protocol, Snapshot, Source, UserContext, Vehicle,
+    VIN_RE, Dtc, Dtcs, Ecu, FreezeFrame, Mil, Mode09Ids, PidValue, Protocol, Reply, Snapshot, Source, UserContext,
+    Vehicle,
 )
 from obd_reader.transport import Transport
+
+_clock = time.monotonic  # module-level so tests can replace it
+
+
+class _Classified:
+    """Wraps the transport: every OBD request's reply class (elm.classify) and latency go into `replies`."""
+
+    def __init__(self, transport: Transport):
+        self._transport = transport
+        self.replies: list[Reply] = []
+
+    def send(self, cmd: str) -> list[str]:
+        t0 = _clock()
+        lines = self._transport.send(cmd)
+        ms = round((_clock() - t0) * 1000, 1)
+        if not cmd.startswith(("AT", "ST")):
+            self.replies.append(Reply(cmd=cmd, reply=classify(lines, int(cmd[:2], 16) + 0x40), ms=ms))
+        return lines
 
 
 def _first(lines: list[str]) -> str | None:
@@ -138,6 +160,7 @@ def scan(
     symptoms: str = "",
 ) -> Snapshot:
     warnings: list[str] = []
+    raw, transport = transport, _Classified(transport)
     init_adapter(transport, protocol)
     adapter = identify(transport)
     adapter.supply_voltage = _reply(transport, "ATRV")
@@ -165,7 +188,7 @@ def scan(
     is_can = "15765" in (proto.name or "")
     ecus: list[Ecu] = []
     if is_can:
-        ecus = _discover_ecus(transport)
+        ecus = _discover_ecus(raw)  # headers on: not a layout classify() reads
         if not ecus:
             warnings.append("ECU attribution unavailable (no CAN ids in the headers-on reply)")
     vin, vin_source = None, "none"
@@ -205,6 +228,12 @@ def scan(
     ignition, monitors = parse_readiness(status)
     freeze_frame = _freeze_frame(transport) if dtcs.stored else None
 
+    # NO DATA means unsupported, which is normal; anything else that gave no data is worth a line.
+    odd = [f"{r.cmd} {r.reply}" for r in transport.replies if r.reply not in ("ok", "no_data")]
+    if odd:
+        warnings.append(f"Replies with no usable data (refused, wrong answer, adapter error or garbled): "
+                        f"{', '.join(odd)}")
+
     return Snapshot(
         snapshot_id=snapshot_id,
         captured_at=captured_at or datetime.now(timezone.utc),
@@ -220,5 +249,6 @@ def scan(
         readiness=monitors,
         ignition_type=ignition,
         user_context=UserContext(symptoms=symptoms),
+        replies=transport.replies,
         warnings=warnings,
     )

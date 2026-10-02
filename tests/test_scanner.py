@@ -141,6 +141,41 @@ def test_no_mode_01_bitmap_gives_a_warning_not_silence():
     assert any("Mode 01" in w and "no response" in w.lower() for w in snap.warnings)
 
 
+def test_every_obd_request_is_recorded_with_its_reply_class():
+    snap, port = run_scan(load_transcript(FIXTURE))
+    w = port.written  # the headers-on ECU discovery request is not classified (headers change the layout)
+    discovery = w.index("ATH1") + 1
+    sent = [c for i, c in enumerate(w) if not c.startswith(("AT", "ST")) and i != discovery]
+    assert w[discovery] == "0100"
+    assert [r.cmd for r in snap.replies] == sent
+    assert all(r.reply == "ok" and r.ms is not None and r.ms >= 0 for r in snap.replies)
+
+
+def test_negative_response_is_recorded_and_warned_not_treated_as_silence():
+    records = _patch(_patch(load_transcript(FIXTURE), "03", ["7F 03 22"]), "0900", ["7F 09 12"])
+    snap, _ = run_scan(records)
+    by_cmd = {r.cmd: r.reply for r in snap.replies}
+    assert by_cmd["03"] == "nrc:22" and by_cmd["0900"] == "nrc:12"
+    assert snap.dtcs.stored == []
+    assert any("03 nrc:22" in w and "0900 nrc:12" in w for w in snap.warnings)
+
+
+def test_no_data_is_recorded_but_not_warned():  # unsupported is not an error
+    snap, _ = run_scan(_patch(load_transcript(FIXTURE), "0A", ["NO DATA"]))
+    assert {r.cmd: r.reply for r in snap.replies}["0A"] == "no_data"
+    assert snap.warnings == []
+
+
+def test_reply_latency_is_recorded_in_milliseconds(monkeypatch):
+    import itertools
+
+    from obd_reader import scanner
+    ticks = itertools.count(0.0, 0.025)  # every clock read is 25 ms later than the last
+    monkeypatch.setattr(scanner, "_clock", lambda: next(ticks))
+    snap, _ = run_scan(load_transcript(FIXTURE))
+    assert snap.replies and all(r.ms == 25.0 for r in snap.replies)
+
+
 class AutoDetectPort(ReplayPort):
     """Like the real adapter under ATSP0: ATDP says only 'AUTO' until a request succeeds."""
 
