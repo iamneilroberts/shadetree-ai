@@ -1448,7 +1448,12 @@
     render();
   }
   Array.prototype.forEach.call(btns, function (b) { b.addEventListener('click', function () { show(b.dataset.view); history.replaceState(null, '', location.search + '#' + b.dataset.view); }); });
-  var init = (location.hash || '').replace('#', ''); if (init && $(init)) { show(init); window.addEventListener('load', function () { if (window.scrollTo) window.scrollTo(0, 0); }); }  // the #fragment would otherwise scroll the page to that section
+  // the opening view (never stored): a known #fragment, else Handheld on a phone-width screen, else the Dashboard; a fixed list, so a stale or unknown hash can never reach show()
+  function pickView(hash, narrow) { var h = String(hash || '').replace('#', ''); return h === 'v0' || h === 'v3' || h === 'v5' || h === 'v6' ? h : narrow ? 'v5' : 'v0'; }
+  var narrowNow = false;
+  try { narrowNow = !!(window.matchMedia && window.matchMedia('(max-width: 600px)').matches); } catch (e) { narrowNow = false; }
+  show(pickView(location.hash, narrowNow));
+  if (location.hash) window.addEventListener('load', function () { if (window.scrollTo) window.scrollTo(0, 0); });  // the #fragment would otherwise scroll the page to that section
 
   renderResults(); render();
   window.addEventListener('resize', render);
@@ -1476,7 +1481,7 @@
     })
     .catch(function () {});
   // the page test reaches the shared parts through this hook; a browser never defines it, so nothing is exposed
-  if (typeof window.__shadetreeParts === 'function') window.__shadetreeParts({ lampModel: lampModel, panel: panel, gaugeZones: gaugeZones, gauges: gauges, pidRows: pidRows, pidTableEl: pidTableEl,
+  if (typeof window.__shadetreeParts === 'function') window.__shadetreeParts({ lampModel: lampModel, pickView: pickView, panel: panel, gaugeZones: gaugeZones, gauges: gauges, pidRows: pidRows, pidTableEl: pidTableEl,
     gaugeModel: gaugeModel, segDigits: segDigits, BUILTIN: BUILTIN, cleanSpecs: cleanSpecs, scenarioList: scenarioList, loadSaved: loadSaved, saveSaved: saveSaved, specsFor: specsFor, editAdd: editAdd, editRemove: editRemove, editMove: editMove, editForm: editForm });
 })();
 </script>

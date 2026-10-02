@@ -23,7 +23,7 @@ function makeNode(id, handlers) {
 }
 
 function makeEnv(states, viewId = 'v0', help = null, runs = [], store = {}, page = {}) {   // page: { search, hash, views (view nodes the page toggles is-active on), absent (ids getElementById answers null for), postReply(url, body), prefersLight, narrow, storageThrows }
-  const els = {}, handlers = {}, docHandlers = {}, posts = [];
+  const els = {}, handlers = {}, docHandlers = {}, winH = {}, posts = [];
   let parts = null;   // the page hands its shared parts to window.__shadetreeParts
   function el(id) { return els[id] || (els[id] = makeNode(id, handlers)); }
   (page.views || []).forEach(v => { els[v.id] = v; });   // page.views: real view sections, so show() toggling is observable
@@ -38,7 +38,7 @@ function makeEnv(states, viewId = 'v0', help = null, runs = [], store = {}, page
                 querySelectorAll: (sel) => (sel === '.vbtn' ? (page.vbtns || []) : sel === '.view' ? (page.views || []) : sel === '.hh-pane' ? hhPanes : sel === '.hh-nav button' ? hhBtns : []),
                 querySelector: (sel) => (page.views && sel === '.view.is-active' ? page.views.find(v => v.className.split(' ').includes('is-active')) || null : { id: viewId }),
                 createElement: () => makeNode('new', handlers), addEventListener(t, fn) { docHandlers[t] = fn; } },
-    window: { addEventListener() {}, devicePixelRatio: 1, innerWidth: 500, innerHeight: 800, __shadetreeParts: page.noHook ? undefined : (p) => { parts = p; } },
+    window: { addEventListener(t, fn) { (winH[t] = winH[t] || []).push(fn); }, devicePixelRatio: 1, innerWidth: 500, innerHeight: 800, __shadetreeParts: page.noHook ? undefined : (p) => { parts = p; } },
     location: { search: page.search || '?t=abc', hash: page.hash || '' }, history: { replaceState() {} },
     performance: { now: () => now },
     setInterval: (fn) => { timer = fn; }, encodeURIComponent,
@@ -62,7 +62,7 @@ function makeEnv(states, viewId = 'v0', help = null, runs = [], store = {}, page
     sandbox.window.matchMedia = (q) => ({ matches: /max-width/.test(q) ? !!page.narrow : /light/.test(q) === !!page.prefersLight });
   vm.runInNewContext(js, sandbox);
   return {
-    el, handlers, docHandlers, posts, sandbox, store, hhBtns, parts: () => parts,
+    el, handlers, docHandlers, winH, posts, sandbox, store, hhBtns, parts: () => parts,
     timer() { timer(); }, setHelp(h) { help = h; }, advance(ms) { now += ms; },
     async tick() { timer(); await new Promise(r => setImmediate(r)); await new Promise(r => setImmediate(r)); }
   };
@@ -1013,6 +1013,40 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
     const good = ['v0', 'v3', 'v5', 'v6'].map(id => { const v = makeNode(id, {}); v.className = id === 'v0' ? 'view is-active' : 'view'; return v; });
     makeEnv(statesFor(1, base), 'v0', OVF, [], {}, { hash: '#v5', views: good });
     assert.deepStrictEqual(good.filter(v => v.className.split(' ').includes('is-active')).map(v => v.id), ['v5'], 'a real #v5 still opens Handheld (the harness can see a switch)');
+  }
+
+  {   // 17) pickView and the opening view: a phone opens Handheld, a desktop the Dashboard, a known hash wins, nothing is stored
+    const P = makeEnv(statesFor(3, base), 'v0', OVF).parts();
+    assert.strictEqual(P.pickView('', false), 'v0');
+    assert.strictEqual(P.pickView('', true), 'v5');
+    assert.strictEqual(P.pickView('#v6', true), 'v6');
+    assert.strictEqual(P.pickView('v3', false), 'v3');
+    assert.strictEqual(P.pickView('v4', true), 'v5', 'the removed view falls through to the default');
+    assert.strictEqual(P.pickView('#vp', false), 'v0'); assert.strictEqual(P.pickView('nonsense', false), 'v0');
+    const open = async (page, store = {}) => {
+      const mk = () => ['v0', 'v3', 'v5', 'v6'].map(id => { const v = makeNode(id, {}); v.className = 'view'; return v; });
+      const views = mk(), vbtns = ['v0', 'v3', 'v5', 'v6'].map(id => { const b = makeNode('vb_' + id, {}); b.dataset.view = id; return b; });
+      const e = makeEnv(statesFor(3, base), 'v0', OVF, [], store, Object.assign({ views, vbtns }, page));
+      await e.tick();
+      const act = () => views.filter(v => v.className.split(' ').includes('is-active')).map(v => v.id);
+      return { e, act, tabs: () => vbtns.filter(b => b.className.split(' ').includes('is-active')).map(b => b.dataset.view), store };
+    };
+    const ph = await open({ narrow: true });
+    assert.deepStrictEqual(ph.act(), ['v5'], 'a phone with no hash opens Handheld'); assert.deepStrictEqual(ph.tabs(), ['v5'], 'and its tab');
+    assert.strictEqual(ph.e.el('h_livepane').hidden, false, 'on the Live pane');
+    assert.deepStrictEqual((await open({ narrow: true, hash: '#v0' })).act(), ['v0'], 'a phone with #v0 opens the Dashboard');
+    assert.deepStrictEqual((await open({ narrow: true, hash: '#v4' })).act(), ['v5'], 'a stale #v4 on a phone falls to Handheld');
+    assert.deepStrictEqual((await open({ narrow: false })).act(), ['v0'], 'a desktop opens the Dashboard');
+    const dx = await open({ narrow: false, search: '?example=x.json' });
+    assert.deepStrictEqual(dx.act(), ['v0'], '?example= alone does not change a desktop view'); assert.strictEqual(dx.e.posts.length, 1, 'and the replay still starts');
+    assert.deepStrictEqual((await open({ narrow: true, search: '?example=x.json' })).act(), ['v5'], '?example= on a phone opens Handheld');
+    const sv = await open({ narrow: true }, { 'shadetree.scenario': 'cooling' });
+    assert.strictEqual(sv.e.el('d_sel').value, 'cooling', 'a stored scenario still wins on a phone'); assert.deepStrictEqual(Object.keys(sv.store), ['shadetree.scenario'], 'the opening view is not stored');
+    const rz = await open({ narrow: true });
+    rz.e.sandbox.window.matchMedia = () => ({ matches: false });
+    assert.ok((rz.e.winH.resize || []).length, 'the page listens for resize'); rz.e.winH.resize.forEach(f => f());
+    assert.deepStrictEqual(rz.act(), ['v5'], 'a resize after load does not switch views');
+    const noMq = await open({}); assert.deepStrictEqual(noMq.act(), ['v0'], 'no matchMedia: not narrow, Dashboard');
   }
 
   {   // every code is a row in the Dashboard list (the CSS scrolls it; nothing is dropped here)
