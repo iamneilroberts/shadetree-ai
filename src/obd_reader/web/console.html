@@ -249,6 +249,10 @@
     :root[data-skin="retro"] #v0 .dface .stab:hover, :root[data-skin="retro"] #v0 .dface .stab.is-active { color: var(--cb-silk); }
     :root[data-skin="retro"] #v0 .dface .stab:active, :root[data-skin="retro"] #v0 .dface #d_edit:active, :root[data-skin="retro"] #v0 .dface .ltest:active { transform: translateY(1px); box-shadow: inset 0 2px 3px rgba(0,0,0,.7); }
     :root[data-skin="retro"] #v0 .dface #d_edit { padding: 13px 9px 5px; font-size: 14px; letter-spacing: 0; }
+    #d_ready_mount .rsum, #d_ready_mount .rtog { display: none; }
+    :root[data-skin="retro"] #v0 .dface .rsum { display: inline; flex: 1 1 auto; font: 600 12px/1.3 var(--cb-label); letter-spacing: .06em; text-transform: uppercase; color: var(--cb-engrave); } :root[data-skin="retro"] #v0 .dface .rsum.warn { color: var(--cb-warn); }
+    :root[data-skin="retro"] #v0 .dface .rtog { display: inline-block; margin-left: auto; padding: 0 9px; font-size: 13px; line-height: 22px; }
+    :root[data-skin="retro"] #v0 .dface .panel.shut > .pbody { display: none; } :root[data-skin="retro"] #v0 .dface .panel.shut > .ptitle { padding-bottom: 10px; }
     :root[data-skin="retro"] #v0 .dface > .ltest { display: block; justify-self: end; align-self: start; margin: 4px 6px 0 0; padding: 11px 8px 4px; z-index: 1; font-size: 10px; letter-spacing: .12em; }
     /* LAMP TEST: while held every lens lights in its own colour (a class on the row; the lamps' state underneath is untouched, nothing is announced) */
     :root[data-skin="retro"] #v0 .dface .lamps.lamp-test .lampbox:nth-child(1) .lens { background: var(--lens-red-lit); box-shadow: 0 0 0 4px var(--cb-chrome-2), 0 0 0 5px var(--cb-chrome-4), 0 0 16px 6px var(--led-r); }
@@ -440,7 +444,7 @@
     body:has(.rbar:not([hidden])) .stage { padding-bottom: var(--rbar-h); }   /* room under the pinned replay bar (Handheld's stage padding of 0 wins by specificity; its frame height reserves the bar instead) */
   }
   @media (max-width: 600px), (pointer: coarse) {   /* 44px touch targets; a ? keeps its look and gets a 44px hit area */
-    button.b, select.b, .vbtn, .stab, .qbtn, .ltest, label.chip, .seg label { min-height: 44px; } .seg label { min-width: 44px; } label.chip { display: inline-flex; align-items: center; }
+    button.b, select.b, .vbtn, .stab, .qbtn, .ltest, label.chip, .seg label { min-height: 44px; } .seg label, .rtog { min-width: 44px; } label.chip { display: inline-flex; align-items: center; }
     .q { position: relative; } .q::after { content: ""; position: absolute; inset: calc(50% - 22px); }
   }
   .banner[hidden], [hidden] { display: none !important; }
@@ -1414,12 +1418,24 @@
   var MONRANK = { incomplete: 0, unknown: 1, complete: 2, 'not supported': 3 };
   function notRead(b, what) { return '<p class="note">' + esc(b.note || (source().sampling ? 'Reading ' + what + '\u2026' : 'Start sampling to read ' + what + '.')) + '</p>'; }
   function pidTitle(p, fb) { var e = HELP.pids[p]; return GTITLE[p] || (e && typeof e.title === 'string' ? e.title : '') || fb; }
+  function readyRows(r) {
+    var ms = r.monitors || {}, rows = Object.keys(ms).map(function (k) {
+      var m = ms[k]; return { k: k, w: !m.supported ? 'not supported' : m.complete === true ? 'complete' : m.complete === false ? 'incomplete' : 'unknown' };
+    }), sup = rows.filter(function (x) { return x.w !== 'not supported'; });
+    return { rows: rows, sup: sup, done: sup.filter(function (x) { return x.w === 'complete'; }), n: function (w) { return rows.filter(function (x) { return x.w === w; }).length; } };
+  }
+  // the Retro Dashboard's one-line Readiness: anything not a pass (not read, no answer, incomplete, unknown, check engine on or unknown) is named and warns
+  function readySum() {
+    var r = (state && state.readiness) || { read: false };
+    if (!r.read) return { t: /did not answer/.test(r.note || '') ? 'no answer' : 'not read' + (r.note ? ': ' + r.note : ''), warn: true };
+    var c = readyRows(r), inc = c.n('incomplete'), unk = c.n('unknown');
+    return { t: (inc ? inc + ' incomplete \u00b7 ' : '') + (unk ? unk + ' unknown \u00b7 ' : '') + c.done.length + ' of ' + c.sup.length + ' monitors complete \u00b7 check engine ' +
+      (r.mil === true ? 'ON' : r.mil === false ? 'off' : '?'), warn: inc > 0 || unk > 0 || r.mil !== false };
+  }
   function readyHtml() {
     var r = (state && state.readiness) || { read: false };
     if (!r.read) return notRead(r, 'the monitors');
-    var ms = r.monitors || {}, rows = Object.keys(ms).map(function (k) {
-      var m = ms[k]; return { k: k, w: !m.supported ? 'not supported' : m.complete === true ? 'complete' : m.complete === false ? 'incomplete' : 'unknown' };
-    }), sup = rows.filter(function (x) { return x.w !== 'not supported'; }), done = sup.filter(function (x) { return x.w === 'complete'; });
+    var c = readyRows(r), rows = c.rows, sup = c.sup, done = c.done;
     rows.sort(function (a, b) { return MONRANK[a.w] - MONRANK[b.w]; });   // incomplete first: what still has to run
     return '<p class="rdhd">' + esc('Check engine ' + (r.mil === true ? 'ON' : r.mil === false ? 'off' : '?') + ' \u00b7 ' + r.dtc_count + ' code' + (r.dtc_count === 1 ? '' : 's') +
       ' counted by the car \u00b7 ' + done.length + ' of ' + sup.length + ' supported monitors complete') + '</p><div class="mons">' + rows.map(function (x) {
@@ -1606,6 +1622,9 @@
       DB = { cp: codesPanel(), fp: panel('Freeze frame'), rp: panel('Readiness monitors'), p: p, g: g, rows: t.body, none: el('p', 'note'), tnote: el('p', 'note'), miss: el('p', 'note miss') };
       p.body.appendChild(DB.miss);
       [DB.fp, DB.rp].forEach(function (x) { x.plate.appendChild(el('span', 'pnote', 'read at run start, not live')); $('d_ready_mount').appendChild(x.root); });
+      DB.rs = el('span', 'rsum', ''); DB.rb = el('button', 'qbtn rtog', ''); DB.rb.type = 'button'; DB.rp.body.id = 'd_rbody'; DB.rb.setAttribute('aria-controls', 'd_rbody');
+      DB.rp.plate.appendChild(DB.rs); DB.rp.plate.appendChild(DB.rb);
+      DB.rb.addEventListener('click', function () { RDY = !RDY; try { sessionStorage.setItem('shadetree.readiness', RDY ? 'open' : 'shut'); } catch (e) { /* this session only */ } render(); });
       $('d_table').appendChild(DB.tnote);
       p.body.insertBefore(DB.none, g);
       $('d_codes_mount').appendChild(DB.cp.root);
@@ -1615,6 +1634,10 @@
     if (ED.on && (!ED.box || ED.sig !== ids.join())) drawEditor();   // the editor is rebuilt on actions and when the PIDs in the run change, not every poll
     DB.p.name.textContent = sc.name; DB.none.textContent = specs.length ? '' : 'No gauges. Add one or Reset.'; DB.none.hidden = specs.length > 0;
     renderSummary($('d_sum')); gauges(DB.g, specs); setMiss(DB.miss, specs); renderLamps($('d_lamps')); renderCodes(DB.cp); renderReady(DB.rp, DB.fp);
+    var rs = readySum(), rl = RDY ? '\u25be' : '\u25b8';   // Readiness: one line (Retro), the list on request; Plain always shows the list
+    if (DB.rs.textContent !== rs.t) DB.rs.textContent = rs.t; DB.rs.className = 'rsum' + (rs.warn ? ' warn' : '');
+    if (DB.rb.textContent !== rl) DB.rb.textContent = rl;
+    DB.rb.setAttribute('aria-expanded', RDY ? 'true' : 'false'); DB.rb.setAttribute('aria-label', 'Readiness monitors: ' + (RDY ? 'hide' : 'show') + ' the list'); DB.rp.root.classList.toggle('shut', !RDY);
     specs.forEach(function (s) { mine[s.pid] = true; });   // keys are two-hex-digit PIDs (cleanSpecs), so a plain object is safe
     pidRows(DB.rows, ids); DB.tnote.textContent = ids.length ? '' : 'No readings yet.'; DB.tnote.hidden = ids.length > 0;
     Array.prototype.forEach.call(DB.rows.children, function (r) { r.classList.toggle('scen', mine[r.getAttribute('data-key')] === true); });
@@ -1786,7 +1809,8 @@
   });
   /* the Retro Dashboard keeps one slim bar: the controls move into the Options drawer (and Start/Stop into the bar); every other skin and view keeps the
      toolbar. The same nodes move (ids, handlers and state go with them), each back to the spot it came from */
-  var HOME = {}, OPT = false;
+  var HOME = {}, OPT = false, RDY = false;
+  try { RDY = sessionStorage.getItem('shadetree.readiness') === 'open'; } catch (e) { RDY = false; }   // the Retro Readiness list: shut by default, per session
   ['ctl', 'pause', 'menuStatus', 'rbar', 'd_sum'].forEach(function (id) { var n = $(id); HOME[id] = { n: n, p: n.parentNode, s: n.nextSibling }; });
   try { OPT = sessionStorage.getItem('shadetree.options') === 'open'; } catch (e) { OPT = false; }   // open or closed for this session only
   function put(id, to, before) {

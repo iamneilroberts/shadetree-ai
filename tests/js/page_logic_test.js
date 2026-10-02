@@ -1465,6 +1465,37 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
     assert.ok(/no freeze frame stored/.test(H(ffRoot(await rd({ freeze_frame: { read: true, note: null, dtc: null, pids: {} }, codes: C })))), 'answered with no frame');
   }
 
+  {   // Readiness on the Retro Dashboard: one line, shut by default, the list on request (per session); a state that is not a pass is named and warns
+    const mon = (o) => Object.assign({ misfire: { supported: true, complete: true }, fuel_system: { supported: true, complete: true }, egr: { supported: false, complete: null } }, o);
+    const find = (e, cls) => { let r = null; walk(e.el('d_ready_mount'), n => { if (n.className.split(' ')[0] === cls || n.className === cls) r = n; }); return r; };
+    const line = async (readiness, sess = {}) => {
+      const e = makeEnv(statesFor(3, base).map(x => Object.assign(x, { readiness })), 'v0', OVF, [], { 'shadetree.skin': 'retro' }, { session: sess });
+      for (let k = 0; k < 3; k++) await e.tick();
+      return { e, sum: find(e, 'rsum'), btn: find(e, 'qbtn'), root: e.el('d_ready_mount').children[1] };
+    };
+    const ok = await line({ read: true, note: null, mil: false, dtc_count: 0, monitors: mon({}) });
+    assert.deepStrictEqual([ok.sum.textContent, ok.sum.className], ['2 of 2 monitors complete · check engine off', 'rsum'], 'all complete: a quiet line');
+    assert.ok(ok.root.className.split(' ').includes('shut') && ok.btn.getAttribute('aria-expanded') === 'false' && ok.btn.getAttribute('aria-controls') === 'd_rbody', 'shut by default');
+    assert.ok(/Misfire/.test(ok.root.children[1].innerHTML), 'the list is still there, only hidden');
+    const inc = await line({ read: true, note: null, mil: false, dtc_count: 0, monitors: mon({ evap: { supported: true, complete: false }, catalyst: { supported: true, complete: false }, o2_sensor: { supported: true, complete: null } }) });
+    assert.deepStrictEqual([inc.sum.textContent, inc.sum.className], ['2 incomplete · 1 unknown · 2 of 5 monitors complete · check engine off', 'rsum warn'], 'incomplete and unknown: named, warning colour');
+    const mil = await line({ read: true, note: null, mil: true, dtc_count: 1, monitors: mon({}) });
+    assert.ok(/check engine ON$/.test(mil.sum.textContent) && mil.sum.className === 'rsum warn', 'check engine on warns');
+    const nr = await line({ read: false, note: null });
+    assert.deepStrictEqual([nr.sum.textContent, nr.sum.className], ['not read', 'rsum warn'], 'not read');
+    const rec = await line({ read: false, note: 'not in this recording' });
+    assert.strictEqual(rec.sum.textContent, 'not read: not in this recording');
+    const na = await line({ read: false, note: 'the car did not answer the readiness request (Mode 01 PID 01)' });
+    assert.deepStrictEqual([na.sum.textContent, na.sum.className], ['no answer', 'rsum warn'], 'no answer is not a pass');
+    const sess = {}, t = await line({ read: true, note: null, mil: false, dtc_count: 0, monitors: mon({}) }, sess);
+    t.btn.on.click(); await t.e.tick();
+    assert.ok(!t.root.className.split(' ').includes('shut') && t.btn.getAttribute('aria-expanded') === 'true' && sess['shadetree.readiness'] === 'open', 'the button opens the list, for this session');
+    assert.strictEqual(t.btn.getAttribute('aria-label'), 'Readiness monitors: hide the list');
+    t.btn.on.click(); await t.e.tick(); assert.ok(t.root.className.split(' ').includes('shut') && sess['shadetree.readiness'] === 'shut', 'and shuts it');
+    const again = await line({ read: true, note: null, mil: false, dtc_count: 0, monitors: mon({}) }, { 'shadetree.readiness': 'open' });
+    assert.ok(!again.root.className.split(' ').includes('shut'), 'remembered within the session');
+  }
+
   {   // choosing a scenario asks the hub for its PIDs (hex ids only); a PID the car does not list, or the recording does not hold, is named, not left blank
     const focusPosts = (e) => e.posts.filter(p => /^\/api\/focus\?/.test(p.url)).map(p => p.body.pids.join(' '));
     const fe = await dash();
