@@ -324,7 +324,7 @@ def test_handheld_alert_repeats_the_notices_inside_the_frame_using_tokens_only()
     assert "background: var(--msg-bg)" in body and "color: var(--amber)" in body  # the --amber on --msg-bg pair is held by TEXT_PAIRS
 
 
-_DESKTOP = ("(min-width: 601px)", "(min-width: 601px) and (max-width: 900px)", "(min-width: 701px)")  # the cabinet is desktop only: wider than a phone
+_DESKTOP = ("(min-width: 601px)", "(min-width: 601px) and (max-width: 900px)", "(min-width: 701px)", "(min-width: 701px) and (prefers-reduced-motion: reduce)")  # the cabinet is desktop only: wider than a phone
 
 
 def _cabinet_rules(css):
@@ -342,7 +342,7 @@ def test_cabinet_chrome_is_retro_desktop_only():
         if media is None and not all(s.startswith(':root[data-skin="retro"]') for s in sels):
             # unscoped base: only hides the decorative chrome, never gives the wrapper or the face a look
             assert flat in ("display: none;", "display: none"), f"{sels} outside the Retro skin may only be display: none"
-            assert all(re.search(r"\.dcab \.(plate|screw|bench)$", s) for s in sels), f"{sels}: only plate, screw and bench are hidden unscoped"
+            assert all(re.search(r"\.dcab \.(plate|screw|bench|knob)$", s) for s in sels), f"{sels}: only plate, screw, bench and knob are hidden unscoped"
         else:
             assert media in _DESKTOP, f"{sels} gives the cabinet a look outside the desktop media queries: {media}"
             assert all(s.startswith(':root[data-skin="retro"] ') for s in sels), f"{sels} is not scoped to the Retro skin"
@@ -350,7 +350,7 @@ def test_cabinet_chrome_is_retro_desktop_only():
     for needle in (".dcab::before", ".dcab::after", ".dface", ".dface > .plate", ".screw", ".bench", ".rocker", ".dcab.max"):
         assert needle in scoped, f"Retro desktop rule for {needle}"
     hidden = " ".join(" ".join(r[1]) for r in rules if not r[0])
-    for needle in (".dcab .plate", ".dcab .screw", ".dcab .bench"):
+    for needle in (".dcab .plate", ".dcab .screw", ".dcab .bench", ".dcab .knob"):
         assert needle in hidden, f"{needle} is hidden by default"
 
 
@@ -647,3 +647,20 @@ def test_retro_readings_table_is_the_crt_bay():
             assert _contrast(p[fg], p["--cb-face"]) >= need, (theme, fg)
         assert 1.2 <= _contrast(p["--crt-rule"], p["--cb-face"]) < _contrast(p["--crt-rule-strong"], p["--cb-face"]) < _contrast(p["--cb-needle"], p["--cb-face"]), "rules faint, row bar visible, scenario marker strongest"
     assert any(any(s.endswith("#d_table.crt table.rd .dash") for s in ss) and "var(--crt-muted)" in b for m, ss, b in crt)
+
+
+def test_rotary_selector_shows_only_on_a_wide_retro_desktop_and_falls_back_to_the_pushbuttons():
+    assert re.search(r'<button class="qbtn" id="d_edit"[^>]*>&#9998;</button>\s*<div class="knob" id="d_knob"></div>', HTML), "the knob sits in the scenario bar"
+    rules = _cabinet_rules(_css())
+    show = [(m, ss, b) for m, ss, b in rules if any(s.endswith(" .knob") for s in ss) and "display: block" in b]
+    hide_tabs = [(m, ss, b) for m, ss, b in rules if any(s.endswith(" .stabs") for s in ss) and "display: none" in b]
+    for found in (show, hide_tabs):
+        assert len(found) == 1 and found[0][0] == "(min-width: 701px)", "only wider than 700 px; at 700 px or less the tabs stay, styled as pushbuttons"
+        sel = found[0][1][0]
+        assert ':has(.knob[data-on="1"])' in sel and ':not(:has(#d_edit[aria-pressed="true"]))' in sel, "never while editing, never with too many scenarios"
+    js = re.search(r"<script>(.*?)</script>", HTML, re.S).group(1)
+    assert "role=\"radiogroup\" aria-label=\"Scenario\"" in js and "role=\"radio\" aria-checked=" in js
+    for k in ("ArrowRight", "ArrowLeft", "ArrowUp", "ArrowDown", "Home", "End"):
+        assert "'" + k + "'" in js, k
+    push = [b for m, ss, b in rules if any(s.endswith("#v0 .dface .stab") for s in ss)]
+    assert push and "border: 4px solid transparent" in push[0] and "var(--cb-cap-1)" in push[0], "the fallback tabs are chrome-bezelled pushbuttons"

@@ -1046,6 +1046,28 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
     assert.ok(!flat(E4.e.el('d_table')).includes('No readings yet'), 'and only when the run is empty');
   }
 
+  // Retro cabinet: the rotary test selector lists the same scenarios as the tabs, escaped, and its keys drive the one shared scenario
+  {
+    const evil = { id: 'x<b>', name: '<img src=x onerror=1> leak', gauges: [{ pid: '0C', form: 'dial' }] };
+    const kn = makeEnv(statesFor(3, idle), 'v0', OVF, [], {}, { scenarios: [evil] }); await kn.tick(); await kn.tick();
+    const k = kn.el('d_knob');
+    assert.strictEqual((k.innerHTML.match(/role="radio"/g) || []).length, 6, 'one radio per scenario: five built in, one from the server');
+    assert.ok(/role="radiogroup" aria-label="Scenario"/.test(k.innerHTML), 'a labelled radio group');
+    assert.ok(k.innerHTML.includes('&lt;img src=x onerror=1&gt; leak') && !k.innerHTML.includes('<img'), 'scenario names are escaped in the knob');
+    assert.strictEqual(k.getAttribute('data-on'), '1', 'six positions fit round the dial');
+    const on = () => kn.el('d_tabs').children.filter(b => /is-active/.test(b.className)).map(b => b.getAttribute('data-scen'));
+    const key = (name) => { let pd = false; k.on.keydown({ key: name, preventDefault() { pd = true; } }); return pd; };
+    assert.ok(key('ArrowRight')); assert.deepStrictEqual(on(), ['fuel'], 'ArrowRight picks the next scenario, the same state the tabs show');
+    key('End'); assert.deepStrictEqual(on(), ['x<b>'], 'End: the last');
+    key('ArrowDown'); assert.deepStrictEqual(on(), ['general'], 'and it wraps round');
+    key('ArrowUp'); assert.deepStrictEqual(on(), ['x<b>']); key('ArrowLeft'); assert.deepStrictEqual(on(), ['charging']);
+    key('Home'); assert.deepStrictEqual(on(), ['general']); assert.strictEqual(kn.store['shadetree.scenario'], 'general', 'stored like a tab click');
+    assert.ok(!key('a') && !key('Tab'), 'other keys pass through');
+    const many = [1, 2, 3].map(i => ({ id: 's' + i, name: 'Extra ' + i, gauges: [{ pid: '0C', form: 'dial' }] }));
+    const k8 = makeEnv(statesFor(3, idle), 'v0', OVF, [], {}, { scenarios: many }); await k8.tick(); await k8.tick();
+    assert.strictEqual(k8.el('d_knob').getAttribute('data-on'), '0', 'eight scenarios do not fit the dial: the pushbuttons stay');
+  }
+
   // Phone Menu: a real button toggles a menu-open class on the topbar (CSS collapses the tabs, chips and controls behind it at phone width); a view pick closes it
   {
     const mkBtns = () => ['v0', 'v3', 'v5', 'v6'].map(v => { const b = makeNode('vb_' + v, {}); b.dataset.view = v; return b; });

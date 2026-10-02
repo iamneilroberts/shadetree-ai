@@ -46,7 +46,7 @@
     --cb-steel: #34383b; --cb-steel-hi: #40454a; --cb-steel-lo: #25282b; --cb-seam: #1b1d1f; --cb-line: #5b6064; --cb-engrave: #dedbd2; --cb-engrave-soft: #bbb7ad;
     --cb-trim: #1c1e20; --cb-trim-hi: #2a2d30; --cb-trim-ink: #dedbd2; --cb-chrome-1: #d9dce0; --cb-chrome-2: #80868b; --cb-chrome-3: #3e4246; --cb-chrome-4: #24272a; --cb-vent: #0a0b0c;
     --cb-plate-1: #c9ccd0; --cb-plate-2: #989da2; --cb-plate-ink: #111213; --cb-sticker: #d6bc3a; --cb-sticker-ink: #15120a;
-    --cb-ok: #86d895; --cb-warn: #f0b75a; --cb-bad: #ff9a8a; --cb-accent: #dfb066; --cb-on-accent: #15120a;
+    --cb-ok: #86d895; --cb-warn: #f0b75a; --cb-bad: #ff9a8a; --cb-accent: #dfb066; --cb-on-accent: #15120a; --cb-focus: #8ab4ff;
     --cb-cheek: linear-gradient(90deg, rgba(0,0,0,.55), rgba(0,0,0,0) 32%, rgba(0,0,0,0) 68%, rgba(0,0,0,.55)), repeating-linear-gradient(0deg, #2a2d30 0 3px, #151719 3px 6px);
   }
   :root[data-skin="retro"][data-theme="light"] {
@@ -56,7 +56,7 @@
     --cb-steel: #cdc5ae; --cb-steel-hi: #ddd6c2; --cb-steel-lo: #b8af96; --cb-seam: #8d846e; --cb-line: #9a9178; --cb-engrave: #25231f; --cb-engrave-soft: #403b31;
     --cb-trim: #2e3134; --cb-trim-hi: #3c4044; --cb-trim-ink: #e8e3d5; --cb-chrome-1: #f6f7f8; --cb-chrome-2: #aab0b5; --cb-chrome-3: #62676c; --cb-chrome-4: #3b3f43; --cb-vent: #1b1c1d;
     --cb-plate-1: #eceeef; --cb-plate-2: #c3c7ca; --cb-plate-ink: #1b1c1d; --cb-sticker: #f0d44a; --cb-sticker-ink: #1d1a10;
-    --cb-ok: #174a1f; --cb-warn: #5e3200; --cb-bad: #7a1a0f; --cb-accent: #8e2619; --cb-on-accent: #fff6e6;
+    --cb-ok: #174a1f; --cb-warn: #5e3200; --cb-bad: #7a1a0f; --cb-accent: #8e2619; --cb-on-accent: #fff6e6; --cb-focus: #0b57d0;
     --cb-cheek: linear-gradient(90deg, rgba(0,0,0,.38), rgba(0,0,0,0) 28%, rgba(0,0,0,0) 72%, rgba(0,0,0,.42)), repeating-linear-gradient(91deg, #6e4328 0 2px, #7d4f31 2px 5px, #603920 5px 6px, #865837 6px 10px, #6a4026 10px 13px);
   }
   * { box-sizing: border-box; }
@@ -170,7 +170,7 @@
      nameplate sits between vents with a calibration sticker; controls, lamps and panels are engraved groups; labels and body in Archivo Narrow,
      plate and legends in the stencil face, digits in the mono face. Inside the body the page tokens are re-pointed at the engraving colours.
      Plain and a phone keep the plain page (chrome hidden, wrapper adds nothing). */
-  .dcab .plate, .dcab .screw, .dcab .bench { display: none; }
+  .dcab .plate, .dcab .screw, .dcab .bench, .dcab .knob { display: none; }
   @media (min-width: 601px) {
     :root[data-skin="retro"] .dcab { position: relative; padding: 30px 24px 64px; }
     :root[data-skin="retro"] .dcab::before, :root[data-skin="retro"] .dcab::after { content: ""; position: absolute; top: 30px; bottom: 64px; width: 24px; background: var(--cb-cheek); }
@@ -276,6 +276,28 @@
     :root[data-skin="retro"] #v0 .dface svg.dial .df { stroke-width: 1; }
     :root[data-skin="retro"] #v0 .dface svg.dial text { font-family: var(--cb-label); font-weight: 600; }
   }
+  /* the rotary TEST SELECTOR: a radio group (arrow keys, Home, End) driving the same scenario as the tabs; above 700 px, 2 to 7 scenarios, not while editing */
+  @media (min-width: 701px) {
+    :root[data-skin="retro"] #v0 .dface > .scenbar:has(.knob[data-on="1"]):not(:has(#d_edit[aria-pressed="true"])) .knob { display: block; flex: 1 1 100%; }
+    :root[data-skin="retro"] #v0 .dface > .scenbar:has(.knob[data-on="1"]):not(:has(#d_edit[aria-pressed="true"])) .stabs { display: none; }
+    :root[data-skin="retro"] #v0 .dface .knob svg { display: block; width: 100%; max-width: 330px; height: auto; margin: 0 auto; overflow: visible; }
+    :root[data-skin="retro"] #v0 .dface .knob .r-lbl { font: 600 12.5px var(--cb-label); letter-spacing: .1em; fill: var(--cb-engrave-soft); }
+    :root[data-skin="retro"] #v0 .dface .knob .r-opt[aria-checked="true"] .r-lbl { fill: var(--cb-engrave); font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+    :root[data-skin="retro"] #v0 .dface .knob .r-opt, :root[data-skin="retro"] #v0 .dface .knob .r-knob { cursor: pointer; }
+    :root[data-skin="retro"] #v0 .dface .knob .r-opt:focus { outline: none; }
+    :root[data-skin="retro"] #v0 .dface .knob .r-hit { fill: transparent; }
+    :root[data-skin="retro"] #v0 .dface .knob .r-opt:focus-visible .r-hit { stroke: var(--cb-focus); stroke-width: 2; }
+    :root[data-skin="retro"] #v0 .dface .knob .r-det { stroke: var(--cb-engrave); stroke-width: 2; }
+    :root[data-skin="retro"] #v0 .dface .knob .r-skirt { fill: url(#kchrome); }
+    :root[data-skin="retro"] #v0 .dface .knob .r-knurl { fill: none; stroke: var(--cb-chrome-4); stroke-width: 5; stroke-dasharray: 2.2 2.2; }
+    :root[data-skin="retro"] #v0 .dface .knob .r-cap { fill: url(#kcap); }
+    :root[data-skin="retro"] #v0 .dface .knob .r-ptr { stroke: var(--cb-silk); stroke-width: 3; stroke-linecap: round; }
+    :root[data-skin="retro"] #v0 .dface .knob .r-ptrg { transform-box: view-box; transform-origin: 150px 112px; transition: transform .35s cubic-bezier(.3, 1.4, .5, 1); }
+    :root[data-skin="retro"] #v0 .dface .knob .k1 { stop-color: var(--cb-chrome-1); } :root[data-skin="retro"] #v0 .dface .knob .k2 { stop-color: var(--cb-chrome-2); } :root[data-skin="retro"] #v0 .dface .knob .k3 { stop-color: var(--cb-chrome-3); }
+    :root[data-skin="retro"] #v0 .dface .knob .c1 { stop-color: var(--cb-cap-1); } :root[data-skin="retro"] #v0 .dface .knob .c2 { stop-color: var(--cb-cap-2); }
+    :root[data-skin="retro"] #v0 .dface .knob .r-say { margin: 6px 0 0; text-align: center; white-space: pre-line; font: 500 13px/1.35 var(--cb-label); color: var(--cb-engrave-soft); }
+  }
+  @media (min-width: 701px) and (prefers-reduced-motion: reduce) { :root[data-skin="retro"] #v0 .dface .knob .r-ptrg { transition: none; } }
   /* the Retro Dashboard's readings table is scheme B, "CRT bay": a black scope screen in a dark bezel, amber mono readings, white stencil headings and
      names, thin grey rules, the neutral row bar in grey and the scenario marker in the needle orange; every width and both themes */
   :root[data-skin="retro"] #d_table.crt .rwrap { padding: 10px 12px; background: var(--cb-face); color: var(--crt-fg); border: 9px solid var(--cb-trim); border-radius: 14px;
@@ -570,6 +592,7 @@
       <div class="stabs" id="d_tabs" role="tablist" aria-label="Scenarios"></div>
       <select class="b ssel" id="d_sel" aria-label="Scenario"></select>
       <button class="qbtn" id="d_edit" type="button" aria-pressed="false" title="Edit this scenario's gauges">&#9998;</button>
+      <div class="knob" id="d_knob"></div>
     </div>
     <div id="d_panel"></div>
     <div class="lamps" id="d_lamps"></div>
@@ -1368,7 +1391,49 @@
       sels.forEach(function (sel) { var o = el('option', '', s.name); o.value = s.id; if (s.id === SC.id) o.selected = true; sel.appendChild(o); });
     });
     sels.forEach(function (sel) { sel.value = SC.id; });
+    drawKnob();
   }
+  /* the Retro cabinet's rotary selector: the same scenarios as the tabs, as an SVG radio group; names are escaped (they come from a file or the page) */
+  var KNOB = { sig: null };
+  function knobAt() { var at = 0; SC.list.forEach(function (s, i) { if (s.id === SC.id) at = i; }); return at; }
+  function knobAng(i, n) { return n > 1 ? -162 + 144 * i / (n - 1) : -90; }
+  function knobPt(r, d) { var a = d * Math.PI / 180; return [150 + r * Math.cos(a), 112 + r * Math.sin(a)]; }
+  function knobShort(name) { var s = name.length > 14 ? name.split(/\s+\/\s+|\s+/)[0] : name; return s.length > 14 ? s.slice(0, 13) + '\u2026' : s; }
+  function drawKnob() {
+    var box = $('d_knob'), list = SC.list, n = list.length, at = knobAt(), sc = list[at], sig = list.map(function (s) { return s.id + '\u0001' + s.name; }).join('\u0002');
+    box.setAttribute('data-on', n >= 2 && n <= 7 ? '1' : '0');   // more than seven do not fit round the dial: the pushbuttons stay
+    if (sig !== KNOB.sig) {
+      KNOB.sig = sig;
+      var h = '<svg viewBox="0 0 300 162" role="radiogroup" aria-label="Scenario"><defs><linearGradient id="kchrome" x1="0" y1="0" x2="1" y2="1"><stop offset="0" class="k1"/><stop offset=".45" class="k2"/><stop offset=".7" class="k3"/><stop offset="1" class="k2"/></linearGradient>' +
+        '<radialGradient id="kcap" cx=".38" cy=".32" r=".8"><stop offset="0" class="c1"/><stop offset="1" class="c2"/></radialGradient></defs>';
+      list.forEach(function (s, i) {
+        var a = knobAng(i, n), d0 = knobPt(50, a), d1 = knobPt(58, a), t = knobPt(68, a), lab = knobShort(s.name).toUpperCase(), anc = a < -100 ? 'end' : a > -80 ? 'start' : 'middle',
+            y = t[1] + (a < -150 || a > -30 ? 4 : anc === 'middle' ? -2 : 0), w = lab.length * 7.6 + 10, x = anc === 'end' ? t[0] - w + 5 : anc === 'start' ? t[0] - 5 : t[0] - w / 2;
+        h += '<line class="r-det" x1="' + d0[0].toFixed(1) + '" y1="' + d0[1].toFixed(1) + '" x2="' + d1[0].toFixed(1) + '" y2="' + d1[1].toFixed(1) + '"/>' +
+          '<g class="r-opt" role="radio" aria-checked="false" tabindex="-1" data-i="' + i + '" aria-label="' + esc(s.name) + '"><rect class="r-hit" rx="3" x="' + x.toFixed(1) + '" y="' + (y - 10).toFixed(1) + '" width="' + w.toFixed(1) + '" height="20"/>' +
+          '<text class="r-lbl" x="' + t[0].toFixed(1) + '" y="' + y.toFixed(1) + '" text-anchor="' + anc + '" dominant-baseline="central">' + esc(lab) + '</text></g>';
+      });
+      box.innerHTML = h + '<g class="r-knob" aria-hidden="true"><circle class="r-skirt" cx="150" cy="112" r="42"/><circle class="r-knurl" cx="150" cy="112" r="36"/><circle class="r-cap" cx="150" cy="112" r="30"/>' +
+        '<g class="r-ptrg"><line class="r-ptr" x1="150" y1="104" x2="150" y2="85"/></g></g></svg><p class="r-say" aria-live="polite"></p>';
+    }
+    if (!box.querySelectorAll) return;
+    Array.prototype.forEach.call(box.querySelectorAll('.r-opt'), function (g) { var me = g.getAttribute('data-i') === String(at); g.setAttribute('aria-checked', String(me)); g.setAttribute('tabindex', me ? '0' : '-1'); });
+    var ptr = box.querySelector('.r-ptrg'), say = box.querySelector('.r-say'), reads = specsFor(sc).map(function (g) { return GTITLE[g.pid] || pidName(g.pid); });
+    if (ptr) ptr.style.transform = 'rotate(' + (knobAng(at, n) + 90) + 'deg)';
+    if (say) say.textContent = 'Position ' + (at + 1) + ' of ' + n + ' \u00b7 ' + sc.name + (reads.length ? '\nReads ' + reads.join(', ') : '');
+  }
+  function knobGo(i, focus) {
+    var n = SC.list.length; i = (i + n) % n; setScenario(SC.list[i].id);
+    var g = focus && $('d_knob').querySelector ? $('d_knob').querySelector('.r-opt[data-i="' + i + '"]') : null; if (g && g.focus) g.focus();
+  }
+  $('d_knob').addEventListener('click', function (e) {
+    var g = e.target && e.target.closest ? e.target.closest('.r-opt, .r-knob') : null;
+    if (g) knobGo(g.getAttribute('data-i') === null ? knobAt() + 1 : Number(g.getAttribute('data-i')), true);
+  });
+  $('d_knob').addEventListener('keydown', function (e) {
+    var k = e.key, at = knobAt(), i = k === 'ArrowRight' || k === 'ArrowDown' ? at + 1 : k === 'ArrowLeft' || k === 'ArrowUp' ? at - 1 : k === 'Home' ? 0 : k === 'End' ? SC.list.length - 1 : null;
+    if (i !== null) { e.preventDefault(); knobGo(i, true); }
+  });
   ['d_sel', 'h_sel'].forEach(function (id) { $(id).addEventListener('change', function () { setScenario($(id).value); }); });
   /* edit mode: every action saves the draft in the browser and redraws, so there is nothing unsaved to lose */
   function edit(next) { var sc = curScenario(); ED.draft = next; saveSaved(sc.id, next, sc.gauges); drawEditor(); render(); }
