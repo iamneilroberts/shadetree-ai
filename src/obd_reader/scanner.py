@@ -10,8 +10,8 @@ from obd_reader.elm import (
 from obd_reader.pids import PIDS, decode_pid
 from obd_reader.readiness import parse_readiness
 from obd_reader.snapshot import (
-    VIN_RE, Dtc, Dtcs, Ecu, FreezeFrame, Mil, Mode09Ids, PidValue, Protocol, Reply, Snapshot, Source, UserContext,
-    Vehicle,
+    VIN_RE, Dtc, Dtcs, Ecu, FreezeFrame, Mil, Mode09Ids, PidValue, Protocol, Reply, Snapshot, Source, UndecodedPid,
+    UserContext, Vehicle,
 )
 from obd_reader.transport import Transport
 
@@ -125,6 +125,25 @@ def _walk_pages(transport: Transport, mode: int) -> set[str]:
     return found
 
 
+MAX_UNDECODED = 32
+
+
+def _undecoded(transport: Transport, advertised: list[str], warnings: list[str]) -> list[UndecodedPid]:
+    """Advertised Mode 01 PIDs that pids.py cannot decode: ask each once and keep the raw data bytes.
+    Bitmap PIDs (00, 20, ...) and 01 (read for readiness) are already handled elsewhere."""
+    todo = [p for p in advertised if p not in PIDS and p != "01" and int(p, 16) % 0x20]
+    if len(todo) > MAX_UNDECODED:
+        warnings.append(f"{len(todo) - MAX_UNDECODED} more undecoded Mode 01 PIDs not read "
+                        f"(cap {MAX_UNDECODED}): {', '.join(todo[MAX_UNDECODED:])}")
+        todo = todo[:MAX_UNDECODED]
+    out = []
+    for pid in todo:
+        lines = transport.send(f"01{pid}")
+        raw = [p[2:].hex().upper() for p in parse_all(lines, 0x41) if len(p) >= 2 and p[1] == int(pid, 16)]
+        out.append(UndecodedPid(pid=pid, reply=classify(lines, 0x41), raw=raw))
+    return out
+
+
 def _freeze_frame(transport: Transport) -> FreezeFrame | None:
     """Mode 02 frame 0: the DTC that triggered it, then every decodable supported PID."""
     dtc_payloads = [p for p in parse_all(transport.send("020200"), 0x42)
@@ -226,6 +245,7 @@ def scan(
     if status:  # the lamp is on if any ECU commands it; each ECU counts its own codes
         mil = Mil(on=any(p[2] & 0x80 for p in status), dtc_count=sum(p[2] & 0x7F for p in status))
     ignition, monitors = parse_readiness(status)
+    undecoded = _undecoded(transport, supported.get("01", []), warnings)
     freeze_frame = _freeze_frame(transport) if dtcs.stored else None
 
     # NO DATA means unsupported, which is normal; anything else that gave no data is worth a line.
@@ -248,6 +268,7 @@ def scan(
         freeze_frame=freeze_frame,
         readiness=monitors,
         ignition_type=ignition,
+        undecoded=undecoded,
         user_context=UserContext(symptoms=symptoms),
         replies=transport.replies,
         warnings=warnings,

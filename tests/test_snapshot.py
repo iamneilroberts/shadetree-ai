@@ -38,6 +38,12 @@ def test_snapshot_saved_before_reply_classes_still_loads():
     assert Snapshot.model_validate(old).replies == []
 
 
+def test_snapshot_saved_before_undecoded_capture_still_loads():
+    old = make().model_dump(mode="json")
+    del old["undecoded"]
+    assert Snapshot.model_validate(old).undecoded == []
+
+
 def test_json_round_trip():
     s = make(
         vehicle=Vehicle(vin="1HGCM82633A004352", vin_source="obd"),

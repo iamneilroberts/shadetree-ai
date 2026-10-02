@@ -37,6 +37,13 @@ class Reply(_Model):
     ms: float | None = None  # send to reply, milliseconds (near 0 in replay)
 
 
+class UndecodedPid(_Model):
+    """A Mode 01 PID the car advertises that pids.py cannot decode, read once and kept raw."""
+    pid: str
+    reply: str                                    # elm.classify class
+    raw: list[str] = Field(default_factory=list)  # data bytes after "41 <pid>", hex, one per answering ECU
+
+
 class Source(_Model):
     kind: Literal["live", "replay", "import"]
     adapter: Adapter = Field(default_factory=Adapter)
@@ -146,6 +153,7 @@ class Snapshot(_Model):
     readiness: dict[str, Monitor] = Field(default_factory=dict)
     ignition_type: Literal["spark", "compression"] | None = None
     live_sample: LiveSample | None = None
+    undecoded: list[UndecodedPid] = Field(default_factory=list)  # Mode 01 only
     user_context: UserContext = Field(default_factory=UserContext)
     replies: list[Reply] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)

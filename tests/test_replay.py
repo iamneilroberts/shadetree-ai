@@ -9,7 +9,7 @@ FIXTURE = Path(__file__).parent / "fixtures" / "synthetic_sedan.jsonl"
 def test_load_transcript_reads_jsonl():
     records = load_transcript(FIXTURE)
     assert records[0] == {"t": 0.0, "tx": "ATZ", "rx": ["ELM327 v1.5"]}
-    assert len(records) == 29
+    assert len(records) == 30
 
 
 def test_replies_come_from_the_transcript_through_the_transport():
