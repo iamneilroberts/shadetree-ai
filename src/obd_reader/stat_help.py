@@ -72,7 +72,7 @@ HELP = {
               "Engine running, 13.5-14.8 V means the alternator is charging.",
               "Running below about 13 V points to the alternator, its belt or a wiring drop."],
              "13.5-14.8 V running; 12.4-12.7 V engine off (charging while the engine is off, as on a hybrid, is normal).",
-             {"ok": [13.2, 14.8], "out": [11.5, 15.5]}, {"ok": [12.2, None], "out": [11.5, None]}),
+             {"ok": [13.2, 14.8], "out": [11.5, 15.5]}, {"ok": [12.2, 14.8], "out": [11.5, 15.5]}),
     "04": _e("Engine load", "How hard the engine is working, as a percentage of the most air it could take in at that speed.",
              ["Idle is usually 15-30 % and rises with throttle.",
               "High load at idle hints at an air leak or a dragging accessory.",

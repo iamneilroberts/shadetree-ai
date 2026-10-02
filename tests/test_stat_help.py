@@ -47,10 +47,13 @@ def test_watch_ranges_are_well_formed_and_nested():
     assert "watch" not in HELP["04"] and "watch" not in HELP["0B"]
 
 
-def test_engine_off_battery_band_is_open_above_so_charging_is_never_flagged():
-    # hybrids and start-stop pauses read rpm 0 while charging at 14 V; surface charge after shutdown reads 13+ V
-    w = HELP["42"]["watch_engine_off"]
-    assert w["ok"][1] is None and w["out"][1] is None and w["ok"][0] is not None and w["out"][0] is not None
+def test_engine_off_battery_band_keeps_the_running_high_limits_so_charging_is_ok_and_24_v_is_not():
+    # hybrids and start-stop pauses read rpm 0 while charging at 14 V; surface charge after shutdown reads 13+ V;
+    # an engine-off band open above called 24 V normal
+    off, run = HELP["42"]["watch_engine_off"], HELP["42"]["watch"]
+    assert off["ok"][1] == run["ok"][1] and off["out"][1] == run["out"][1]
+    assert off["ok"][0] <= 12.4 and off["ok"][1] >= 14.2  # a resting battery and a charging hybrid both read ok
+    assert 24 > off["out"][1]  # out of range, as the page's judge() reads it
 
 
 def test_metric_numbers_in_the_help_text_come_with_us_equivalents():
