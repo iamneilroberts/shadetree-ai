@@ -272,7 +272,7 @@ def test_shared_parts_fit_a_phone_width():  # Review Focus 5
 
 def test_dashboard_code_list_scrolls_instead_of_clipping_and_its_small_text_is_readable():
     rules = re.findall(r"(?m)^\s*#v0 \.clist\s*\{([^}]*)\}", HTML)
-    assert rules, "a #v0-only .clist rule must exist"
+    assert len(rules) == 1, "one #v0-only .clist rule"
     body = rules[-1]
     assert "overflow-y: auto" in body and "overflow: hidden" not in body
     assert "176px" not in body.replace("min-height: 176px", "") and "height: auto" in body
@@ -297,6 +297,22 @@ def _css_rules(css, media=None):
             out.append((media, [s.strip() for s in head.split(",")], body))
         i = k
     return out
+
+
+def test_dashboard_code_rows_give_the_description_its_own_row_on_a_phone():
+    p600 = [(s, b) for m, s, b in _css_rules(_css()) if m == "(max-width: 600px)"]
+    row = [b for s, b in p600 if "#v0 .crow" in s]
+    assert row and "grid-template-columns: auto 1fr" in row[0], "code and status share a row, sized to their content"
+    assert any("#v0 .crow .cdesc" in s and "grid-column: 1 / -1" in b for s, b in p600), "the description spans the whole row"
+
+
+def test_handheld_alert_repeats_the_notices_inside_the_frame_using_tokens_only():
+    assert re.search(r'<div class="hh-scen">.*?</div>\s*<div class="hh-alert" id="h_alert" hidden></div>\s*<div class="hh-body">', HTML, re.S)
+    rules = [(m, b) for m, s, b in _css_rules(_css()) if ".retro .hh-alert" in s]
+    assert rules and all("var(--msg-bg)" in b or "var(--amber)" in b or "display" in b for m, b in rules)
+    assert any(m == "(max-width: 430px)" and "display: block" in b for m, b in rules), "shown only where the page hides its own notices"
+    body = " ".join(b for m, b in rules)
+    assert "background: var(--msg-bg)" in body and "color: var(--amber)" in body  # the --amber on --msg-bg pair is held by TEXT_PAIRS
 
 
 def _cabinet_rules(css):

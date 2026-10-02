@@ -1094,5 +1094,31 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
     assert.ok(none.el('h_gauges').children.every(g => g.children.some(c => c.className === 'gnote' && c.textContent === 'not sampling')), 'and the gauges say not sampling');
   }
 
+  {   // 16) a replay file's codes note is text, never markup, on the Dashboard and the Handheld
+    const noteEnv = async (note, view) => { const e = makeEnv(statesFor(3, base).map(st => Object.assign(st, { codes: { read: false, note } })), view, OVF); for (let k = 0; k < 3; k++) await e.tick(); return e; };
+    const dCodes = (e) => { let r = null; walk(e.el('d_codes_mount'), n => { if (n.id === 'd_codes') r = n; }); return r.innerHTML; };
+    for (const [note, tag, shown] of [['<img src=x onerror=1>', /<img/i, '&lt;IMG'], ['<a href=//evil.example>tap</a>', /<a[\s>]/i, '&lt;A HREF']]) {
+      const d = dCodes(await noteEnv(note, 'v0')), h = (await noteEnv(note, 'v5')).el('h_codes').innerHTML;
+      assert.ok(!tag.test(d) && d.includes(shown), 'Dashboard codes note escaped: ' + d);
+      assert.ok(!tag.test(h) && h.includes(shown), 'Handheld codes note escaped: ' + h);
+    }
+  }
+
+  {   // 17) the page's notices (demo, replay, server/adapter message, example note) are repeated inside the Handheld frame, as text
+    const quiet = (st) => Object.assign(st, { demo: false });
+    const alertEnv = async (states, page = {}, seed) => { const e = makeEnv(states, 'v5', OVF, [], {}, page); if (seed) seed(e); for (let k = 0; k < 3; k++) await e.tick(); return e.el('h_alert'); };
+    const demoText = html.match(/id="demoBanner" hidden>([^<]*)</)[1];
+    const demo = await alertEnv(statesFor(3, base), {}, (e) => { e.el('demoBanner').textContent = demoText; });
+    assert.ok(!demo.hidden && demo.textContent.includes('simulated engine, no car connected'), 'demo: ' + demo.textContent);
+    const rep = await alertEnv(statesFor(3, base).map(st => Object.assign(quiet(st), { replay: { name: 'run.json', playing: true, ended: false, speed: 1, pos: 1, duration: 10 } })));
+    assert.ok(!rep.hidden && rep.textContent.includes('Replay: run.json · not a live car'), 'replay: ' + rep.textContent);
+    const ex = await alertEnv(statesFor(3, base).map(quiet), { search: '?t=abc&example=x.json', postReply: (url) => (/\/api\/replay/.test(url) ? { ok: false, status: 404, j: { error: 'no' } } : null) });
+    assert.ok(!ex.hidden && ex.textContent.includes('Example not found: x.json'), 'example: ' + ex.textContent);
+    const msg = await alertEnv(statesFor(3, base).map(st => Object.assign(quiet(st), { message: 'Adapter <b>lost</b>' })));
+    assert.ok(!msg.hidden && msg.textContent.includes('Adapter <b>lost</b>') && msg.children.length === 0 && msg.innerHTML === '', 'a message is text, never markup: ' + msg.textContent);
+    const none = await alertEnv(statesFor(3, base).map(quiet));
+    assert.strictEqual(none.hidden, true, 'no notices: the alert is hidden');
+  }
+
   console.log('page logic OK');
 })().catch(e => { console.error('FAIL', e.message); process.exit(1); });

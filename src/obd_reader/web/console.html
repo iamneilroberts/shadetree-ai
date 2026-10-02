@@ -104,7 +104,7 @@
   #v3 .band { display: inline-block; padding: 1px 8px; border: 1px solid var(--line); border-radius: 3px; font-size: 12px; }
   @media (max-width: 860px) { #v3 .wrap { grid-template-columns: 1fr; } #v3 .readouts { grid-template-columns: 1fr 1fr; } }
   /* ---- retro layouts: the Dashboard cabinet and E (handheld / phone): oxblood finish ---- */
-  /* retro device palette: the Dashboard cabinet and Handheld faces read these in every skin and theme; the Retro skin also uses them for any view */
+  /* retro device palette: the Handheld face reads these in every skin and theme, the Dashboard cabinet face (Retro skin, desktop only) reads them too; the Retro skin also uses them for any view */
   :root {
     --sil: "Helvetica Neue", Helvetica, Arial, "Liberation Sans", sans-serif; --ghost: .16; --glow: 3px; --ink2: #4a4a4c; --mut: #a39b88; --retro-ink: #ece6d6;
     --rail: linear-gradient(90deg, #3a0f0e, #7d2724 22%, #a5423b 34%, #74221f 62%, #3f100f); --rail-rivet: radial-gradient(circle at 50% 28px, #e4e4e2 0 2.5px, #2b2b2c 3px 5px, transparent 5.5px) 0 0 / 100% 84px repeat-y; --rail-tex: repeating-linear-gradient(90deg, rgba(255,255,255,.05) 0 1px, rgba(0,0,0,.08) 1px 2px); --rail-edge: rgba(230,230,228,.35);
@@ -170,8 +170,7 @@
   #v0 .cwrap { display: grid; grid-template-columns: 150px 1fr; gap: 12px; }
   #v0 .cntbox { display: flex; flex-direction: column; justify-content: center; gap: 6px; }
   #v0 .cntbox small { font: 700 11px var(--sil); letter-spacing: .12em; text-transform: uppercase; color: var(--ink2); text-align: center; }
-  #v0 .clist { background: var(--win-bg); border: 3px solid var(--win-bd); border-radius: 4px; padding: 4px 12px; height: 176px; overflow: hidden; }
-  #v0 .clist { height: auto; min-height: 176px; max-height: 320px; overflow-y: auto; }
+  #v0 .clist { background: var(--win-bg); border: 3px solid var(--win-bd); border-radius: 4px; padding: 4px 12px; height: auto; min-height: 176px; max-height: 320px; overflow-y: auto; }
   #v0 .crow { display: grid; grid-template-columns: 104px 86px 1fr; gap: 12px; align-items: center; padding: 7px 0; border-bottom: 1px solid var(--crow-line); }
   #v0 .crow:last-child { border-bottom: 0; }
   .retro .ccode, #v0 .ccode { font-weight: 800; font-size: 28px; color: var(--code-amber); text-shadow: 0 0 var(--glow) var(--code-amber); letter-spacing: .04em; }
@@ -206,6 +205,7 @@
   .retro #h_table { margin-top: 10px; }
   .retro .hh table.rd th, .retro .hh table.rd td .at, .retro .hh .note { color: var(--ink2); }   /* the table and the notes sit on the light face */
   .retro .hh .note { font-size: 12.5px; margin: 0 0 8px; }
+  .retro .hh-alert { display: none; flex: none; margin: 8px 10px 0; padding: 6px 10px; background: var(--msg-bg); border: 1px solid var(--amber); border-radius: 4px; color: var(--amber); font-size: 12.5px; white-space: pre-line; overflow-wrap: anywhere; }   /* the page's notices, shown in the frame only where the phone hides the page's own */
   .retro .hh-nav { padding-bottom: calc(8px + env(safe-area-inset-bottom)); }
   .retro .hh-size { font: 12px var(--sil); color: var(--mut); }
   .retro .hhwrap { padding-top: 0; }
@@ -217,6 +217,7 @@
     .retro .hh { width: 100%; height: calc(100dvh - var(--topbar-h)); padding: 0; border-radius: 0; background: none; box-shadow: none; }
     .retro .hh-in { border: 0; border-radius: 0; }
     .retro .hh-top { height: 60px; } .retro .hh-body { padding: 8px; } .retro .hh-size { display: none; }
+    .retro .hh-alert { display: block; }
     body:has(.rbar:not([hidden])) .hh { height: calc(100dvh - var(--topbar-h) - var(--rbar-h)); }   /* the frame ends above the pinned replay bar */
   }
   :root { --topbar-h: 49px; }
@@ -226,6 +227,7 @@
     .topbar:not(.menu-open) .switcher, .topbar:not(.menu-open) + .status { display: none; }
     .topbar { flex-wrap: nowrap; min-height: var(--topbar-h); box-sizing: border-box; padding: 6px 12px; } .topbar.menu-open { flex-wrap: wrap; }
     .switcher { flex: 1 1 100%; margin-left: 0; }
+    #v0 .crow { grid-template-columns: auto 1fr; } #v0 .crow .cst { justify-self: start; } #v0 .crow .cdesc { grid-column: 1 / -1; }   /* code and status on one line, the description on its own */
     :root { --rbar-h: 88px; }
     .rbar:not([hidden]) { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; box-sizing: border-box; height: var(--rbar-h); align-content: center; gap: 6px 8px; padding: 6px 12px; background: var(--panel2); border-bottom: 0; border-top: 1px solid var(--line); }
     .rbar:not([hidden]) input[type=range] { order: -1; flex: 1 1 100%; min-width: 0; }
@@ -466,6 +468,7 @@
 <div class="hhwrap"><div class="hh" id="hh"><div class="hh-in">
     <div class="hh-top"><span class="mil"><i class="lens red" id="h_mil" style="width:18px;height:18px"></i><span id="h_miltxt">Check engine</span></span><span class="hlive" id="h_live">&mdash;</span><span class="n mono" id="h_n">0 CODES</span></div>
     <div class="hh-scen"><select class="b" id="h_sel" aria-label="Scenario"></select></div>
+    <div class="hh-alert" id="h_alert" hidden></div>
     <div class="hh-body">
       <div class="hh-pane" data-mode="live" id="h_livepane">
         <div class="lamps" id="h_lamps"></div>
@@ -743,6 +746,12 @@
     renderReplay();
     if (st.message) showMsg(st.message); else if (st.status !== 'disconnected') showMsg('');
     if (st.status === 'disconnected') showMsg('Lost contact with the console server. Is shadetree-ai still running?');
+    hhAlert();
+  }
+  function hhAlert() {   // the page's notices, repeated as text inside the Handheld frame (a phone hides the page's own banners there)
+    var seen = {}, lines = ['demoBanner', 'replayBanner', 'msg', 'exNote'].map(function (id) { var n = $(id); return n.hidden ? '' : n.textContent; })
+      .filter(function (t) { return t && !seen[t] && (seen[t] = true); });
+    $('h_alert').textContent = lines.join('\n'); $('h_alert').hidden = !lines.length;
   }
   var M06 = { '01': 'O2 sensor B1S1', '02': 'O2 sensor B1S2', '03': 'O2 sensor B1S3', '04': 'O2 sensor B1S4', '05': 'O2 sensor B2S1',
     '06': 'O2 sensor B2S2', '07': 'O2 sensor B2S3', '08': 'O2 sensor B2S4', '21': 'Catalyst bank 1', '22': 'Catalyst bank 2',
@@ -1362,9 +1371,9 @@
     ['stored', 'pending', 'permanent'].forEach(function (k) { (c[k] || []).forEach(function (d) { out.push({ code: d.code, kind: k, desc: d.desc, hint: d.hint }); }); });
     return out;
   }
-  function codeEmpty(c, running) {
+  function codeEmpty(c, running) {   // markup-safe: callers put it in innerHTML, and a replay file's note is untrusted
     if (c && c.read) return 'NO CODES STORED';
-    if (c && c.note) return c.note.toUpperCase();
+    if (c && c.note) return esc(String(c.note).toUpperCase());
     return running ? 'READING CODES...' : 'START SAMPLING TO READ CODES';
   }
   function retroCommon() {
