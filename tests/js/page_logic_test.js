@@ -1150,15 +1150,21 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
     const nt = (P, lo, hi, majors, div) => { const r = P.niceTicks(lo, hi, majors, div); return { step: r.step, dec: r.dec, values: Array.from(r.values), minors: Array.from(r.minors) }; };
     const P = (await gOver({})).parts();
     const labels = (r) => r.values.map(v => v.toFixed(r.dec));
-    assert.deepStrictEqual(labels(nt(P, 0, 124.27, 5, 1)), ['0', '25', '50', '75', '100'], 'speed mph');
-    assert.deepStrictEqual(labels(nt(P, 0, 200, 5, 1)), ['0', '50', '100', '150', '200'], 'speed km/h');
-    assert.deepStrictEqual(labels(nt(P, -4, 266, 5, 1)), ['0', '50', '100', '150', '200', '250'], 'coolant F');
+    assert.deepStrictEqual(labels(nt(P, 0, 124.27, 5, 1)), ['0', '25', '50', '75', '100'], 'speed mph: one 3-character label at the end does not crowd');
+    assert.deepStrictEqual(labels(nt(P, 0, 200, 5, 1)), ['0', '100', '200'], 'speed km/h: no two 3-character labels side by side beyond 4 labels');
+    assert.deepStrictEqual(labels(nt(P, -4, 266, 5, 1)), ['0', '100', '200'], 'coolant F: 3-digit labels, at most 4');
+    assert.deepStrictEqual(labels(nt(P, -20, 130, 5, 1)), ['0', '50', '100'], 'coolant C');
     assert.deepStrictEqual(labels(nt(P, 0, 73.8, 6, 1)), ['0', '20', '40', '60'], 'MAP inHg');
-    assert.deepStrictEqual(labels(nt(P, 0, 250, 6, 1)), ['0', '50', '100', '150', '200', '250'], 'MAP kPa');
-    assert.deepStrictEqual(labels(nt(P, 10, 16, 6, 1)), ['10', '11', '12', '13', '14', '15', '16'], 'voltage');
-    assert.deepStrictEqual(labels(nt(P, 0, 7000, 7, 1000)), ['0', '1', '2', '3', '4', '5', '6', '7'], 'tach x1000');
-    assert.deepStrictEqual(labels(nt(P, -25, 25, 5, 1)), ['-20', '-10', '0', '10', '20'], 'trims');
-    assert.deepStrictEqual(labels(nt(P, 0.5, 1.5, 5, 1)), ['0.50', '0.75', '1.00', '1.25', '1.50'], 'lambda: no float noise');
+    assert.deepStrictEqual(labels(nt(P, 0, 250, 6, 1)), ['0', '100', '200'], 'MAP kPa');
+    assert.deepStrictEqual(labels(nt(P, 10, 16, 6, 1)), ['10', '12', '14', '16'], 'voltage: 2-character labels, at most 5');
+    assert.deepStrictEqual(labels(nt(P, 0, 7000, 7, 1000)), ['0', '1', '2', '3', '4', '5', '6', '7'], 'tach x1000: 1-character labels keep 8');
+    assert.deepStrictEqual(labels(nt(P, -25, 25, 5, 1)), ['-25', '0', '25'], 'trims: a minus sign counts as a character');
+    assert.deepStrictEqual(labels(nt(P, -20, 50, 7, 1)), ['-20', '0', '20', '40'], 'spark advance');
+    assert.deepStrictEqual(labels(nt(P, 0.5, 1.5, 5, 1)), ['0.5', '1.0', '1.5'], 'lambda: no float noise');
+    const capOf = (ls) => {   // the label-width cap: 4 where two neighbouring labels are both 3+ characters, 5 where any label is 2+, else 7+
+      let both3 = false; for (let i = 1; i < ls.length; i++) if (ls[i - 1].length >= 3 && ls[i].length >= 3) both3 = true;
+      return both3 ? 4 : ls.some(l => l.length >= 2) ? 5 : Infinity;
+    };
     const units = { '0C': 'rpm', '0D': 'km/h', '05': '°C', '04': '%', '11': '%', '0B': 'kPa', '42': 'V', '06': '%', '07': '%', '08': '%', '09': '%', '0E': '°', '0F': '°C', '44': '' };
     const withChannels = (st) => { for (const pid in units) st.channels[pid] = { name: 'ch' + pid, unit: units[pid], samples: [[st.seq, st.now, 1]] }; return st; };
     for (const unitSys of ['metric', 'us']) {
@@ -1166,6 +1172,7 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
       for (const pid in units) {
         const m = Q.gaugeModel({ pid, form: 'dial' }), r = nt(Q, m.lo, m.hi, m.majors, m.div), tag = pid + ' ' + unitSys + ' [' + m.lo + ', ' + m.hi + ']';
         assert.ok(r.values.length >= 3 && r.values.length <= Math.max(7, m.majors + 1), tag + ' label count ' + r.values.length);
+        assert.ok(r.values.length <= capOf(labels(r)), tag + ' labels crowd: ' + labels(r).join(' '));
         for (const v of r.values.concat(r.minors)) { assert.ok(v * m.div >= m.lo - 1e-6 && v * m.div <= m.hi + 1e-6, tag + ' tick outside the range: ' + v); }
         for (const v of r.values) {
           const k = v / r.step; assert.ok(Math.abs(k - Math.round(k)) < 1e-9, tag + ' label ' + v + ' not a multiple of ' + r.step);

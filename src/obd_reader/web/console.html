@@ -1341,15 +1341,17 @@
     }
     el.innerHTML = out + '</g></svg>';
   }
-  function niceTicks(lo, hi, majors, div) {   // round-number dial ticks in the displayed unit (value / div): the nice step (1, 2, 2.5, 5 x 10^k) giving the label count nearest majors + 1, 3 to max(7, majors + 1) labels; minors every step / 4, none outside [lo, hi]
+  function niceTicks(lo, hi, majors, div) {   // round-number dial ticks in the displayed unit (value / div): the nice step (1, 2, 2.5, 5 x 10^k) giving the label count nearest majors + 1, at least 3, at most a cap from the label widths (minus sign included): 4 if two neighbouring labels are both 3+ characters, 5 if any label is 2+, else max(7, majors + 1); minors every step / 4, none outside [lo, hi]
     div = div || 1;
-    var a = lo / div, b = hi / div, best = null, E = 1e-9, cap = Math.max(7, majors + 1);
+    var a = lo / div, b = hi / div, best = null, E = 1e-9;
     [1, 2, 2.5, 5].forEach(function (m) {
       for (var k = -4; k <= 5; k++) {
-        var st = m * Math.pow(10, k), n = Math.floor(b / st + E) - Math.ceil(a / st - E) + 1;
+        var st = m * Math.pow(10, k), i0 = Math.ceil(a / st - E), n = Math.floor(b / st + E) - i0 + 1, dec = Math.max(0, -k + (m === 2.5 ? 1 : 0)), cap = Math.max(7, majors + 1);
         if (n < 3 || n > cap) continue;
+        for (var j = 0, w0 = 0; j < n; j++) { var w = ((i0 + j) * st + 0).toFixed(dec).length; cap = Math.min(cap, w >= 3 && w0 >= 3 ? 4 : w >= 2 ? 5 : cap); w0 = w; }
+        if (n > cap) continue;
         var d = Math.abs(n - (majors + 1));
-        if (!best || d < best.d || (d === best.d && st > best.st)) best = { d: d, st: st, dec: Math.max(0, -k + (m === 2.5 ? 1 : 0)) };
+        if (!best || d < best.d || (d === best.d && st > best.st)) best = { d: d, st: st, dec: dec };
       }
     });
     if (!best) best = { st: (b - a) / majors, dec: 1 };
