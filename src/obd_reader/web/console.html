@@ -1669,6 +1669,17 @@
       poll();
     }, function () {});
   }
+  // ?run=<file> replays that run from My runs, else from Examples (same name rule; the server refuses anything else)
+  var RUN = new URLSearchParams(location.search).get('run');
+  if (RUN !== null) {
+    if (!/^[A-Za-z0-9T:_.-]{1,100}\.json$/.test(RUN)) exNote('Run not found: ' + RUN);
+    else post('/api/replay', { source: 'mine', name: RUN }).then(function (r) {
+      return r.ok || (r.status !== 404 && r.status !== 400) ? r : post('/api/replay', { source: 'examples', name: RUN });
+    }).then(function (r) {
+      if (!r.ok) exNote(r.status === 404 || r.status === 400 ? 'Run not found: ' + RUN : 'Could not load the run: ' + ((r.j && r.j.error) || r.status));
+      poll();
+    }, function () {});
+  }
   loadHelp();
   fetch(api('/api/scenarios'))   // the --scenarios file, merged over the built-ins; on failure the built-ins stay
     .then(function (r) { if (!r.ok) throw new Error(String(r.status)); return r.json(); })

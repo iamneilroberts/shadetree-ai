@@ -617,6 +617,24 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
   const exBusy = await exEnv('?t=abc&example=' + EXN, () => ({ ok: false, status: 409, j: { error: 'the console is already sampling; stop it first' } }));
   assert.strictEqual(exBusy.el('exNote').textContent, 'Could not load the example: the console is already sampling; stop it first', 'a busy console is not "not found"');
 
+  // ?run=<file>: My runs first, then Examples; strict names; a 409 is not "not found"
+  const MINE = '2026-10-02T17-52-40Z-auto.json';
+  const runMine = await exEnv('?t=abc&run=' + MINE);
+  assert.deepStrictEqual(replays(runMine).map(p => p.body), [{ source: 'mine', name: MINE }], 'a run in My runs loads from there, with no second request');
+  const runEx = await exEnv('?t=abc&run=' + EXN, (url, body) => (body.source === 'mine' ? { ok: false, status: 404, j: { error: 'no such saved run' } } : null));
+  assert.deepStrictEqual(replays(runEx).map(p => p.body), [{ source: 'mine', name: EXN }, { source: 'examples', name: EXN }], 'not in My runs: tries Examples');
+  assert.strictEqual(runEx.el('exNote').textContent, '', 'and loads without a notice');
+  const runNone = await exEnv('?t=abc&run=missing.json', () => ({ ok: false, status: 404, j: { error: 'no such saved run' } }));
+  assert.strictEqual(runNone.el('exNote').textContent, 'Run not found: missing.json', 'in neither: says so');
+  const runBusy = await exEnv('?t=abc&run=' + MINE, () => ({ ok: false, status: 409, j: { error: 'the console is already sampling; stop it first' } }));
+  assert.strictEqual(replays(runBusy).length, 1, 'a busy console does not fall through to Examples');
+  assert.strictEqual(runBusy.el('exNote').textContent, 'Could not load the run: the console is already sampling; stop it first');
+  for (const bad of ['../runs/mine.json', 'runs/mine.json', 'mine', '', 'a b.json', '<img src=x onerror=1>.json']) {
+    const e = await exEnv('?t=abc&run=' + bad);
+    assert.strictEqual(replays(e).length, 0, 'an invalid run name is never sent: ' + bad);
+    assert(/^Run not found/.test(e.el('exNote').textContent) && !e.el('exNote').textContent.includes('abc'), 'and says so without the token: ' + bad);
+  }
+
   // Theme: the stored choice beats the system preference; a bad stored value is ignored; dark when nothing is known; blocked storage is tolerated
   const thEnv = async (store, page) => { const e = makeEnv(statesFor(2, idle), 'v0', null, [], store, page); for (let k = 0; k < 2; k++) await e.tick(); return e; };
   const theme = (e) => e.el('html').getAttribute('data-theme');
