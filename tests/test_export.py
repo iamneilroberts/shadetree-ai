@@ -79,3 +79,23 @@ def test_cli_writes_the_bundle_and_says_it_may_hold_the_vin(tmp_path, capsys):
     assert main(["export-run", "--out-dir", str(tmp_path), "--dest", str(tmp_path / "o.tgz")]) == 0
     out = capsys.readouterr().out
     assert (tmp_path / "o.tgz").exists() and "never commit" in out.lower()
+
+
+def test_a_run_that_names_its_transcript_is_paired_with_that_one_not_by_time(tmp_path):
+    make(tmp_path)  # by time, RUN would pair with TR_NEW
+    (tmp_path / "runs" / RUN).write_text(json.dumps({"kind": "live_run", "transcript": f"transcripts/{TR_OLD}"}))
+    got, files = names(export_run(tmp_path, tmp_path / "out.tgz"))
+    assert f"shadetree-share/transcripts/{TR_OLD}" in got and f"shadetree-share/transcripts/{TR_NEW}" not in got
+    assert f"transcript: {TR_OLD}" in files["shadetree-share/SUMMARY.txt"]
+
+
+def test_a_named_transcript_outside_the_data_home_is_not_bundled(tmp_path):
+    make(tmp_path)
+    (tmp_path / "secret.jsonl").write_text("{}\n")
+    (tmp_path / "home").mkdir()
+    for d in ("runs", "transcripts"):
+        (tmp_path / d).rename(tmp_path / "home" / d)
+    (tmp_path / "home" / "runs" / RUN).write_text(json.dumps({"transcript": "../secret.jsonl"}))
+    got, files = names(export_run(tmp_path / "home", tmp_path / "out.tgz"))
+    assert [n for n in got if n.startswith("shadetree-share/transcripts/")] == []
+    assert "transcript: none found" in files["shadetree-share/SUMMARY.txt"]

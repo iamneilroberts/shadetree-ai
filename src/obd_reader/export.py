@@ -80,9 +80,18 @@ def export_run(out_dir: Path, dest: Path, latest: int = 1) -> Path:
         raise ExportError(f"no run files in {out_dir / 'runs'} (press Save run in the console first)")
     consoles = sorted((out_dir / "transcripts").glob("*console.jsonl"), key=lambda p: p.name)
     chosen, summaries = [], []
+    home = out_dir.resolve()
     for run in runs:
-        tr = [t for t in consoles if _key(t.name) <= _key(run.name)]
-        pair = tr[-1] if tr else None
+        try:
+            named = json.loads(run.read_text(encoding="utf-8")).get("transcript")
+        except (ValueError, AttributeError):
+            named = None
+        if isinstance(named, str):  # the run names its transcript (relative to the data home): trust only that
+            p = (out_dir / named).resolve()
+            pair = p if p.is_file() and p.is_relative_to(home) else None
+        else:  # older run files: the newest console transcript that started before the run was saved
+            tr = [t for t in consoles if _key(t.name) <= _key(run.name)]
+            pair = tr[-1] if tr else None
         chosen.append((run, pair))
         summaries.append(summarize(run.name, pair.name if pair else "none found", _load(pair) if pair else []))
     with tarfile.open(dest, "w:gz") as tar:
