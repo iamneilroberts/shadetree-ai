@@ -720,3 +720,12 @@ def test_the_nameplate_and_the_handle_share_the_cabinet_centreline():
     assert "padding-inline: 128px;" in wide[P + " > .plate"], "equal margins keep the sticker clear of the right grille"
     assert "grid-row: 2;" in top[P + " > .sumbar"] and "border: 0;" in top[P + " > .sumbar"], "the summary strip is a slim line under the plate"
     assert "grid-area: 3 / 1;" in top[P + " > .scenbar"] and "grid-area: 3 / 2;" in top[P + " > .lamps"], "the selector and the lamps side by side, one row"
+
+
+def test_the_retro_dashboard_bar_keeps_44px_touch_targets():
+    """The slim bar's own 28 px buttons must not beat the touch rule: a later phone/coarse-pointer rule with the same weight restores 44 px."""
+    css = _css()
+    R = ':root[data-skin="retro"][data-view="v0"]'
+    small = css.index(R + " .topbar button.b:not(.tg), " + R + " .topbar select.b { min-height: 28px;")
+    touch = css.index("@media (max-width: 600px), (pointer: coarse) { " + R + " .topbar button.b:not(.tg), " + R + " .topbar button.tg, " + R + " .topbar select.b { min-height: 44px; } }")
+    assert touch > small, "the touch rule comes after the bar's sizes"

@@ -253,7 +253,8 @@
     :root[data-skin="retro"] #v0 .dface .rsum { display: inline; flex: 1 1 auto; font: 600 12px/1.3 var(--cb-label); letter-spacing: .06em; text-transform: uppercase; color: var(--cb-engrave); } :root[data-skin="retro"] #v0 .dface .rsum.warn { color: var(--cb-warn); }
     :root[data-skin="retro"] #v0 .dface .rtog { display: inline-block; margin-left: auto; padding: 0 9px; font-size: 13px; line-height: 22px; }
     :root[data-skin="retro"] #v0 .dface .panel.shut > .pbody { display: none; } :root[data-skin="retro"] #v0 .dface .panel.shut > .ptitle { padding-bottom: 10px; }
-    :root[data-skin="retro"] #v0 .dface > .ltest { display: block; justify-self: end; align-self: start; margin: 4px 6px 0 0; padding: 11px 8px 4px; z-index: 1; font-size: 10px; letter-spacing: .12em; }
+    :root[data-skin="retro"] #v0 .dface > .ltest { display: block; justify-self: end; align-self: start; margin: 44px 12px 0 0; padding: 11px 8px 4px; z-index: 1; font-size: 10px; letter-spacing: .12em; }
+    :root[data-skin="retro"] #v0 .dface > .lamps { padding-right: 112px; }   /* the lamp row ends where LAMP TEST sits */
     /* LAMP TEST: while held every lens lights in its own colour (a class on the row; the lamps' state underneath is untouched, nothing is announced) */
     :root[data-skin="retro"] #v0 .dface .lamps.lamp-test .lampbox:nth-child(1) .lens { background: var(--lens-red-lit); box-shadow: 0 0 0 4px var(--cb-chrome-2), 0 0 0 5px var(--cb-chrome-4), 0 0 16px 6px var(--led-r); }
     :root[data-skin="retro"] #v0 .dface .lamps.lamp-test .lampbox:nth-child(n+2):nth-child(-n+4) .lens { background: var(--lens-amb-lit); box-shadow: 0 0 0 4px var(--cb-chrome-2), 0 0 0 5px var(--cb-chrome-4), 0 0 16px 6px var(--led-y); }
@@ -340,7 +341,7 @@
   @media (max-width: 600px) {
     :root[data-skin="retro"] .dcab { padding: 0 5px; }
     :root[data-skin="retro"] .dcab::before, :root[data-skin="retro"] .dcab::after { top: 0; bottom: 0; width: 5px; }
-    :root[data-skin="retro"] #v0 .dface { gap: 14px; padding: 14px 10px 16px; }
+    :root[data-skin="retro"] #v0 .dface { gap: 10px; padding: 12px 10px 16px; } :root[data-skin="retro"] #v0 .dface > .sumbar { gap: 1px 12px; font-size: 11.5px; }
     :root[data-skin="retro"] #v0 .dface::before, :root[data-skin="retro"] #v0 .dface::after { display: none; }
     :root[data-skin="retro"] #v0 .dface > .plate .np { padding: 6px 10px 5px; }
     :root[data-skin="retro"] #v0 .dface > .plate .np b { font-size: 19px; letter-spacing: .12em; margin-bottom: 4px; }
@@ -356,7 +357,7 @@
         linear-gradient(180deg, var(--cb-cap-1), var(--cb-cap-2)) padding-box, linear-gradient(145deg, var(--cb-chrome-1), var(--cb-chrome-2) 45%, var(--cb-chrome-3) 70%, var(--cb-chrome-2)) border-box;
       color: var(--cb-silk); font: 700 13px/1.1 var(--cb-label); letter-spacing: .12em; text-transform: uppercase; box-shadow: 0 2px 3px rgba(0,0,0,.3); }
     :root[data-skin="retro"] #v0 .dface > .scenbar .ssel option { background: var(--cb-cap-2); color: var(--cb-silk); }
-    :root[data-skin="retro"] #v0 .dface > .lamps { gap: 8px 2px; } :root[data-skin="retro"] #v0 .dface .lampbox { font-size: 9.5px; letter-spacing: .04em; gap: 6px; } :root[data-skin="retro"] #v0 .dface .lampbox em { font-size: 9px; letter-spacing: .02em; }
+    :root[data-skin="retro"] #v0 .dface > .lamps { gap: 8px 2px; padding-right: 56px; } :root[data-skin="retro"] #v0 .dface > .ltest { width: 46px; margin: 34px 6px 0 0; padding: 10px 2px 3px; white-space: normal; line-height: 1.1; font-size: 9px; letter-spacing: .06em; } :root[data-skin="retro"] #v0 .dface .lampbox { font-size: 9.5px; letter-spacing: .04em; gap: 6px; } :root[data-skin="retro"] #v0 .dface .lampbox em { font-size: 9px; letter-spacing: .02em; }
     :root[data-skin="retro"] #v0 .dface .lens { width: 18px; height: 18px; }
     :root[data-skin="retro"] #v0 .dface .gauges { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 10px; }
     :root[data-skin="retro"] #v0 .dface .gauge { grid-template-columns: minmax(0, 1fr); grid-template-areas: "top" "face" "val" "note"; gap: 5px; }
@@ -433,7 +434,7 @@
     .topbar { flex-wrap: nowrap; min-height: var(--topbar-h); box-sizing: border-box; padding: 6px 12px; } .topbar.menu-open { flex-wrap: wrap; }
     .switcher { flex: 1 1 100%; margin-left: 0; }
     :root[data-skin="retro"][data-view="v0"] .topbar:not(.menu-open) > .status { display: none; }   /* the Retro Dashboard's bar on a phone: title, Start/Stop, Options, Menu; views and chips under Menu */
-    :root[data-skin="retro"][data-view="v0"] .topbar { gap: 6px 8px; padding: 6px 10px; } :root[data-skin="retro"][data-view="v0"] .topbar.opt-open { flex-wrap: wrap; } :root[data-skin="retro"][data-view="v0"] .topbar > .brand { flex: 1 1 auto; font-size: 13px; }
+    :root[data-skin="retro"][data-view="v0"] .topbar { gap: 6px 8px; padding: 6px 10px; } :root[data-skin="retro"][data-view="v0"] .topbar.opt-open { flex-wrap: wrap; } :root[data-skin="retro"][data-view="v0"] .topbar > .brand { flex: 1 1 0; font-size: 13px; }
     :root[data-skin="retro"][data-view="v0"] .topbar > #pause { order: 1; white-space: nowrap; padding-inline: 8px; } :root[data-skin="retro"][data-view="v0"] .topbar > .optbtn { order: 2; } :root[data-skin="retro"][data-view="v0"] .topbar > .menubtn { order: 3; margin-left: 0; padding: 5px 12px; }
     :root[data-skin="retro"][data-view="v0"] .topbar > .switcher { order: 4; } :root[data-skin="retro"][data-view="v0"] .topbar > .status { order: 5; flex: 1 1 100%; } :root[data-skin="retro"][data-view="v0"] .topbar > .optd { order: 6; }
     #v0 .crow { grid-template-columns: auto 1fr; } #v0 .crow .cst { justify-self: start; } #v0 .crow .cdesc { grid-column: 1 / -1; }   /* code and status on one line, the description on its own */
@@ -615,23 +616,24 @@
   /* the Retro Dashboard's slim bar: title, views, the source-state chips that matter, Start/Stop (or the replay controls) and Options in one row; the
      adapter, codes, last-sample and auto-stop chips show when Options is open; the DEMO / replay banner is a slim strip */
   :root[data-skin="retro"][data-view="v0"] .banner { padding: 2px 12px; font-size: 11px; line-height: 16px; }
-  :root[data-skin="retro"][data-view="v0"] .brand { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  :root[data-skin="retro"][data-view="v0"] .brand { font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
   :root[data-skin="retro"][data-view="v0"] .topbar { gap: 4px 10px; padding: 5px 14px; background: var(--panel); }
   :root[data-skin="retro"][data-view="v0"] .switcher { margin-left: 0; gap: 4px; }
-  :root[data-skin="retro"][data-view="v0"] .vbtn { padding: 4px 9px; font-size: 12px; }
+  :root[data-skin="retro"][data-view="v0"] .vbtn { padding: 4px 8px; font-size: 12px; }
   :root[data-skin="retro"][data-view="v0"] .topbar > .status { min-width: 0; padding: 0; gap: 3px 6px; background: transparent; border: 0; font-size: 11px; }
-  :root[data-skin="retro"][data-view="v0"] .topbar > .status .chip { padding: 0 7px; line-height: 18px; }
+  :root[data-skin="retro"][data-view="v0"] .topbar > .status .chip { padding: 0 6px; line-height: 17px; font-size: 10.5px; }
   :root[data-skin="retro"][data-view="v0"] .topbar > .status > #chipLive { order: -1; }
   :root[data-skin="retro"][data-view="v0"] .topbar:not(.opt-open) > .status > :is(#chipConn, #chipCodes, #chipAge, #chipAuto) { display: none; }
   @media (min-width: 601px) {
     :root[data-skin="retro"][data-view="v0"] .topbar { display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto auto; align-items: center; }
     :root[data-skin="retro"][data-view="v0"] .topbar > .brand { grid-area: 1 / 1; } :root[data-skin="retro"][data-view="v0"] .topbar > .switcher { grid-area: 1 / 2; } :root[data-skin="retro"][data-view="v0"] .topbar > #pause { grid-area: 1 / 4; } :root[data-skin="retro"][data-view="v0"] .topbar > .optbtn { grid-area: 1 / 5; }
-    :root[data-skin="retro"][data-view="v0"] .topbar > .status { grid-area: 1 / 3; flex-wrap: nowrap; overflow: hidden; white-space: nowrap; }
+    :root[data-skin="retro"][data-view="v0"] .topbar > .status { grid-area: 1 / 3; }   /* chips wrap to a second line in the bar rather than being cut off */
     :root[data-skin="retro"][data-view="v0"] .topbar > .rbar { grid-area: 1 / 3; flex-wrap: nowrap; min-width: 0; gap: 6px; padding: 0; background: transparent; border: 0; }
     :root[data-skin="retro"][data-view="v0"] .topbar > .rbar input[type=range] { flex: 1 1 120px; min-width: 70px; } :root[data-skin="retro"][data-view="v0"] .topbar > .rbar .tm { min-width: 76px; font-size: 12px; }
     :root[data-skin="retro"][data-view="v0"] .topbar:has(> .rbar:not([hidden])) > .status, :root[data-skin="retro"][data-view="v0"] .topbar.opt-open > .status { grid-area: 2 / 1 / 3 / -1; flex-wrap: wrap; white-space: normal; }
     :root[data-skin="retro"][data-view="v0"] .topbar > .optd { grid-column: 1 / -1; }
   }
+  @media (max-width: 600px), (pointer: coarse) { :root[data-skin="retro"][data-view="v0"] .topbar button.b:not(.tg), :root[data-skin="retro"][data-view="v0"] .topbar button.tg, :root[data-skin="retro"][data-view="v0"] .topbar select.b { min-height: 44px; } }   /* after the bar's own sizes: touch targets win */
   @media (min-width: 601px) and (max-width: 1100px) { :root[data-skin="retro"][data-view="v0"] .topbar > .status { grid-area: 2 / 1 / 3 / -1; flex-wrap: wrap; white-space: normal; } }
 </style>
 </head>
