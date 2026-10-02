@@ -88,7 +88,7 @@ def build_tools(session: Session) -> dict[str, Callable]:
         }
 
     def vehicle_info(snapshot_id: str | None = None) -> dict:
-        """VIN, protocol, adapter, ECUs and supported Mode 09 items from a snapshot."""
+        """VIN, protocol, adapter (incl. battery voltage), ECUs, Mode 09 items and CAL ID / CVN / ECU name from a snapshot."""
         s = latest_or(snapshot_id)
         return {
             "snapshot_id": s.snapshot_id,
@@ -99,6 +99,7 @@ def build_tools(session: Session) -> dict[str, Callable]:
             "adapter": _dump(s.source.adapter),
             "ecus": [_dump(e) for e in s.ecus],
             "supported_mode09_pids": s.supported_pids.get("09", []),
+            "mode09": _dump(s.mode09),
             "user_context": _dump(s.user_context),
             "warnings": s.warnings,
         }

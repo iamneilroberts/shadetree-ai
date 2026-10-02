@@ -72,6 +72,12 @@ def test_vehicle_info(tools):
     assert v["adapter"]["genuine_stn"] is True and "02" in v["supported_mode09_pids"]
 
 
+def test_vehicle_info_shows_mode09_identity_and_battery_voltage(tools):
+    v = tools["vehicle_info"]("sedan-1")
+    assert v["mode09"] == {"cal_ids": ["SYNCAL0001"], "cvns": ["1A2B3C4D"], "ecu_names": ["ECM-EngineControl"]}
+    assert v["adapter"]["supply_voltage"] == "12.6V"
+
+
 def test_list_supported_pids_names_decodable_pids(tools):
     out = tools["list_supported_pids"]("ridge-1")["mode01"]
     by = {p["pid"]: p for p in out}

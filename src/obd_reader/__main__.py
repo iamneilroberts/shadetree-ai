@@ -28,7 +28,11 @@ def _scan(args) -> int:
     codes = lambda ds: ", ".join(d.code for d in ds) or "none"  # noqa: E731
     print(f"vin:        {snap.vehicle.vin or 'not read'}")
     print(f"protocol:   {snap.protocol.name or 'unknown'}")
-    print(f"adapter:    {snap.source.adapter.ati} / {snap.source.adapter.sti or 'not STN'}")
+    a, m9 = snap.source.adapter, snap.mode09
+    print(f"adapter:    {a.ati} / {a.sti or 'not STN'}" + (f" / {a.device}" if a.device else ""))
+    print(f"battery:    {a.supply_voltage or 'not read'}")
+    print(f"ecu names:  {', '.join(m9.ecu_names) or 'not read'}")
+    print(f"cal ids:    {', '.join(m9.cal_ids) or 'not read'} (cvn {', '.join(m9.cvns) or 'not read'})")
     print(f"stored:     {codes(snap.dtcs.stored)}")
     print(f"pending:    {codes(snap.dtcs.pending)}")
     print(f"permanent:  {codes(snap.dtcs.permanent)}")

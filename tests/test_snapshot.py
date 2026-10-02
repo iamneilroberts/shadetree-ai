@@ -23,6 +23,15 @@ def test_defaults_are_sensible():
     assert s.dtcs.stored == [] and s.warnings == []
 
 
+def test_snapshot_saved_before_mode09_and_battery_fields_still_loads():
+    old = make().model_dump(mode="json")
+    del old["mode09"]
+    for k in ("device", "supply_voltage"):
+        del old["source"]["adapter"][k]
+    s = Snapshot.model_validate(old)
+    assert s.mode09.cal_ids == [] and s.source.adapter.supply_voltage is None
+
+
 def test_json_round_trip():
     s = make(
         vehicle=Vehicle(vin="1HGCM82633A004352", vin_source="obd"),

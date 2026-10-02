@@ -68,6 +68,36 @@ def test_mode_09_negative_response_is_handled():  # Review Focus 3
     assert any("VIN unsupported" in w for w in snap.warnings)
 
 
+def test_mode_09_identity_and_battery_voltage_are_read():
+    snap, port = run_scan(load_transcript(FIXTURE))
+    assert snap.mode09.cal_ids == ["SYNCAL0001"]  # NUL padding stripped
+    assert snap.mode09.cvns == ["1A2B3C4D"]
+    assert snap.mode09.ecu_names == ["ECM-EngineControl"]
+    assert snap.source.adapter.supply_voltage == "12.6V"
+    assert snap.source.adapter.device is None and "STDI" not in port.written  # STDI is STN-only; this is an ELM
+
+
+def test_mode_09_identity_reads_follow_the_bitmap():
+    records = _patch(load_transcript(FIXTURE), "0900", ["49 00 40 00 00 00"])  # VIN only
+    snap, port = run_scan(records)
+    assert not {"0904", "0906", "090A"} & set(port.written)
+    assert snap.mode09.cal_ids == snap.mode09.cvns == snap.mode09.ecu_names == []
+    assert snap.warnings == []
+
+
+def test_mode_09_identity_negative_or_garbled_replies_give_a_warning_not_a_crash():
+    records = _patch(_patch(load_transcript(FIXTURE), "0904", ["7F 09 12"]), "0906", ["49 06 01 1A"])
+    snap, _ = run_scan(records)
+    assert snap.mode09.cal_ids == [] and snap.mode09.cvns == []
+    assert snap.mode09.ecu_names == ["ECM-EngineControl"]
+    assert any("0904" in w and "0906" in w and "090A" not in w for w in snap.warnings)
+
+
+def test_unanswered_battery_voltage_is_none():
+    snap, _ = run_scan(_patch(load_transcript(FIXTURE), "ATRV", ["?"]))
+    assert snap.source.adapter.supply_voltage is None
+
+
 def test_invalid_vin_from_adapter_is_dropped_with_warning():  # Review Focus 5
     bad = ["014", "0: 49 02 01 4F 48 47", "1: 43 4D 38 32 36 33 33", "2: 41 30 30 34 33 35 32"]  # 'O'
     snap, _ = run_scan(_patch(load_transcript(FIXTURE), "0902", bad))

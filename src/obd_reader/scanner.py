@@ -3,17 +3,57 @@ from datetime import datetime, timezone
 
 from obd_reader import __version__
 from obd_reader.adapter import identify, init_adapter
-from obd_reader.elm import decode_dtc, decode_dtc_list, decode_supported, parse_all, parse_headers
+from obd_reader.elm import ERROR_MARKERS, decode_dtc, decode_dtc_list, decode_supported, parse_all, parse_headers
 from obd_reader.pids import PIDS, decode_pid
 from obd_reader.readiness import parse_readiness
 from obd_reader.snapshot import (
-    VIN_RE, Dtc, Dtcs, Ecu, FreezeFrame, Mil, PidValue, Protocol, Snapshot, Source, UserContext, Vehicle,
+    VIN_RE, Dtc, Dtcs, Ecu, FreezeFrame, Mil, Mode09Ids, PidValue, Protocol, Snapshot, Source, UserContext, Vehicle,
 )
 from obd_reader.transport import Transport
 
 
 def _first(lines: list[str]) -> str | None:
     return lines[0] if lines else None
+
+
+def _reply(transport: Transport, cmd: str) -> str | None:
+    """First line of an adapter reply, or None for "?" / an error."""
+    line = _first(transport.send(cmd))
+    return None if line is None or any(m in line for m in ERROR_MARKERS) else line
+
+
+def _ascii(b: bytes) -> str:
+    return "".join(chr(x) for x in b if 32 <= x < 127).strip()  # drops the NUL padding
+
+
+# Mode 09 identity reads: PID, label, bytes per item ("49 <pid> <count> <count x size bytes>" on CAN)
+_MODE09_IDS = (("04", "CAL ID", 16), ("06", "CVN", 4), ("0A", "ECU name", 20))
+
+
+def _mode09_items(transport: Transport, pid: str, size: int) -> list[bytes]:
+    """Every whole item in every ECU's reply, first-seen order, duplicates dropped."""
+    items: list[bytes] = []
+    for p in parse_all(transport.send(f"09{pid}"), 0x49):
+        if len(p) >= 3 and p[1] == int(pid, 16):
+            for i in range(p[2]):
+                chunk = p[3 + i * size : 3 + (i + 1) * size]
+                if len(chunk) == size and chunk not in items:
+                    items.append(chunk)
+    return items
+
+
+def _mode09_ids(transport: Transport, advertised: set[str], warnings: list[str]) -> Mode09Ids:
+    got: dict[str, list[bytes]] = {}
+    missing: list[str] = []
+    for pid, label, size in _MODE09_IDS:
+        if pid in advertised:
+            got[pid] = _mode09_items(transport, pid, size)
+            if not got[pid]:
+                missing.append(f"09{pid} ({label})")
+    if missing:
+        warnings.append(f"Mode 09 advertised but gave no usable reply: {', '.join(missing)}")
+    text = lambda pid: list(dict.fromkeys(s for s in map(_ascii, got.get(pid, [])) if s))  # noqa: E731
+    return Mode09Ids(cal_ids=text("04"), cvns=[c.hex().upper() for c in got.get("06", [])], ecu_names=text("0A"))
 
 
 def _dtcs(transport: Transport, cmd: str, sid: int) -> list[Dtc]:
@@ -100,6 +140,9 @@ def scan(
     warnings: list[str] = []
     init_adapter(transport, protocol)
     adapter = identify(transport)
+    adapter.supply_voltage = _reply(transport, "ATRV")
+    if adapter.genuine_stn:
+        adapter.device = _reply(transport, "STDI")
     supported: dict[str, list[str]] = {}
     pids01 = _walk_pages(transport, 0x01)
     if pids01:
@@ -126,6 +169,7 @@ def scan(
         if not ecus:
             warnings.append("ECU attribution unavailable (no CAN ids in the headers-on reply)")
     vin, vin_source = None, "none"
+    mode09 = Mode09Ids()
     dtcs = Dtcs()
     if is_can:
         pids09 = _supported(parse_all(transport.send("0900"), 0x49), 0x00)
@@ -142,6 +186,7 @@ def scan(
                 warnings.append(f"Mode 09 returned an invalid VIN: {candidates[0] if candidates else ''!r}")
         else:
             warnings.append("VIN unsupported via Mode 09")
+        mode09 = _mode09_ids(transport, pids09, warnings)
 
         dtcs = Dtcs(
             stored=_dtcs(transport, "03", 0x43),
@@ -168,6 +213,7 @@ def scan(
         protocol=proto,
         ecus=ecus,
         supported_pids=supported,
+        mode09=mode09,
         dtcs=dtcs,
         mil=mil,
         freeze_frame=freeze_frame,

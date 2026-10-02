@@ -88,6 +88,31 @@ def test_non_can_protocol_never_sends_the_headers_pass():
     assert "ATH1" not in port.written
 
 
+def _frames(payload: bytes) -> list[str]:
+    hx = lambda c: " ".join(f"{x:02X}" for x in c)  # noqa: E731
+    if len(payload) <= 7:
+        return [hx(payload)]
+    rest = [payload[i:i + 7] for i in range(6, len(payload), 7)]
+    return [f"{len(payload):03X}", "0: " + hx(payload[:6])] + [f"{n + 1:X}: " + hx(c) for n, c in enumerate(rest)]
+
+
+def test_mode_09_identity_is_read_because_the_real_bitmap_advertises_it():
+    # The real capture's 0900 bitmaps advertise 04, 06 and 0A on both ECUs; it predates these reads, so the replies are synthetic.
+    cal = lambda *ids: bytes([0x49, 0x04, len(ids)]) + b"".join(i.ljust(16, b"\0") for i in ids)  # noqa: E731
+    extra = [
+        {"tx": "STDI", "rx": ["OBDLink EX r1.0"]}, {"tx": "ATRV", "rx": ["12.4V"]},
+        {"tx": "0904", "rx": _frames(cal(b"SYNENG01", b"SYNENG02")) + _frames(cal(b"SYNTRN01"))},
+        {"tx": "0906", "rx": ["49 06 01 00 00 12 34", "49 06 01 00 00 AB CD"]},
+        {"tx": "090A", "rx": _frames(bytes([0x49, 0x0A, 0x01]) + b"TCM\0-TransmissionCtl".ljust(20, b"\0"))},
+    ]
+    snap, port = run(load_transcript(REAL) + extra)
+    assert {"0904", "0906", "090A", "STDI", "ATRV"} <= set(port.written)
+    assert snap.mode09.cal_ids == ["SYNENG01", "SYNENG02", "SYNTRN01"]
+    assert snap.mode09.cvns == ["00001234", "0000ABCD"]
+    assert snap.mode09.ecu_names == ["TCM-TransmissionCtl"]
+    assert snap.source.adapter.device == "OBDLink EX r1.0" and snap.source.adapter.supply_voltage == "12.4V"
+
+
 def test_disagreeing_vins_warn_and_use_the_first_valid_one():
     records = patch(load_transcript(REAL), "0902", VIN_A + ["014", "0: 49 02 01 35 46 50",
                     "1: 59 4B 33 46 35 31 52", "2: 42 30 30 30 30 30 31"])

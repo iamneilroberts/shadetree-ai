@@ -18,6 +18,16 @@ class Adapter(_Model):
     sti: str | None = None
     chip: str | None = None
     genuine_stn: bool | None = None
+    device: str | None = None          # STDI device id (STN chips only)
+    supply_voltage: str | None = None  # ATRV at scan time, as the adapter printed it (e.g. "12.6V")
+
+
+class Mode09Ids(_Model):
+    """Mode 09 identity reads (CAN layout): union across ECUs, first-seen order. Headers are off,
+    so entries are not attributed to an ECU."""
+    cal_ids: list[str] = Field(default_factory=list)    # 0904 calibration ids
+    cvns: list[str] = Field(default_factory=list)       # 0906 calibration verification numbers, 8 hex digits
+    ecu_names: list[str] = Field(default_factory=list)  # 090A, e.g. "ECM-EngineControl"
 
 
 class Source(_Model):
@@ -122,6 +132,7 @@ class Snapshot(_Model):
     protocol: Protocol = Field(default_factory=Protocol)
     ecus: list[Ecu] = Field(default_factory=list)
     supported_pids: dict[str, list[str]] = Field(default_factory=dict)
+    mode09: Mode09Ids = Field(default_factory=Mode09Ids)
     dtcs: Dtcs = Field(default_factory=Dtcs)
     mil: Mil = Field(default_factory=Mil)
     freeze_frame: FreezeFrame | None = None
