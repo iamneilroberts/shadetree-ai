@@ -383,8 +383,58 @@ def test_every_pid_table_row_has_the_same_left_bar_and_scenario_rows_only_recolo
         assert len(decl) == 1 and re.fullmatch(r"box-shadow: inset 3px 0 0 var\(--[\w-]+\)", decl[0]) and "--line" not in decl[0], f"{s}: .scen only recolours the bar"
 
 
-# ---- feedback wave: text inside the Retro cabinet and the Handheld is readable on its own card --------
 _R = ':root[data-skin="retro"] '
+
+
+def _spec(sel):
+    """CSS specificity (ids, classes/attributes/pseudo-classes, elements) for the simple selectors used here."""
+    return (len(re.findall(r"#[\w-]+", sel)), len(re.findall(r"\.[\w-]+|\[[^\]]*\]|:(?!:)[\w-]+", sel)),
+            len(re.findall(r"(?:^|[\s>+~])([a-zA-Z][\w-]*)", sel)))
+
+
+def _bar_tok(rules, skin, media_ok, candidates):
+    """The left-bar colour token the winning rule (highest specificity, then the later one) gives among `candidates`."""
+    best = None
+    for i, (media, sels, body) in enumerate(rules):
+        if media not in media_ok:
+            continue
+        for s in sels:
+            if s in candidates and (skin == "retro" or not s.startswith(_R)):
+                m = re.search(r"box-shadow: inset 3px 0 0 var\((--[\w-]+)\)", body)
+                if m and (best is None or (_spec(s), i) >= best[0]):
+                    best = ((_spec(s), i), m.group(1))
+    return best and best[1]
+
+
+_BAR = "table.rd tbody td:first-child"
+_BAR_CONTEXTS = [  # (where, skins, media, a plain row's candidate selectors, a scenario row's extra selectors or None, background)
+    ("Dashboard cabinet (Retro desktop)", {"retro"}, {None, "(min-width: 601px)"}, [_BAR, _R + "#v0 .dface " + _BAR],
+     ["#d_table tr.scen td:first-child", _R + "#v0 .dface #d_table tr.scen td:first-child"], "face"),
+    ("Dashboard on the page (Plain, or a phone)", {"plain", "retro"}, {None}, [_BAR], ["#d_table tr.scen td:first-child"], "--bg"),
+    ("Handheld table on the device face", {"plain", "retro"}, {None, "(min-width: 601px)"}, [_BAR, ".retro .hh " + _BAR], None, "face"),
+]
+
+
+@pytest.mark.parametrize("skin,theme", [("plain", "dark"), ("plain", "light"), ("retro", "dark"), ("retro", "light")])
+def test_the_neutral_row_bar_is_fainter_than_the_scenario_marker_on_every_surface(skin, theme):
+    rules, p = _css_rules(_css()), _palette(skin, theme)
+    face = re.findall(r"#[0-9a-fA-F]{6}", p["--face"])
+    bad = []
+    for where, skins, media, plain, scen, back in _BAR_CONTEXTS:
+        if skin not in skins:
+            continue
+        backs = face if back == "face" else [p[back]]
+        neutral = _bar_tok(rules, skin, media, plain)
+        marker = _bar_tok(rules, skin, media, plain + scen) if scen else "--meter-zone"  # the Handheld has no scenario rows: the cabinet marker on the same face is the reference
+        assert neutral and marker and neutral != marker, f"{where}: neutral {neutral}, marker {marker}"
+        for b in backs:
+            n, m = _contrast(p[neutral], b), _contrast(p[marker], b)
+            if not (1.2 <= n < m):
+                bad.append((where, neutral, round(n, 2), marker, round(m, 2), b))
+    assert bad == [], f"{skin}/{theme}: the neutral bar must be visible (>= 1.2:1) and fainter than the scenario marker: {bad}"
+
+
+# ---- feedback wave: text inside the Retro cabinet and the Handheld is readable on its own card --------
 _CAB = [["body"], [_R + ".dcab .dface"]]  # the Dashboard: page ink, then the cabinet face's dark ink (Retro, desktop only)
 _HH = [["body"], [".retro"], [".retro .hh-in"]]  # the Handheld: page ink, the device ink, the light face's ink
 _DGAUGE, _HGAUGE = [[".gauge"]], [[".gauge", ".retro .hh .gauge"]]  # a gauge card on the Dashboard, and in the Handheld

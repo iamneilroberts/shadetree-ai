@@ -293,7 +293,7 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
     for (let k = 0; k < 32; k++) await e.tick();
     return e;
   };
-  const tile =(e, key) => { let r = null; walk(e.el('o_tiles'), n => { if (n.getAttribute('data-key') === key) r = n; }); return r; };
+  const tile = (e, key) => { let r = null; walk(e.el('o_tiles'), n => { if (n.getAttribute('data-key') === key) r = n; }); return r; };
   const part = (t, cls) => { let r = null; walk(t, n => { if (n.className === cls) r = n; }); return r.textContent; };
   const rowsOf = e => e.el('o_attn').children.map(c => c.getAttribute('data-key'));
 
