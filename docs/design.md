@@ -109,11 +109,12 @@ Two artifacts per scan:
   },
   "protocol": {"name": "ISO 15765-4 CAN 11/500", "atsp": "6", "pinned": true},
   "ecus": [{"header": "7E8", "role": "engine", "modes_seen": ["01","03","09"]}],
-  "supported_pids": {"01": ["00","04","05"], "09": ["00","02"]},
+  "supported_pids": {"01": ["00","04","05"], "09": ["00","02"], "06": ["00","01","20","21"]},
   "dtcs": {
     "stored":    [{"code": "P0171", "ecu": "7E8", "ref": "dtc:P0171"}],
     "pending":   [],
-    "permanent": []
+    "permanent": [],
+    "unanswered": ["pending"]
   },
   "mil": {"on": true, "dtc_count": 1},
   "freeze_frame": {"dtc": "P0171", "pids": {"0C": {"name": "rpm", "value": 2150, "unit": "rpm", "raw": "…"}}},
@@ -130,7 +131,9 @@ Two artifacts per scan:
 }
 ```
 
-Rules: unsupported ≠ error (`NO DATA` and negative responses map to `unsupported`); `replies` records each scan request's `elm.classify` class (`ok | no_data | nrc:<code> | wrong_sid | adapter_error | garbled`) and latency, and any class other than ok or no_data is warned; `undecoded` keeps the raw data bytes of advertised Mode 01 PIDs that have no decoder (cap 32); every decoded value keeps its `raw` hex; snapshots contain a VIN, so they stay local and are gitignored except synthetic fixtures.
+**Probe report** (`shadetree-ai probe --port DEV` or `--replay TRANSCRIPT`): a scan with the Mode 06 bitmap pass on, written as `probes/<id>.json` plus `probes/<id>.md` (gitignored). It is the shareable form: vehicle key (WMI + VDS + year char), protocol, adapter, ECU headers, Mode 09 CAL IDs/CVNs/ECU names, supported-PID bitmaps, every reply class with its latency, undecoded raw bytes, warnings (a VIN warning keeps only its lead-in). No VIN, VIN serial or transcript; the writer refuses a report in which `vin.find_vins` finds anything. A live probe also saves the usual private snapshot and transcript.
+
+Rules: unsupported ≠ error (`NO DATA` and negative responses map to `unsupported`); `replies` records each scan request's `elm.classify` class (`ok | no_data | nrc:<code> | wrong_sid | adapter_error | garbled`) and latency, and any class other than ok or no_data is warned; `undecoded` keeps the raw data bytes of advertised Mode 01 PIDs that have no decoder (cap 32); `dtcs.unanswered` names each of stored/pending/permanent whose request got no usable answer (NO DATA, refused, garbled), so silence is never shown as "no codes" (same rule as the console's `codes.unanswered`); `supported_pids["06"]` (the Mode 06 MID bitmaps, CAN only) is filled only by `shadetree-ai probe`; every decoded value keeps its `raw` hex; snapshots contain a VIN, so they stay local and are gitignored except synthetic fixtures.
 
 ## 7. MCP tools (defined once, in `tools.py`)
 
@@ -141,10 +144,10 @@ All carry `readOnlyHint: true`. No tool accepts a command string. The 17 tools b
 | `list_snapshots` | — | index of saved snapshots |
 | `get_snapshot` | `snapshot_id?` (newest if omitted) | snapshot JSON |
 | `import_snapshot` | `path` (a file inside the data directory) | validates and registers it; `snapshot_id` |
-| `read_dtcs` | `snapshot_id?`, `kind: stored\|pending\|permanent\|all` | DTCs from a snapshot, plus MIL |
+| `read_dtcs` | `snapshot_id?`, `kind: stored\|pending\|permanent\|all` | DTCs from a snapshot, plus MIL and the requested kinds the car did not answer (`unanswered`) |
 | `freeze_frame` | `snapshot_id?` | freeze-frame block |
 | `readiness` | `snapshot_id?` | readiness monitors from a snapshot |
-| `vehicle_info` | `snapshot_id?` | VIN, protocol, adapter, ECUs, supported Mode 09 items (decoded locally from the snapshot; no vPIC lookup) |
+| `vehicle_info` | `snapshot_id?` | VIN, protocol, adapter, ECUs, supported Mode 09 items (decoded locally from the snapshot; no vPIC lookup), reply-class counts and the number of undecoded PIDs |
 | `list_supported_pids` | `snapshot_id?` | supported Mode 01 PIDs with names |
 | `compare_snapshots` | `a`, `b` | differences: DTCs, MIL, protocol, supported PIDs, readiness |
 | `adapter_info` | — | adapter chip, firmware, device id, supply voltage (live) |
