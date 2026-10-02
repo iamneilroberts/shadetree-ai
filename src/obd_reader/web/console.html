@@ -306,6 +306,8 @@
   .edbox { margin-bottom: 10px; }
   .edrow { display: flex; gap: 6px; align-items: center; margin-bottom: 4px; }
   .edrow span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  @media (max-width: 600px) { .edrow { flex-wrap: wrap; } .edrow span { flex-basis: 100%; } }
+  .qbtn[aria-pressed="true"] { background: var(--cyan); border-color: var(--cyan); color: var(--on-accent); }
   .gauge { background: var(--panel2); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; min-width: 0; }
   .gauge.watch { border-color: var(--amber); } .gauge.out { border-color: var(--bad); } .gauge.dim .gface { opacity: .4; }
   .gauge .gtop { display: flex; align-items: center; gap: 6px; font: 700 11.5px var(--cond); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
@@ -390,7 +392,7 @@
   <section class="view is-active" id="v0" role="tabpanel">
     <div class="scenbar">
       <div class="stabs" id="d_tabs" role="tablist" aria-label="Scenarios"></div>
-      <select class="ssel" id="d_sel" aria-label="Scenario"></select>
+      <select class="b ssel" id="d_sel" aria-label="Scenario"></select>
       <button class="qbtn" id="d_edit" type="button" aria-pressed="false" title="Edit this scenario's gauges">&#9998;</button>
     </div>
     <div id="d_panel"></div>
@@ -1113,15 +1115,15 @@
     ED.draft.forEach(function (g, i) {
       var row = el('div', 'edrow');
       row.appendChild(el('span', '', pidName(g.pid) + ' (' + g.pid + ', ' + g.form + ')'));
-      [['Up', function () { edit(editMove(ED.draft, i, -1)); }], ['Down', function () { edit(editMove(ED.draft, i, 1)); }],
-       ['Form', function () { edit(editForm(ED.draft, i)); }], ['Remove', function () { edit(editRemove(ED.draft, i)); }]]
-        .forEach(function (b) { var x = el('button', 'qbtn', b[0]); x.setAttribute('type', 'button'); x.addEventListener('click', b[1]); row.appendChild(x); });
+      [['Up', function () { edit(editMove(ED.draft, i, -1)); }, i === 0], ['Down', function () { edit(editMove(ED.draft, i, 1)); }, i === ED.draft.length - 1],
+       ['Form', function () { edit(editForm(ED.draft, i)); }, !GAUGE[g.pid]], ['Remove', function () { edit(editRemove(ED.draft, i)); }, false]]
+        .forEach(function (b) { var x = el('button', 'qbtn', b[0]); x.setAttribute('type', 'button'); x.disabled = b[2]; x.addEventListener('click', b[1]); row.appendChild(x); });
       box.appendChild(row);
     });
     var chs = (state && state.channels) || {}, shown = {}, full = ED.draft.length >= SCEN_MAX;
-    ED.sig = Object.keys(chs).sort().join();
+    var ids0 = Object.keys(chs); ED.sig = ids0.sort().join();
     ED.draft.forEach(function (g) { shown[g.pid] = true; });
-    var sel = el('select'), add = el('button', 'qbtn', 'Add'), reset = el('button', 'qbtn', 'Reset'), done = el('button', 'qbtn', 'Done');
+    var sel = el('select', 'b'), add = el('button', 'qbtn', 'Add'), reset = el('button', 'qbtn', 'Reset'), done = el('button', 'qbtn', 'Done');
     sel.id = 'd_add'; add.id = 'd_addbtn';
     [add, reset, done].forEach(function (b) { b.setAttribute('type', 'button'); });
     Object.keys(chs).sort().filter(function (p) { return !shown[p] && HEXPID.test(p); }).forEach(function (p) { var o = el('option', '', pidName(p) + ' (' + p + ')'); o.value = p; sel.appendChild(o); });
@@ -1129,7 +1131,10 @@
     add.addEventListener('click', function () { if (sel.value) edit(editAdd(ED.draft, sel.value)); });
     reset.addEventListener('click', function () { edit(sc.gauges.slice()); });
     done.addEventListener('click', function () { ED.on = false; $('d_edit').setAttribute('aria-pressed', 'false'); drawEditor(); render(); });
-    [sel, add, reset, done].forEach(function (c) { box.appendChild(c); });
+    if (!ids0.length) box.appendChild(el('p', 'note', 'Start sampling or load a replay to add readings.'));
+    var ctl = el('div', 'edrow');
+    [sel, add, reset, done].forEach(function (c) { ctl.appendChild(c); });
+    box.appendChild(ctl);
   }
   $('d_edit').addEventListener('click', function () {
     ED.on = !ED.on; ED.draft = specsFor(curScenario()).slice(); ED.sig = null;
@@ -1141,7 +1146,8 @@
     if (!DB) {
       var p = panel(''), t = pidTableEl(), g = el('div', 'gauges');
       p.body.appendChild(g); $('d_panel').appendChild(p.root); $('d_table').appendChild(t.root);
-      DB = { p: p, g: g, rows: t.body, none: el('p', 'note') };
+      DB = { p: p, g: g, rows: t.body, none: el('p', 'note'), tnote: el('p', 'note') };
+      $('d_table').appendChild(DB.tnote);
       p.body.insertBefore(DB.none, g);
       drawTabs();
     }
@@ -1150,7 +1156,7 @@
     DB.p.name.textContent = sc.name; DB.none.textContent = specs.length ? '' : 'No gauges. Add one or Reset.'; DB.none.hidden = specs.length > 0;
     gauges(DB.g, specs);
     specs.forEach(function (s) { mine[s.pid] = true; });   // keys are two-hex-digit PIDs (cleanSpecs), so a plain object is safe
-    pidRows(DB.rows, ids);
+    pidRows(DB.rows, ids); DB.tnote.textContent = ids.length ? '' : 'No readings yet.'; DB.tnote.hidden = ids.length > 0;
     Array.prototype.forEach.call(DB.rows.children, function (r) { r.classList.toggle('scen', mine[r.getAttribute('data-key')] === true); });
     $('d_strip').hidden = sc.id !== 'general';
     if (sc.id === 'general') renderOverview();

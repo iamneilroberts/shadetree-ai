@@ -855,10 +855,10 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
     const mkEd = async (store, states = statesFor(30, base), ticks = 32) => {
       const e = makeEnv(states, 'v0', OVF, [], store); for (let k = 0; k < ticks; k++) await e.tick();
       const ed = () => { let b = null; walk(e.el('d_panel'), n => { if (n.id === 'd_editor') b = n; }); return b; };
-      const rows = () => ed().children.filter(c => c.className === 'edrow');
+      const rows = () => ed().children.filter(c => c.className === 'edrow' && c.children.length === 5);   // gauge rows (the controls row has 4)
       const ctl = (id) => { let r = null; walk(ed(), n => { if (n.id === id) r = n; }); return r; };
       const btn = (row, name) => row.children.filter(c => c.textContent === name)[0];
-      const named = (name) => ed().children.filter(c => c.textContent === name)[0];
+      const named = (name) => { let r = null; walk(ed(), n => { if (n.textContent === name && n.type !== undefined && n.children.length === 0 && n.className === 'qbtn') r = n; }); return r; };
       const press = async (n) => { assert.ok(n && !n.disabled, 'a pressable control'); n.on.click(); await e.tick(); };
       const saved = () => JSON.parse(store['shadetree.scen.general']);
       return { e, ed, rows, ctl, btn, named, press, saved, opts: () => ctl('d_add').children.map(o => o.value) };
@@ -933,6 +933,27 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
     const E4 = await mkEd({}, more, 10); E4.e.el('d_edit').on.click();
     assert.ok(!E4.opts().includes('10')); for (let k = 0; k < 20; k++) await E4.e.tick();
     assert.ok(E4.opts().includes('10'), 'a PID that appears in the run is offered');
+    // buttons that cannot act are disabled: Up on the first row, Down on the last, Form on a PID with no gauge range
+    assert.strictEqual(E4.btn(E4.rows()[0], 'Up').disabled, true, 'Up on the first row'); assert.strictEqual(E4.btn(E4.rows()[1], 'Up').disabled, false);
+    assert.strictEqual(E4.btn(E4.rows()[7], 'Down').disabled, true, 'Down on the last row'); assert.strictEqual(E4.btn(E4.rows()[0], 'Down').disabled, false);
+    assert.ok(E4.rows().every(r => r.children[3].disabled === false), 'every General PID has a range: Form works');
+    await E4.press(E4.btn(E4.rows()[0], 'Remove')); E4.ctl('d_add').value = '10'; await E4.press(E4.ctl('d_addbtn'));
+    const lastR = E4.rows()[7]; assert.ok(lastR.children[0].textContent.includes('(10, seven)'));
+    assert.strictEqual(E4.btn(lastR, 'Form').disabled, true, 'Form on a PID with no range'); assert.strictEqual(E4.btn(lastR, 'Down').disabled, true);
+    assert.strictEqual(E4.btn(E4.rows()[6], 'Down').disabled, false, 'Down on a middle row'); assert.strictEqual(E4.btn(E4.rows()[6], 'Form').disabled, false);
+    // the editor's controls sit together in one row; the Add list is styled like the other selects
+    const ctlRow = E4.ed().children[E4.ed().children.length - 1];
+    assert.strictEqual(ctlRow.className, 'edrow'); assert.deepStrictEqual(ctlRow.children.map(c => c.id !== 'new' ? c.id : c.textContent), ['d_add', 'd_addbtn', 'Reset', 'Done']);
+    assert.strictEqual(E4.ctl('d_add').className, 'b', 'the Add list is a styled select');
+    assert.ok(/<select class="b ssel" id="d_sel"/.test(html), 'the scenario dropdown is a styled select');
+    assert.ok(/@media \(max-width: 600px\) \{ \.edrow \{ flex-wrap: wrap; \}/.test(html), 'edit rows wrap on a phone');
+    assert.ok(/\.qbtn\[aria-pressed="true"\]/.test(html), 'the pencil shows when it is on');
+    // no readings yet: the editor and the table both say so
+    const emp = makeEnv([{ status: 'idle', channels: {}, stats: {}, extras: {}, seq: 1 }], 'v0', OVF); await emp.tick();
+    assert.ok(flat(emp.el('d_table')).includes('No readings yet'), 'the table says so');
+    emp.el('d_edit').on.click(); let edE = null; walk(emp.el('d_panel'), n => { if (n.id === 'd_editor') edE = n; });
+    assert.ok(flat(edE).includes('Start sampling or load a replay to add readings'), 'the editor says so');
+    assert.ok(!flat(E4.e.el('d_table')).includes('No readings yet'), 'and only when the run is empty');
   }
 
   console.log('page logic OK');
