@@ -48,6 +48,8 @@ _SPEEDS = (0.5, 1.0, 2.0, 4.0, 8.0)
 _REPLAY_TICK = 0.05
 _REPLAY_WINDOW_S = 60.0
 _LABEL_RE = re.compile(r"[a-z0-9-]{1,40}")
+_PID_RE = re.compile(r"[0-9A-Fa-f]{2}")
+MAX_FOCUS = 8  # a scenario's gauges
 
 
 def slow_per_sweep(n_slow: int, hz: float) -> int:
@@ -71,6 +73,8 @@ class LiveHub:
         self._thread: threading.Thread | None = None
         self._stop = threading.Event()
         self._run_id = 0                    # changes on every start, so viewers can tell runs apart
+        self._focus: list[str] = []         # the PIDs of the scenario the page shows: read first among the extras
+        self._focus_ver = 0                 # bumped on every change, so the sampler re-plans its extras
         self._reset()
 
     def _reset(self) -> None:
@@ -139,6 +143,15 @@ class LiveHub:
             self._stop.clear()
             self._thread = threading.Thread(target=self._run, args=(pids, float(hz), float(seconds), capture == "all"), daemon=True)
             self._thread.start()
+
+    def set_focus(self, pids) -> None:
+        """The page's scenario PIDs (up to 8 two-hex-digit ids). Only the ones the car's support bitmap lists and the
+        decoder table knows are ever read, as Mode 01 extras through the same gated path; the rest are just reported."""
+        if not isinstance(pids, list) or len(pids) > MAX_FOCUS or not all(isinstance(p, str) and _PID_RE.fullmatch(p) for p in pids):
+            raise LiveLimitError(f"focus is a list of at most {MAX_FOCUS} two-digit hex PIDs")
+        with self._data_lock:
+            self._focus = list(dict.fromkeys(p.upper() for p in pids))
+            self._focus_ver += 1
 
     def stop(self, timeout: float = 5.0) -> None:
         if self._replay is not None:
@@ -284,6 +297,7 @@ class LiveHub:
                 t0 = self._clock()
                 self._t0, self._deadline = t0, t0 + seconds
                 silent, period = 0, 1.0 / hz
+                fv = self._focus_ver
                 plan = self._capture_plan(t, hz) if capture_all else None
                 if plan:
                     active, extras, per = plan
@@ -295,6 +309,8 @@ class LiveHub:
                     if now > seconds:
                         self.message = f"auto-stopped after {seconds:g} s"
                         break
+                    if not plan and fv != self._focus_ver:  # another scenario on the page: its supported PIDs lead the extras
+                        fv, extras, rot = self._focus_ver, self._plan_extras(pids), 0
                     batch = [extras[(rot + i) % len(extras)] for i in range(min(per, len(extras)))]
                     rot = (rot + per) % len(extras) if extras else 0
                     got = self._sweep(t, active + batch, now)
@@ -337,16 +353,23 @@ class LiveHub:
 
     def _discover_extras(self, t, core: list[str]) -> list[str]:
         """Ask the car which Mode 01 PIDs it supports and pick the extra readings it can give, up to the PID cap."""
-        room = MAX_PIDS - len(core)
-        if room <= 0:
+        if MAX_PIDS - len(core) <= 0:
             return []
         supported = self._discover_supported(t)
-        extras = [p for p in EXTRA_PIDS if p in supported and p in PIDS and p not in core][:room]
         with self._data_lock:
-            self._extras, self._supported = extras, supported
+            self._supported = supported
+        return self._plan_extras(core)
+
+    def _plan_extras(self, core: list[str]) -> list[str]:
+        """The scenario's supported PIDs first, then EXTRA_PIDS in order, up to the PID cap. A channel no longer read
+        keeps its samples (it goes stale on the page); a live run's channels are decoder-table PIDs, at most 59 < 64."""
+        with self._data_lock:
+            ok = lambda p: p in self._supported and p in PIDS and p not in core  # noqa: E731
+            extras = list(dict.fromkeys([p for p in self._focus if ok(p)] + [p for p in EXTRA_PIDS if ok(p)]))[:MAX_PIDS - len(core)]
+            self._extras = extras
             for p in extras:
-                self._ch[p] = deque(maxlen=self._max)
-                self._full[p] = []
+                if p not in self._ch:
+                    self._ch[p], self._full[p] = deque(maxlen=self._max), []
         return extras
 
     def _capture_plan(self, t, hz: float) -> tuple[list[str], list[str], int] | None:
@@ -535,6 +558,7 @@ class LiveHub:
             adapter, st, codes = dict(self._adapter), list(self._sweep_t), dict(self._codes)
             unsupported, extras, m06 = list(self._unsupported), list(self._extras), dict(self._m06)
             ready, ff = dict(self._ready), dict(self._ff)
+            supported, focus = sorted(self._supported), list(self._focus)
             tiers = None if self._tiers is None else dict(self._tiers)
             vehicle = None if self._vehicle is None else dict(self._vehicle)
             # only sweeps up to `seq`: anything newer is not complete yet
@@ -568,6 +592,7 @@ class LiveHub:
                              if status == "running" and deadline else None),
             "adapter": adapter, "codes": codes, "unsupported": unsupported,
             "extras": extras, "tiers": tiers, "mode06": m06, "readiness": ready, "freeze_frame": ff, "vehicle": vehicle, "replay": replay,
+            "supported": supported, "focus": focus,
             "channels": channels, "stats": stats,
         }
 

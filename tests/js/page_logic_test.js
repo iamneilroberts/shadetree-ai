@@ -1100,7 +1100,7 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
     assert.deepStrictEqual((await open({ narrow: true, hash: '#v4' })).act(), ['v5'], 'a stale #v4 on a phone falls to Handheld');
     assert.deepStrictEqual((await open({ narrow: false })).act(), ['v0'], 'a desktop opens the Dashboard');
     const dx = await open({ narrow: false, search: '?example=x.json' });
-    assert.deepStrictEqual(dx.act(), ['v0'], '?example= alone does not change a desktop view'); assert.strictEqual(dx.e.posts.length, 1, 'and the replay still starts');
+    assert.deepStrictEqual(dx.act(), ['v0'], '?example= alone does not change a desktop view'); assert.strictEqual(dx.e.posts.filter(p => /\/api\/replay/.test(p.url)).length, 1, 'and the replay still starts');
     assert.deepStrictEqual((await open({ narrow: true, search: '?example=x.json' })).act(), ['v5'], '?example= on a phone opens Handheld');
     const sv = await open({ narrow: true }, { 'shadetree.scenario': 'cooling' });
     assert.strictEqual(sv.e.el('d_sel').value, 'cooling', 'a stored scenario still wins on a phone'); assert.deepStrictEqual(Object.keys(sv.store), ['shadetree.scenario'], 'the opening view is not stored');
@@ -1379,6 +1379,26 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
     const rec = await rd({ readiness: { read: false, note: 'not in this recording' }, freeze_frame: { read: false, note: 'not in this recording' }, codes: C });
     assert.ok(ffRoot(rec).hidden === false && /not in this recording/.test(H(ffRoot(rec))) && /not in this recording/.test(H(rec.el('d_ready_mount').children[1])), 'an old recording with a code says the frame is not in it');
     assert.ok(/no freeze frame stored/.test(H(ffRoot(await rd({ freeze_frame: { read: true, note: null, dtc: null, pids: {} }, codes: C })))), 'answered with no frame');
+  }
+
+  {   // choosing a scenario asks the hub for its PIDs (hex ids only); a PID the car does not list, or the recording does not hold, is named, not left blank
+    const focusPosts = (e) => e.posts.filter(p => /^\/api\/focus\?/.test(p.url)).map(p => p.body.pids.join(' '));
+    const fe = await dash();
+    assert.deepStrictEqual(focusPosts(fe), ['0C 0D 05 04 11 0B 42 06'], "the opening scenario's PIDs, once");
+    fe.el('d_sel').value = 'fuel'; fe.handlers['d_sel:change'](); await fe.tick(); await fe.tick();
+    assert.deepStrictEqual(focusPosts(fe), ['0C 0D 05 04 11 0B 42 06', '06 07 08 09 03 14 10 0C'], 'a new scenario sends its PIDs, and only on a change');
+    const sup = Object.keys(base()).concat(['03']), live = statesFor(30, base).map(s => Object.assign(s, { supported: sup }));
+    const lv = await dash({ 'shadetree.scenario': 'fuel' }, {}, live), note = (e, k) => dGauges(e).filter(g => g.getAttribute('data-key') === k)[0].children.filter(c => c.className === 'gnote')[0].textContent;
+    const missOf = (e, root) => { let r = null; walk(e.el(root), n => { if (n.className === 'note miss') r = n; }); return r; };
+    assert.strictEqual(note(lv, '10:seven'), 'not supported by this car'); assert.strictEqual(note(lv, '03:seven'), 'not in this run', 'listed by the car but not read yet');
+    assert.ok(missOf(lv, 'd_panel').textContent === 'Not supported by this car: O2 B1S1 (14), Mass airflow (10)' && !missOf(lv, 'd_panel').hidden, missOf(lv, 'd_panel').textContent);
+    const rec = statesFor(30, base).map(s => Object.assign(s, { status: 'running', demo: false, replay: { name: 'r.json', duration: 60, pos: s.now, speed: 1, playing: true, ended: false, demo: false } }));
+    const rp = await dash({ 'shadetree.scenario': 'fuel' }, {}, rec);
+    assert.strictEqual(note(rp, '14:bar'), 'not in this recording');
+    assert.strictEqual(missOf(rp, 'd_panel').textContent, 'Not in this recording: Fuel system (03), O2 B1S1 (14), Mass airflow (10)');
+    const hh = makeEnv(live, 'v5', OVF, [], { 'shadetree.scenario': 'fuel' }); for (let k = 0; k < 4; k++) await hh.tick();
+    assert.ok(/Not supported by this car: O2 B1S1 \(14\)/.test(missOf(hh, 'h_livepane').textContent), 'the Handheld names them too');
+    assert.strictEqual(missOf(await dash(), 'd_panel').hidden, true, 'nothing missing: no line (no bitmap read yet says nothing about support)');
   }
 
   console.log('page logic OK');

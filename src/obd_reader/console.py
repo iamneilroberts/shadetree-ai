@@ -25,7 +25,7 @@ MAX_BODY = 4096
 _HOSTNAME = re.compile(r"(?=.{1,253}$)[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*")
 MAX_UPLOAD = MAX_FILE_BYTES  # the replay upload route only
 _LOOPBACK = {"127.0.0.1", "localhost", "::1"}
-_POST_ROUTES = ("/api/start", "/api/stop", "/api/save", "/api/sim", "/api/replay", "/api/replay/control")
+_POST_ROUTES = ("/api/start", "/api/stop", "/api/save", "/api/sim", "/api/replay", "/api/replay/control", "/api/focus")
 _CSP_JSON = "default-src 'none'"
 _SOURCES = ("examples", "mine")   # replay sources: the public example runs, and the user's own runs/
 
@@ -228,6 +228,9 @@ class ConsoleServer:
                     if path == "/api/start":
                         outer.hub.start(body.get("pids"), hz=body.get("hz", 2.5), seconds=body.get("seconds", 600.0),
                                         capture=body.get("capture", "default"))
+                        return self._json(200, {"ok": True})
+                    if path == "/api/focus":  # the scenario's PIDs: hex ids only, filtered by the car's bitmap in the hub
+                        outer.hub.set_focus(body.get("pids"))
                         return self._json(200, {"ok": True})
                     if path == "/api/stop":
                         outer.hub.stop()

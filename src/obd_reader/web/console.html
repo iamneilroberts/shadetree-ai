@@ -326,7 +326,7 @@
   .mon { display: flex; justify-content: space-between; gap: 8px; font-size: 12.5px; padding: 3px 0; border-bottom: 1px dotted var(--line); }
   .mon b { font: 700 11px var(--cond); letter-spacing: .06em; text-transform: uppercase; opacity: .7; }
   .mon.complete b { color: var(--ok); opacity: 1; } .mon.incomplete b { color: var(--amber); opacity: 1; }
-  table.ff td:last-child { text-align: right; } .hsec { font: 700 12px var(--cond); letter-spacing: .12em; text-transform: uppercase; margin: 16px 0 6px; }
+  .hsec { font: 700 12px var(--cond); letter-spacing: .12em; text-transform: uppercase; margin: 16px 0 6px; }
   .gauges { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
   @media (min-width: 601px) { .gauges { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); } }   /* wider cards where there is room, so long names fit; a phone keeps two side by side */
   .hh .gauges { grid-template-columns: repeat(2, 1fr); }   /* the Handheld frame is phone width on any screen: always two across */
@@ -1018,12 +1018,13 @@
         ranged = typeof lo === 'number' && typeof hi === 'number' && hi > lo, form = !ranged ? 'seven' : FORMS.indexOf(spec.form) >= 0 ? spec.form : 'dial',
         chs = (state && state.channels) || {}, present = !!chs[pid], a = assess(pid), v = a.v, has = v !== null, c = chFor(pid),
         s = a.s === 'na' ? 'none' : RANK[a.now] > RANK[a.s] ? a.now : a.s,   // worse of now and 10 s
-        lab = has && chs[pid].labels ? chs[pid].labels[String(Math.round(v))] || null : null, noans = ((state && state.unsupported) || []).indexOf(pid) >= 0;
+        lab = has && chs[pid].labels ? chs[pid].labels[String(Math.round(v))] || null : null, noans = ((state && state.unsupported) || []).indexOf(pid) >= 0,
+        rec = !!(state && state.replay), sup = (state && state.supported) || [], nosup = sup.length > 0 && sup.indexOf(pid) < 0;   // sup: the car's bitmap (empty: not read)
     return { key: pid + ':' + form, pid: pid, form: form, present: present, s: s, v: has ? cv(pid, v) : null, lab: lab,
              dp: dpFor(pid, d.dp !== undefined ? d.dp : c ? c.dp : isRatio(pid) ? 2 : 1), lo: ranged ? cv(pid, lo) : null, hi: ranged ? cv(pid, hi) : null,
              zones: ranged ? gaugeZones(watchFor(pid), lo, hi).map(function (z) { return { from: cv(pid, z.from), to: cv(pid, z.to), s: z.s }; }) : [],
              majors: d.majors || 5, div: d.div || 1, centre: CENTRE[pid] === 1,
-             note: !present ? (Object.keys(chs).length ? 'not in this run' : 'not sampling') : !has ? (noans ? 'no answer from the car' : 'waiting')
+             note: !present ? (rec ? 'not in this recording' : nosup ? 'not supported by this car' : Object.keys(chs).length ? 'not in this run' : 'not sampling') : !has ? (noans ? 'no answer from the car' : 'waiting')
                : a.s === 'stale' ? 'not current' : !WORD[a.s] ? '' : a.now !== a.s ? 'now: ' + WORD[a.now] + ' · 10 s: ' + WORD[a.s] : '10 s: ' + WORD[a.s] };
   }
   function segDigits(it) {   // enough digits for the range and the value, so the display does not clip to 9s
@@ -1050,6 +1051,22 @@
     else if (it.form === 'dial') nd.face.innerHTML = dialSvg(it.v, it.lo, it.hi, it.majors, it.zones, name, it.div);   // numbers and fixed markup; the name is escaped
     else if (it.form === 'bar') nd.face.innerHTML = '<div class="leds">' + ledStrip(it.v, it.lo, it.hi, it.zones, 21, it.centre) + '</div>';
     else { nd.face.className = 'gface led'; nd.face.setAttribute('style', '--c:' + SEGCOL[it.s]); seven(nd.face, it.v, segDigits(it), it.dp, SEGCOL[it.s], 72); }
+  }
+  function missLine(specs) {   // the scenario's PIDs the car's bitmap lacks (live) or the recording does not hold, by name: never silently blank
+    var st = state || {}, chs = st.channels || {}, sup = st.supported || [], seen = {}, out = [];
+    specs.forEach(function (g) {
+      var p = g.pid; if (seen[p] || chs[p]) return; seen[p] = 1;
+      if (st.replay || (sup.length && sup.indexOf(p) < 0)) out.push(pidTitle(p, p) + ' (' + p + ')');
+    });
+    return out.length ? (st.replay ? 'Not in this recording: ' : 'Not supported by this car: ') + out.join(', ') : '';
+  }
+  function setMiss(n, specs) { var t = missLine(specs); if (n.textContent !== t) n.textContent = t; n.hidden = !t; }
+  var FOCUS = null;   // the scenario PIDs last sent: the hub reads the ones the car supports first among its extras
+  function syncFocus() {
+    var ps = [], sig;
+    (ED.on ? ED.draft : specsFor(curScenario())).forEach(function (g) { if (ps.indexOf(g.pid) < 0) ps.push(g.pid); });
+    sig = ps.join(); if (lost || sig === FOCUS) return;
+    FOCUS = sig; post('/api/focus', { pids: ps }).then(null, function () { FOCUS = null; });   // unreachable: try again on a later poll
   }
   function gauges(box, specs) {   // draw these gauges in box, in order, updated in place; a repeated pid+form is drawn once
     var seen = {};
@@ -1128,7 +1145,7 @@
     if (!f.dtc) return '<p class="note">The car reports no freeze frame stored.</p>';
     var ps = f.pids || {}, ks = Object.keys(ps).sort();
     return '<p class="rdhd">Readings frozen when ' + esc(f.dtc) + ' was set</p>' + (!ks.length ? '<p class="note">No readings came with it.</p>' : '<table class="rd ff"><tbody>' + ks.map(function (p) {
-      return '<tr><td>' + esc(pidTitle(p, String(ps[p].name).replace(/_/g, ' '))) + ' (' + esc(p) + ')</td><td>' + esc(ffVal(p, ps[p])) + '</td></tr>'; }).join('') + '</tbody></table>');
+      return '<tr><td class="n">' + esc(pidTitle(p, String(ps[p].name).replace(/_/g, ' '))) + ' (' + esc(p) + ')</td><td>' + esc(ffVal(p, ps[p])) + '</td></tr>'; }).join('') + '</tbody></table>');
   }
   function setHtml(box, h) { if (box._sig !== h) { box._sig = h; box.innerHTML = h; } }
   function renderReady(rp, fp) { setHtml(fp.body, ffHtml()); fp.root.hidden = !ffShown(); setHtml(rp.body, readyHtml()); }
@@ -1251,7 +1268,8 @@
     if (!DB) {
       var p = panel(''), t = pidTableEl(), g = el('div', 'gauges');
       p.body.appendChild(g); $('d_panel').appendChild(p.root); $('d_table').appendChild(t.root);
-      DB = { cp: codesPanel(), fp: panel('Freeze frame'), rp: panel('Readiness monitors'), p: p, g: g, rows: t.body, none: el('p', 'note'), tnote: el('p', 'note') };
+      DB = { cp: codesPanel(), fp: panel('Freeze frame'), rp: panel('Readiness monitors'), p: p, g: g, rows: t.body, none: el('p', 'note'), tnote: el('p', 'note'), miss: el('p', 'note miss') };
+      p.body.appendChild(DB.miss);
       [DB.fp, DB.rp].forEach(function (x) { x.plate.appendChild(el('span', 'pnote', 'read at run start, not live')); $('d_ready_mount').appendChild(x.root); });
       $('d_table').appendChild(DB.tnote);
       p.body.insertBefore(DB.none, g);
@@ -1261,7 +1279,7 @@
     var sc = curScenario(), specs = ED.on ? ED.draft : specsFor(sc), chs = (state && state.channels) || {}, ids = Object.keys(chs).sort(), mine = {};
     if (ED.on && (!ED.box || ED.sig !== ids.join())) drawEditor();   // the editor is rebuilt on actions and when the PIDs in the run change, not every poll
     DB.p.name.textContent = sc.name; DB.none.textContent = specs.length ? '' : 'No gauges. Add one or Reset.'; DB.none.hidden = specs.length > 0;
-    renderSummary($('d_sum')); gauges(DB.g, specs); renderLamps($('d_lamps')); renderCodes(DB.cp); renderReady(DB.rp, DB.fp);
+    renderSummary($('d_sum')); gauges(DB.g, specs); setMiss(DB.miss, specs); renderLamps($('d_lamps')); renderCodes(DB.cp); renderReady(DB.rp, DB.fp);
     specs.forEach(function (s) { mine[s.pid] = true; });   // keys are two-hex-digit PIDs (cleanSpecs), so a plain object is safe
     pidRows(DB.rows, ids); DB.tnote.textContent = ids.length ? '' : 'No readings yet.'; DB.tnote.hidden = ids.length > 0;
     Array.prototype.forEach.call(DB.rows.children, function (r) { r.classList.toggle('scen', mine[r.getAttribute('data-key')] === true); });
@@ -1436,6 +1454,7 @@
     if (!helpLoaded() && performance.now() - helpTried > 5000) loadHelp();   // the first fetch failed or is slow: try again
     chips();
     if (helpKey !== null && $('helpPanel')._live) $('helpPanel')._live.textContent = liveLine(helpKey);
+    syncFocus();
     var view = active();
     if (view === 'v6') renderReadings();
     if (view === 'v0') {
@@ -1541,8 +1560,8 @@
   function renderHandheld() {   // the top strip, Codes (unchanged), and Live: lamps, the scenario's gauges (no editing here), every PID in the run
     var r = retroCommon(), st = state || {};
     if (!HB) {
-      var t = pidTableEl(); HB = { g: $('h_gauges'), rows: t.body, none: el('p', 'note'), tnote: el('p', 'note') };
-      $('h_livepane').insertBefore(HB.none, HB.g); $('h_table').appendChild(t.root); $('h_table').appendChild(HB.tnote); drawTabs();
+      var t = pidTableEl(); HB = { g: $('h_gauges'), rows: t.body, none: el('p', 'note'), tnote: el('p', 'note'), miss: el('p', 'note miss') };
+      $('h_livepane').insertBefore(HB.none, HB.g); $('h_livepane').insertBefore(HB.miss, $('h_tblbtn')); $('h_table').appendChild(t.root); $('h_table').appendChild(HB.tnote); drawTabs();
     }
     var mil = $('h_mil'); mil.className = 'lens red';
     mil.style.cssText = 'width:18px;height:18px' + (r.mil ? ';background:var(--lens-red-lit);box-shadow:0 0 12px var(--led-r)' : '');
@@ -1553,7 +1572,7 @@
       (ffShown() ? '<h3 class="hsec">Freeze frame</h3>' + ffHtml() : '') + '<h3 class="hsec">Readiness monitors</h3>' + readyHtml();
     var specs = specsFor(curScenario()), ids = Object.keys(st.channels || {}).sort();
     HB.none.textContent = specs.length ? '' : 'No gauges in this scenario. Edit it on the Dashboard.'; HB.none.hidden = specs.length > 0;
-    renderSummary($('h_sum')); renderLamps($('h_lamps')); gauges(HB.g, specs);
+    renderSummary($('h_sum')); renderLamps($('h_lamps')); gauges(HB.g, specs); setMiss(HB.miss, specs);
     pidRows(HB.rows, ids); HB.tnote.textContent = ids.length ? '' : 'No readings yet.'; HB.tnote.hidden = ids.length > 0;
     $('h_tblbtn').textContent = 'All readings' + (ids.length ? ' (' + ids.length + ')' : '') + ' ▾';
   }

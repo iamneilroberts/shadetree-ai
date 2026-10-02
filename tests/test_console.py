@@ -130,6 +130,8 @@ def test_save_and_sim_endpoints(srv, tmp_path):
     assert call(server, "POST", "/api/save", {"label": "../x"})[0] == 400
     assert call(server, "POST", "/api/sim", {"scenario": "lean", "rev": True})[0] == 200
     assert call(server, "POST", "/api/sim", {"scenario": "bogus"})[0] == 400
+    assert call(server, "POST", "/api/focus", {"pids": ["0C", "10"]})[0] == 200 and hub.state()["focus"] == ["0C", "10"]
+    assert call(server, "POST", "/api/focus", {"pids": ["010C"]})[0] == 400 and call(server, "GET", "/api/focus")[0] == 405
 
 
 def test_sim_is_refused_when_not_in_demo(tmp_path):

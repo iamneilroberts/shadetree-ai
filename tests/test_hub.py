@@ -875,6 +875,30 @@ def test_a_replayed_simulation_says_so(tmp_path):
     hub.exit_replay()
 
 
+def test_a_scenario_chosen_mid_run_gets_its_supported_pids_read_and_never_one_the_bitmap_lacks(tmp_path):
+    sim = SimPort("rich")
+    sent, orig = [], sim.write
+    sim.write = lambda data: (sent.append(data.decode("ascii").rstrip("\r")), orig(data))[1]
+    hub, _, _ = make(tmp_path, sim=sim)
+    hub.start(DEFAULT_PIDS, hz=10, seconds=30)
+    assert wait_for(lambda: hub.state()["seq"] >= 3)
+    assert "3E" not in hub.state()["extras"]  # not one of the default extras on this car
+    hub.set_focus(["0F", "3e", "5C", "0C"])  # 0F: not in this car's bitmap; 0C: already a core channel
+    assert wait_for(lambda: hub.state()["channels"].get("3E", {}).get("samples"))
+    st = hub.state()
+    hub.stop()
+    assert st["focus"] == ["0F", "3E", "5C", "0C"] and st["extras"][:2] == ["3E", "5C"] and len(DEFAULT_PIDS) + len(st["extras"]) <= 16
+    assert "0F" not in st["supported"] and "3E" in st["supported"] and "0F" not in st["channels"]
+    assert "010F" not in sent, "a PID the car does not list is never asked for"
+
+
+@pytest.mark.parametrize("bad", ["0C", ["0C\r04"], ["ATZ"], [5], [f"{i:02X}" for i in range(9)]])
+def test_focus_takes_only_a_short_list_of_hex_pids(tmp_path, bad):
+    hub, _, _ = make(tmp_path)
+    with pytest.raises(LiveLimitError):
+        hub.set_focus(bad)
+
+
 def test_readiness_and_freeze_frame_are_read_once_with_the_codes_and_carried_in_state(tmp_path):
     st = _state_when(tmp_path, SimPort("rich"), lambda s: s["freeze_frame"]["read"])
     r, ff = st["readiness"], st["freeze_frame"]
