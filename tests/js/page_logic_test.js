@@ -76,7 +76,7 @@ function makeEnv(states, viewId = 'v0', help = null, runs = [], store = {}, page
 
 // the parts the page re-parents, with the parents and order the markup gives them (checked against the markup: a stale list fails here)
 const TREE = [['body', ['topbar', 'menuStatus', 'msg', 'rbar']], ['topbar', ['menuBtn', 'viewNav', 'optBtn', 'optDrawer']], ['optDrawer', ['clarity']],
-              ['menuStatus', ['chipConn', 'chipCar', 'chipLamp', 'chipCodes', 'chipLive', 'ctl']],
+              ['menuStatus', ['chipConn', 'chipCar', 'chipLamp', 'chipCodes', 'chipLive', 'liveOff', 'chipRate', 'chipAge', 'chipAuto', 'ctl']],
               ['ctl', ['simctl', 'unitsBtn', 'themeBtn', 'skinBtn', 'replayBtn', 'capLvl', 'pause', 'save']], ['v0', ['d_sum']]];
 {
   const at = (id) => { const i = html.indexOf('id="' + id + '"'); assert.ok(i > 0, id); return i; };
@@ -1527,6 +1527,23 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
     assert.ok(/id="clarity"[^>]*title="Max: unlit segments nearly invisible and no glow \(crisper\); Standard: faint unlit segments and a soft glow\."/.test(html), 'Clarity says what it does');
     const ids = [...html.matchAll(/\sid="([^"]+)"/g)].map(m => m[1]), dup = ids.filter((x, i) => ids.indexOf(x) !== i);
     assert.deepStrictEqual(dup, [], 'no id twice in the markup');
+  }
+
+  {   // 'last sample' and 'auto-stop in' show only while a live or simulated capture samples; a replay swaps Start/Stop for a quiet 'live off'
+    const run = (o) => Object.assign({ status: 'running', message: null, demo: false, seq: 3, now: 1, since_last_sample: 0.1, hz: 2.5, hz_measured: 2.5, seconds_left: 500, adapter: {}, channels: {} }, o);
+    const rpl = (o) => ({ name: 'r.json', duration: 60, pos: 5, speed: 1, playing: true, ended: false, demo: false, ...o });
+    const cases = [['live sampling', run({}), true, true], ['simulated', run({ demo: true }), true, true], ['no auto-stop timer', run({ seconds_left: null }), true, false],
+                   ['replay playing', run({ replay: rpl({}) }), false, false], ['replay paused', run({ status: 'idle', replay: rpl({ playing: false }) }), false, false],
+                   ['replay ended', run({ status: 'idle', replay: rpl({ playing: false, ended: true }) }), false, false],
+                   ['stopped', run({ status: 'stopped', seconds_left: null }), false, false], ['idle', run({ status: 'idle', since_last_sample: null, seconds_left: null }), false, false]];
+    for (const [what, st, age, auto] of cases) {
+      const e = makeEnv([st]); await e.tick();
+      assert.deepStrictEqual([!e.el('chipAge').hidden, !e.el('chipAuto').hidden], [age, auto], what + ': last sample / auto-stop shown');
+      const rp = !!st.replay;
+      assert.deepStrictEqual([e.el('pause').hidden, e.el('liveOff').hidden], [rp, !rp], what + ': Start/Stop or live off');
+    }
+    assert.ok(/<span class="chip liveoff" id="liveOff" title="Live sampling is off while a replay plays" hidden>live off<\/span>/.test(html), 'a plain span: not focusable, no button look');
+    assert.ok(/<span class="chip" id="chipAge" hidden>/.test(html) && /<span class="chip" id="chipAuto" hidden>/.test(html), 'hidden until a capture samples');
   }
 
   console.log('page logic OK');

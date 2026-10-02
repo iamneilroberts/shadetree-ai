@@ -435,6 +435,7 @@
   }
   .banner[hidden], [hidden] { display: none !important; }
   .msgbar { padding: 8px 16px; background: var(--msg-bg); border-bottom: 1px solid var(--amber); color: var(--amber); font-size: 13px; }
+  .chip.liveoff { color: var(--muted); } .chip.liveoff::before { content: ""; display: inline-block; width: 7px; height: 7px; margin-right: 6px; border-radius: 50%; border: 1px solid var(--muted); }
   .chip.err b::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 6px; background: var(--bad); }
   .chip.idle b::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 6px; border: 1px solid var(--muted); }
   #chipConn { color: var(--ink); font-weight: 600; }
@@ -625,9 +626,10 @@
   <span class="chip" id="chipLamp" title="Malfunction indicator lamp (check-engine light) as reported by the engine computer">check engine: ?</span>
   <span class="chip" id="chipCodes">codes not read</span>
   <span class="chip idle" id="chipLive"><b>NOT SAMPLING</b></span>
-  <span class="chip">rate <b id="rate">&mdash;</b></span>
-  <span class="chip">last sample <b id="age">&mdash;</b></span>
-  <span class="chip">auto-stop in <b id="autostop">&mdash;</b></span>
+  <span class="chip liveoff" id="liveOff" title="Live sampling is off while a replay plays" hidden>live off</span>
+  <span class="chip" id="chipRate">rate <b id="rate">&mdash;</b></span>
+  <span class="chip" id="chipAge" hidden>last sample <b id="age">&mdash;</b></span>
+  <span class="chip" id="chipAuto" hidden>auto-stop in <b id="autostop">&mdash;</b></span>
   <div class="ctl" id="ctl">
     <span id="simctl" hidden>
       <button class="b primary" id="demoBtn">Demo</button>
@@ -923,6 +925,7 @@
   function renderReplay() {
     var r = state && state.replay;
     $('replayBanner').hidden = !r; $('rbar').hidden = !r;
+    $('pause').hidden = !!r; $('liveOff').hidden = !r;   // a replay: a quiet 'live off' with the chips instead of a wide disabled button
     if (!r) { $('pause').disabled = false; $('save').disabled = false; return; }
     $('replayBanner').textContent = 'Replay: ' + r.name + (r.demo ? ' · recorded simulation, not a car' : ' · recorded car, not live');
     $('pause').disabled = true; $('save').disabled = true; $('pause').textContent = 'Live sampling off';
@@ -1035,6 +1038,8 @@
     $('rate').textContent = st.hz_measured ? st.hz_measured.toFixed(1) + ' Hz' : '—';
     var age = st.since_last_sample === null || st.since_last_sample === undefined ? null : st.since_last_sample + (st.status === 'running' ? (performance.now() - fetchedAt) / 1000 : 0);
     $('age').textContent = age === null ? '—' : age.toFixed(1) + ' s ago';
+    var samp = st.status === 'running' && !st.replay;   // a live or simulated capture is going (as last heard: a lost link still shows how old its last sample is)
+    $('chipAge').hidden = !samp; $('chipAuto').hidden = !(samp && st.seconds_left !== null && st.seconds_left !== undefined);   // a replay, stopped or idle: no clock to show
     var sl = st.seconds_left; $('autostop').textContent = sl === null || sl === undefined ? '—' : Math.floor(sl / 60) + ':' + ('0' + Math.floor(sl % 60)).slice(-2);
     $('pause').textContent = st.status === 'running' ? 'Stop sampling' : 'Start sampling';
     $('simctl').hidden = !st.demo; $('demoBanner').hidden = !st.demo; $('demoBtn').hidden = st.status === 'running'; 
