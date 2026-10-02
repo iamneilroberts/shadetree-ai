@@ -22,3 +22,4 @@ Read-only OBD-II diagnostic assistant. Design: `docs/design.md` (source of truth
 - Ask before installing system packages or touching attached hardware.
 - Stage files by name; do not commit until Neil says so.
 - Snapshots contain VINs: keep local, gitignored (synthetic fixtures excepted).
+- Mockups: never publish design mockups as Artifacts. Build one self-contained HTML file (inline CSS/JS, example data only) and host it on a `fuxed.org` subdomain. The voygent-lite `/mock` skill (`~/dev/voygent-lite/.claude/skills/mock`) is the pattern, but its deploy script targets voygent.ai, so it needs a fuxed.org target first.
