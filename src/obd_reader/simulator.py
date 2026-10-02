@@ -42,7 +42,7 @@ ENCODERS: dict[str, Callable[[float], bytes]] = {
     "3C": lambda v: _u16(round((v + 40) * 10)),
     "44": lambda v: _u16(round(v * 65536 / 2)),
     "42": lambda v: _u16(round(v * 1000)),
-    # the rest of a typical 2000s gasoline car's list, so "Capture all supported" has ~30 readings (no MAF: speed density; no 0F, which tests use as a PID this car does not answer)
+    # the rest of a typical 2000s gasoline car's list, so capture level max has ~30 readings (no MAF: speed density; no 0F, which tests use as a PID this car does not answer)
     "03": lambda v: bytes([round(v), 0]),
     "3E": lambda v: _u16(round((v + 40) * 10)), "46": lambda v: bytes([_clamp(round(v + 40), 0, 255)]),
     "5C": lambda v: bytes([_clamp(round(v + 40), 0, 255)]),

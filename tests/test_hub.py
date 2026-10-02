@@ -695,7 +695,7 @@ def test_live_stats_age_and_extreme_times_match_the_samples(tmp_path):
     assert s0["age"] == pytest.approx(st["now"] - rows[-1][1], abs=0.1) and s0["age"] >= 0
 
 
-from obd_reader.hub import FAST_PIDS, slow_per_sweep
+from obd_reader.hub import EXTRA_PIDS, FAST_PIDS, slow_per_sweep
 
 
 def test_slow_tier_takes_enough_per_sweep_for_its_target_rate_within_a_cap():
@@ -738,9 +738,47 @@ def test_default_start_is_unchanged_and_has_no_tiers(tmp_path):
     hub.stop()
 
 
+def test_the_state_reports_the_capture_level_and_all_is_max(tmp_path):
+    hub, _, _ = make(tmp_path)
+    assert hub.state()["capture"] is None, "no run yet"
+    for given, level in (("min", "min"), ("std", "std"), ("max", "max"), ("all", "max")):
+        hub.start(DEFAULT_PIDS, hz=10, seconds=30, capture=given)
+        assert wait_for(lambda: hub.state()["seq"] >= 1)
+        assert hub.state()["capture"] == level
+        hub.stop()
+        assert wait_for(lambda: not hub.running)
+
+
+def test_capture_min_reads_only_the_core_pids_and_the_supported_focus_pids_every_sweep(tmp_path):
+    sim = SimPort("rich")
+    sent, orig = [], sim.write
+    sim.write = lambda data: (sent.append(data.decode("ascii").rstrip("\r")), orig(data))[1]
+    hub, _, _ = make(tmp_path, sim=sim)
+    hub.set_focus(["0F", "3E", "5C", "0C"])  # 0F: not in this car's bitmap; 0C: already core
+    hub.start(DEFAULT_PIDS, hz=10, seconds=30, capture="min")
+    assert wait_for(lambda: hub.state()["seq"] >= 4)
+    st = hub.state()
+    assert st["extras"] == ["3E", "5C"] and set(st["channels"]) == set(DEFAULT_PIDS) | {"3E", "5C"}
+    assert wait_for(lambda: hub.state()["stats"]["5C"]["n"] >= 3), "focus PIDs are read every sweep, not rotated"
+    hub.set_focus([])  # the old focus-only PIDs are dropped on the next sweep
+    assert wait_for(lambda: hub.state()["extras"] == [])
+    hub.stop()
+    rotating = {"01" + p for p in EXTRA_PIDS if p not in DEFAULT_PIDS} - {"013E", "015C"}
+    assert not rotating & set(sent), "no rotating extras"
+
+
+def test_std_still_rotates_extras_and_reports_its_level(tmp_path):
+    hub, _, _ = make(tmp_path)
+    hub.start(DEFAULT_PIDS, hz=10, seconds=30, capture="std")
+    assert wait_for(lambda: hub.state()["seq"] >= 3)
+    st = hub.state()
+    assert st["capture"] == "std" and st["extras"] and st["tiers"] is None
+    hub.stop()
+
+
 def test_a_bad_capture_mode_is_refused_before_any_traffic(tmp_path):
     hub, _, _ = make(tmp_path)
-    for bad in ("everything", 1, None, ["all"]):
+    for bad in ("everything", "default", "ALL", 1, None, ["all"]):
         with pytest.raises(LiveLimitError):
             hub.start(DEFAULT_PIDS, capture=bad)
     assert not hub.running

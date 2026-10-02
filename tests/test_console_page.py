@@ -106,7 +106,7 @@ def test_phone_menu_collapse_lives_in_the_600px_query_and_uses_no_colour_literal
 
 # ---- console stage 1: the features every stage must keep (spec "Retained features") ----------------
 RETAINED = {
-    "Capture all supported": ['id="capAll"', "body.capture = 'all'"],
+    "Capture level (was Capture all supported)": ['id="capLvl"', 'id="cap_min"', 'id="cap_std"', 'id="cap_max"', "body.capture = lv"],
     "Demo button": ['id="demoBtn"'],
     "Dashboard": ['data-view="v0"', 'id="d_tabs"', 'id="d_table"', 'id="d_edit"'],
     "Save run": ['id="save"', "/api/save"],

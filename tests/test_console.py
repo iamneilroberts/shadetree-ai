@@ -430,12 +430,23 @@ def test_the_page_url_may_name_an_example_and_the_get_alone_loads_nothing(srv_ex
     assert call(server, "GET", "/api/state")[1]["replay"] is None, "the page posts the load; the server does nothing on the GET"
 
 
-def test_start_can_capture_all_supported_and_refuses_an_unknown_mode(srv):
+@pytest.mark.parametrize("bad", ["everything", "default", "ALL", "Max", 1, "foo", None])
+def test_start_refuses_any_capture_level_but_min_std_max_all(srv, bad):
     server, hub, _ = srv
-    assert call(server, "POST", "/api/start", {"pids": DEFAULT_PIDS, "capture": "everything"})[0] == 400
+    assert call(server, "POST", "/api/start", {"pids": DEFAULT_PIDS, "capture": bad})[0] == 400
     assert not hub.running
-    assert call(server, "POST", "/api/start", {"pids": DEFAULT_PIDS, "hz": 10, "seconds": 30, "capture": "all"})[0] == 200
+
+
+@pytest.mark.parametrize("given,level", [(None, "std"), ("min", "min"), ("std", "std"), ("max", "max"), ("all", "max")])
+def test_start_accepts_each_capture_level_and_absent_means_std(srv, given, level):
+    server, hub, _ = srv
+    body = {"pids": DEFAULT_PIDS, "hz": 10, "seconds": 30}
+    if given:
+        body["capture"] = given
+    assert call(server, "POST", "/api/start", body)[0] == 200
     assert wait_seq(server, 4)
     st = call(server, "GET", "/api/state?after=0")[1]
-    assert st["tiers"]["fast"] == ["0C", "0D", "04", "11"] and len(st["channels"]) > 16
+    assert st["capture"] == level
+    if level == "max":
+        assert st["tiers"]["fast"] == ["0C", "0D", "04", "11"] and len(st["channels"]) > 16
     assert call(server, "POST", "/api/stop", {})[0] == 200

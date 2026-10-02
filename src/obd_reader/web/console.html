@@ -430,7 +430,7 @@
     body:has(.rbar:not([hidden])) .stage { padding-bottom: var(--rbar-h); }   /* room under the pinned replay bar (Handheld's stage padding of 0 wins by specificity; its frame height reserves the bar instead) */
   }
   @media (max-width: 600px), (pointer: coarse) {   /* 44px touch targets; a ? keeps its look and gets a 44px hit area */
-    button.b, select.b, .vbtn, .stab, .qbtn, label.chip { min-height: 44px; } label.chip { display: inline-flex; align-items: center; }
+    button.b, select.b, .vbtn, .stab, .qbtn, label.chip, .seg label { min-height: 44px; } .seg label { min-width: 44px; } label.chip { display: inline-flex; align-items: center; }
     .q { position: relative; } .q::after { content: ""; position: absolute; inset: calc(50% - 22px); }
   }
   .banner[hidden], [hidden] { display: none !important; }
@@ -555,6 +555,13 @@
   /* Retro Dashboard: the controls live in a drawer under the bar that the Options button opens (closed by default; Esc or a click outside closes it).
      Two-state settings are narrow switches with both states engraved, actions small chrome pushbuttons. Plain and the other views keep the toolbar. */
   .optbtn { display: none; }
+  .seg { display: inline-flex; align-items: stretch; border: 1px solid var(--line); border-radius: 4px; font: 600 12.5px var(--cond); letter-spacing: .03em; }
+  .seg::before { content: "Capture"; align-self: center; padding: 0 8px; color: var(--muted); }
+  .seg label { position: relative; display: inline-flex; align-items: center; justify-content: center; padding: 4px 9px; color: var(--muted); cursor: pointer; }
+  .seg label:has(:checked) { background: var(--cyan); color: var(--on-accent); }
+  .seg label:has(:focus-visible) { outline: 2px solid var(--cyan); outline-offset: 1px; z-index: 1; }
+  .seg input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+  .seg:has(:disabled) { opacity: .45; } .seg input:disabled { cursor: not-allowed; }
   .tgw { display: contents; }
   :root[data-skin="retro"][data-view="v0"] .optbtn { display: inline-block; }
   :root[data-skin="retro"][data-view="v0"] .optd { flex: 1 1 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px; padding: 7px 2px 3px; border-top: 1px solid var(--line); }
@@ -578,6 +585,12 @@
   :root[data-skin="retro"][data-view="v0"] .optd .tg:hover { border-color: var(--line); }
   :root[data-skin="retro"][data-view="v0"] .optd .tg:focus-visible, :root[data-skin="retro"][data-view="v0"] .optd label.tg:has(:focus-visible) { outline: 2px solid var(--cb-focus); outline-offset: 1px; }
   :root[data-skin="retro"][data-view="v0"] .optd label.tg:has(:disabled) { opacity: .45; } :root[data-skin="retro"][data-view="v0"] .optd label.tg input:disabled { cursor: not-allowed; }
+  :root[data-skin="retro"][data-view="v0"] .optd .seg { border: 2px solid transparent; border-radius: 4px; background: linear-gradient(180deg, var(--cb-cap-1), var(--cb-cap-2)) padding-box, linear-gradient(145deg, var(--cb-chrome-1), var(--cb-chrome-2) 45%, var(--cb-chrome-3) 70%, var(--cb-chrome-2)) border-box; }
+  :root[data-skin="retro"][data-view="v0"] .optd .seg::before { content: none; }
+  :root[data-skin="retro"][data-view="v0"] .optd .seg label { padding: 4px 9px 3px; color: var(--cb-silk); font: 700 11.5px/1.1 var(--cb-label); letter-spacing: .1em; text-transform: uppercase; }
+  :root[data-skin="retro"][data-view="v0"] .optd .seg label + label { border-left: 1px solid var(--cb-chrome-3); }
+  :root[data-skin="retro"][data-view="v0"] .optd .seg label:has(:checked) { background: transparent; color: var(--cb-lamp); box-shadow: inset 0 -2px 0 var(--cb-lamp); }
+  :root[data-skin="retro"][data-view="v0"] .optd .seg label:has(:focus-visible) { outline-color: var(--cb-focus); }
   :root[data-skin="retro"][data-view="v0"] .optd label.chip:not(.tg) { display: inline-flex; align-items: center; gap: 7px; padding: 0; border: 0; font: 400 11px/1 var(--cb-stencil); letter-spacing: .12em; text-transform: uppercase; color: var(--ink); }
   :root[data-skin="retro"][data-view="v0"] .topbar button.b:not(.tg), :root[data-skin="retro"][data-view="v0"] .topbar select.b { min-height: 28px; padding: 3px 10px; border: 2px solid transparent; border-radius: 4px; box-shadow: 0 1px 2px rgba(0,0,0,.3); cursor: pointer;
     background: linear-gradient(180deg, var(--cb-cap-1), var(--cb-cap-2)) padding-box, linear-gradient(145deg, var(--cb-chrome-1), var(--cb-chrome-2) 45%, var(--cb-chrome-3) 70%, var(--cb-chrome-2)) border-box;
@@ -630,7 +643,10 @@
     <span class="tgw" data-n="Theme"><button class="b tg" id="themeBtn" type="button" role="switch" aria-checked="false" aria-label="Theme: Dark" data-a="Light" data-b="Dark">Theme: Light</button></span>
     <span class="tgw" data-n="Skin"><button class="b tg" id="skinBtn" type="button" role="switch" aria-checked="true" aria-label="Skin: Retro" data-a="Plain" data-b="Retro">Skin: Retro</button></span>
     <button class="b" id="replayBtn">Replay&hellip;</button>
-    <span class="tgw" data-n="Capture all"><label class="chip tg" data-a="Off" data-b="On" title="Read every reading the car supports: engine speed, speed, load and throttle every sweep, the rest a few at a time"><input type="checkbox" id="capAll" role="switch" aria-label="Capture all supported"> Capture all supported</label></span>
+    <span class="tgw" data-n="Capture"><span class="seg" id="capLvl" role="radiogroup" aria-label="Capture level" title="How much to read at Start: min, std (the default) or max">
+      <label title="min: only engine speed, speed, load, throttle and this scenario's readings, no rotating extras (the fastest sweep, the least bus traffic: for a car or adapter that struggles)"><input type="radio" name="caplvl" id="cap_min" value="min">min</label>
+      <label title="std: the core readings every sweep plus extras in rotation, this scenario's first (up to 16 readings; the default)"><input type="radio" name="caplvl" id="cap_std" value="std" checked>std</label>
+      <label title="max: every reading the car supports: engine speed, speed, load and throttle every sweep, the rest a few at a time"><input type="radio" name="caplvl" id="cap_max" value="max">max</label></span></span>
     <button class="b" id="pause">Start sampling</button>
     <button class="b primary" id="save">Save run</button>
   </div>
@@ -1021,7 +1037,9 @@
     $('age').textContent = age === null ? '—' : age.toFixed(1) + ' s ago';
     var sl = st.seconds_left; $('autostop').textContent = sl === null || sl === undefined ? '—' : Math.floor(sl / 60) + ':' + ('0' + Math.floor(sl % 60)).slice(-2);
     $('pause').textContent = st.status === 'running' ? 'Stop sampling' : 'Start sampling';
-    $('simctl').hidden = !st.demo; $('demoBanner').hidden = !st.demo; $('demoBtn').hidden = st.status === 'running'; $('capAll').disabled = st.status === 'running';
+    $('simctl').hidden = !st.demo; $('demoBanner').hidden = !st.demo; $('demoBtn').hidden = st.status === 'running'; 
+    ['min', 'std', 'max'].forEach(function (v) { $('cap_' + v).disabled = st.status === 'running'; });   // the level applies at Start
+    if (st.status === 'running' && !st.replay && (st.capture === 'min' || st.capture === 'std' || st.capture === 'max')) $('cap_' + st.capture).checked = true;   // the running run's level, after a reload too
     renderReplay(); renderLost();
     showMsg(st.message || '');
     hhAlert();
@@ -1906,9 +1924,10 @@
       .catch(function () { lost = true; try { render(); } catch (x) { } })   // keep the last state, not current
       .then(function (again) { polling = false; if (again === true) poll(); });
   }
+  function capLevel() { return $('cap_min').checked ? 'min' : $('cap_max').checked ? 'max' : 'std'; }
   function startRun() {
     var body = { pids: PIDS, hz: 2.5, seconds: 600 };
-    if ($('capAll').checked) body.capture = 'all';   // every supported reading in two tiers; the default request is unchanged
+    var lv = capLevel(); if (lv !== 'std') body.capture = lv;   // min or max; std is the server's default, so its request is unchanged
     post('/api/start', body).then(function (r) { if (!r.ok) showMsg(r.j.error || 'request failed'); poll(); }); }
   $('pause').addEventListener('click', function () {
     if (!(state && state.status === 'running')) return startRun();

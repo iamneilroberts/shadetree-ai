@@ -77,7 +77,7 @@ function makeEnv(states, viewId = 'v0', help = null, runs = [], store = {}, page
 // the parts the page re-parents, with the parents and order the markup gives them (checked against the markup: a stale list fails here)
 const TREE = [['body', ['topbar', 'menuStatus', 'msg', 'rbar']], ['topbar', ['menuBtn', 'viewNav', 'optBtn', 'optDrawer']], ['optDrawer', ['clarity']],
               ['menuStatus', ['chipConn', 'chipCar', 'chipLamp', 'chipCodes', 'chipLive', 'ctl']],
-              ['ctl', ['simctl', 'unitsBtn', 'themeBtn', 'skinBtn', 'replayBtn', 'capAll', 'pause', 'save']], ['v0', ['d_sum']]];
+              ['ctl', ['simctl', 'unitsBtn', 'themeBtn', 'skinBtn', 'replayBtn', 'capLvl', 'pause', 'save']], ['v0', ['d_sum']]];
 {
   const at = (id) => { const i = html.indexOf('id="' + id + '"'); assert.ok(i > 0, id); return i; };
   const close = (id, tag) => html.indexOf('</' + tag + '>', at(id));
@@ -158,18 +158,35 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
   for (let k = 0; k < 2; k++) await dm.tick();
   assert.strictEqual(dm.el('demoBtn').hidden, true, 'hidden while the simulated run is going');
 
-  // "Capture all supported": unticked, Start sends the same request as before; ticked, it adds capture: 'all' (Demo too); locked while running
+  // Capture level min / std / max: std (the default) sends the same request as before; min and max add capture: 'min' | 'max' (Demo too); locked while running
   assert(!('capture' in start.body), 'the default start request is unchanged');
+  assert.ok(/<input type="radio" name="caplvl" id="cap_std" value="std" checked>/.test(html) && /id="capLvl" role="radiogroup" aria-label="Capture level"/.test(html), 'std is checked in the markup; a radio group');
+  assert.deepStrictEqual([...html.matchAll(/name="caplvl" id="cap_(\w+)" value="(\w+)"/g)].map(m => m[1] + '=' + m[2]), ['min=min', 'std=std', 'max=max'], 'three levels, in order');
+  for (const lv of ['min', 'max']) {
+    const cl = makeEnv([demoIdle, demoIdle]); await cl.tick();
+    cl.el('cap_' + lv).checked = true;
+    cl.handlers['pause:click'](); cl.handlers['demoBtn:click'](); await new Promise(r => setImmediate(r));
+    const ps = cl.posts.filter(p => /\/api\/start/.test(p.url));
+    assert.ok(ps.length === 2 && ps.every(p => p.body.capture === lv && p.body.pids.length === 8), lv + ' on both buttons');
+  }
+  {
+    const back = makeEnv([Object.assign({}, demoIdle, { status: 'running', capture: 'min' })]); await back.tick();
+    assert.ok(back.el('cap_min').checked === true && back.el('cap_min').disabled === true, 'a running run shows its own level, locked');
+    const rp = makeEnv([Object.assign({}, demoIdle, { status: 'running', capture: 'max', replay: { name: 'r.json', duration: 9, pos: 1, speed: 1, playing: true, ended: false, demo: true } })]); await rp.tick();
+    assert.notStrictEqual(rp.el('cap_max').checked, true, 'a replay does not set it (the level is the last live run\'s)');
+    const bad = makeEnv([Object.assign({}, demoIdle, { status: 'running', capture: 'everything' })]); await bad.tick();
+    assert.ok(!bad.el('cap_min').checked && !bad.el('cap_max').checked, 'an unknown level is ignored');
+  }
   const ca = makeEnv([demoIdle, demoIdle, Object.assign({}, demoIdle, { status: 'running', channels: { '05': { name: 'coolant_temp', unit: 'C', samples: [] } }, tiers: { fast: ['0C'], slow: ['05', '42'], slow_per_sweep: 1 } })], 'v6');
   await ca.tick();
-  assert.strictEqual(ca.el('capAll').disabled, false, 'the option can be changed before a run');
-  ca.el('capAll').checked = true;
+  assert.strictEqual(ca.el('cap_max').disabled, false, 'the level can be changed before a run');
+  ca.el('cap_max').checked = true;
   ca.handlers['pause:click'](); ca.handlers['demoBtn:click']();
   await new Promise(r => setImmediate(r));
   const cstarts = ca.posts.filter(p => /\/api\/start/.test(p.url));
-  assert(cstarts.length === 2 && cstarts.every(p => p.body.capture === 'all' && p.body.pids.length === 8 && p.body.hz === 2.5), 'capture all on both buttons');
+  assert(cstarts.length === 2 && cstarts.every(p => p.body.capture === 'max' && p.body.pids.length === 8 && p.body.hz === 2.5), 'max on both buttons');
   for (let k = 0; k < 2; k++) await ca.tick();
-  assert.strictEqual(ca.el('capAll').disabled, true, 'locked while a run is going: it only applies at Start');
+  assert.ok(['min', 'std', 'max'].every(v => ca.el('cap_' + v).disabled === true), 'locked while a run is going: it only applies at Start');
   assert(/all supported: 1 fast every sweep, 2 slow in rotation/.test(ca.el('x_count').textContent), ca.el('x_count').textContent);
 
   // 4) a new run (seq restarts) resets the buffers instead of mixing runs
@@ -1502,7 +1519,6 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
       const tag = html.match(new RegExp('<button [^>]*id="' + id + '"[^>]*>'))[0];
       assert.ok(/role="switch"/.test(tag) && /aria-checked="(true|false)"/.test(tag) && tag.includes('data-a="' + a + '"') && tag.includes('data-b="' + b + '"') && tag.includes('aria-label="'), tag);
     }
-    assert.ok(/<input type="checkbox" id="capAll" role="switch"/.test(html), 'Capture all is a native switch');
     const us = makeEnv(statesFor(1, idle), 'v0'); await us.tick();
     assert.strictEqual(us.el('unitsBtn').getAttribute('aria-checked'), 'false'); us.handlers['unitsBtn:click'](); await us.tick();
     assert.ok(us.el('unitsBtn').getAttribute('aria-checked') === 'true' && us.el('unitsBtn').textContent === 'Units: US', 'Units: the switch state follows, the label is as before');

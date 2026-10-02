@@ -227,7 +227,7 @@ class ConsoleServer:
                 try:
                     if path == "/api/start":
                         outer.hub.start(body.get("pids"), hz=body.get("hz", 2.5), seconds=body.get("seconds", 600.0),
-                                        capture=body.get("capture", "default"))
+                                        capture=body.get("capture", "std"))
                         return self._json(200, {"ok": True})
                     if path == "/api/focus":  # the scenario's PIDs: hex ids only, filtered by the car's bitmap in the hub
                         outer.hub.set_focus(body.get("pids"))
