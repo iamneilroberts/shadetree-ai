@@ -202,7 +202,8 @@
   /* Live: lamps, the scenario's gauges two across, then the PID table (it scrolls sideways inside its .rwrap); the pane scrolls inside .hh-body */
   .retro .hh-scen { flex: none; padding: 8px 10px 0; } .retro .hh-scen select { width: 100%; }
   .retro .hh .lamps { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; margin-bottom: 10px; }
-  .retro #h_table { margin-top: 10px; }
+  .retro .hh-tbl { display: block; width: 100%; min-height: 40px; margin-top: 10px; padding: 8px 12px; appearance: none; border: 0; border-radius: 4px; background: var(--plate-bg); color: var(--plate-ink); font: 700 12px var(--sil); letter-spacing: .12em; text-transform: uppercase; text-align: left; cursor: pointer; }   /* the table's heading: says how many readings there are and scrolls to them */
+  .retro #h_table { margin-top: 6px; }
   .retro .hh table.rd th, .retro .hh table.rd td .at, .retro .hh .note { color: var(--ink2); }   /* the table and the notes sit on the light face */
   .retro .hh .note { font-size: 12.5px; margin: 0 0 8px; }
   .retro .hh-alert { display: none; flex: none; margin: 8px 10px 0; padding: 6px 10px; background: var(--msg-bg); border: 1px solid var(--amber); border-radius: 4px; color: var(--amber); font-size: 12.5px; white-space: pre-line; overflow-wrap: anywhere; }   /* the page's notices, shown in the frame only where the phone hides the page's own */
@@ -474,6 +475,7 @@
       <div class="hh-pane" data-mode="live" id="h_livepane">
         <div class="lamps" id="h_lamps"></div>
         <div class="gauges" id="h_gauges"></div>
+        <button type="button" class="hh-tbl" id="h_tblbtn" aria-controls="h_table">All readings &#9662;</button>
         <div id="h_table"></div>
       </div>
       <div class="hh-pane" data-mode="codes" id="h_codes" hidden></div>
@@ -1427,7 +1429,9 @@
     HB.none.textContent = specs.length ? '' : 'No gauges in this scenario. Edit it on the Dashboard.'; HB.none.hidden = specs.length > 0;
     renderLamps($('h_lamps')); gauges(HB.g, specs);
     pidRows(HB.rows, ids); HB.tnote.textContent = ids.length ? '' : 'No readings yet.'; HB.tnote.hidden = ids.length > 0;
+    $('h_tblbtn').textContent = 'All readings' + (ids.length ? ' (' + ids.length + ')' : '') + ' ▾';
   }
+  $('h_tblbtn').addEventListener('click', function () { var t = $('h_table'); if (t.scrollIntoView) t.scrollIntoView({ block: 'start' }); });
   function setMode(m) {
     Array.prototype.forEach.call(document.querySelectorAll('.hh-pane'), function (e) { e.hidden = e.dataset.mode !== m; });
     Array.prototype.forEach.call(document.querySelectorAll('.hh-nav button'), function (b) { b.classList.toggle('on', b.dataset.mode === m); });

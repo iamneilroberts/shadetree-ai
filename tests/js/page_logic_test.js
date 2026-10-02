@@ -1138,6 +1138,18 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
     const none = makeEnv([{ status: 'idle', channels: {}, stats: {}, extras: {}, seq: 1 }], 'v5', OVF); await none.tick();
     assert.strictEqual(hRows(none).length, 0, 'no channels: the table body is empty'); assert.ok(flat(none.el('h_table')).includes('No readings yet.'), 'and the table says so');
     assert.ok(none.el('h_gauges').children.every(g => g.children.some(c => c.className === 'gnote' && c.textContent === 'not sampling')), 'and the gauges say not sampling');
+    // the table's heading is a button that says how many readings there are and scrolls to them
+    assert.ok(/<button type="button" class="hh-tbl" id="h_tblbtn" aria-controls="h_table">All readings &#9662;<\/button>\s*<div id="h_table"><\/div>/.test(html), 'a real button right above the table');
+    assert.strictEqual(e.el('h_tblbtn').textContent, 'All readings (' + Object.keys(base()).length + ') ▾', 'it counts the readings in the run');
+    assert.strictEqual(e.el('h_tblbtn').children.length, 0, 'text, not markup');
+    assert.strictEqual(none.el('h_tblbtn').textContent, 'All readings ▾', 'no readings: no count, and the table note says so');
+    const grow = makeEnv([{ status: 'idle', channels: {}, stats: {}, extras: {}, seq: 0 }].concat(statesFor(3, base)), 'v5', OVF); await grow.tick();
+    assert.strictEqual(grow.el('h_tblbtn').textContent, 'All readings ▾');
+    for (let k = 0; k < 3; k++) await grow.tick();
+    assert.strictEqual(grow.el('h_tblbtn').textContent, 'All readings (' + Object.keys(base()).length + ') ▾', 'the count follows the run');
+    const calls = []; e.el('h_table').scrollIntoView = (o) => calls.push(JSON.stringify(o));
+    e.el('h_tblbtn').on.click(); assert.deepStrictEqual(calls, ['{"block":"start"}'], 'a tap scrolls the table into view');
+    none.el('h_tblbtn').on.click();   // no scrollIntoView on this node: guarded, no throw
   }
 
   {   // 16) a replay file's codes note is text, never markup, on the Dashboard and the Handheld
