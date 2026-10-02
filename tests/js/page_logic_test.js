@@ -77,11 +77,11 @@ function makeEnv(states, viewId = 'v0', help = null, runs = [], store = {}, page
 // the parts the page re-parents, with the parents and order the markup gives them (checked against the markup: a stale list fails here)
 const TREE = [['body', ['topbar', 'menuStatus', 'msg', 'rbar']], ['topbar', ['menuBtn', 'viewNav', 'optBtn', 'optDrawer']], ['optDrawer', ['clarity']],
               ['menuStatus', ['chipConn', 'chipCar', 'chipLamp', 'chipCodes', 'chipLive', 'liveOff', 'chipRate', 'chipAge', 'chipAuto', 'ctl']],
-              ['ctl', ['simctl', 'unitsBtn', 'themeBtn', 'skinBtn', 'replayBtn', 'capLvl', 'pause', 'save']], ['v0', ['d_sum']]];
+              ['ctl', ['simctl', 'unitsBtn', 'themeBtn', 'skinBtn', 'replayBtn', 'capLvl', 'pause', 'save']], ['v0', ['d_sum']], ['d_face', ['d_scenbar']]];
 {
   const at = (id) => { const i = html.indexOf('id="' + id + '"'); assert.ok(i > 0, id); return i; };
   const close = (id, tag) => html.indexOf('</' + tag + '>', at(id));
-  const TAG = { body: null, topbar: 'header', menuStatus: 'div', optDrawer: 'div', ctl: 'div', v0: 'section' };
+  const TAG = { body: null, d_face: null, topbar: 'header', menuStatus: 'div', optDrawer: 'div', ctl: 'div', v0: 'section' };
   TREE.forEach(([parent, kids]) => { kids.reduce((prev, k) => { assert.ok(at(k) > prev, k + ' follows its elder sibling in the markup'); return at(k); }, parent === 'body' ? 0 : at(parent));
     if (TAG[parent]) kids.forEach(k => assert.ok(at(k) < close(parent, TAG[parent]), k + ' sits inside ' + parent)); });
 }
@@ -1512,6 +1512,13 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
     e.handlers['skinBtn:click'](); await e.tick(); assert.strictEqual(where(), 'optDrawer topbar topbar topbar', 'and Retro moves them again');
     const re = makeEnv(statesFor(1, idle), 'v0', OVF, [], { 'shadetree.skin': 'retro' }, { views: [], session: { 'shadetree.options': 'open' } }); await re.tick();
     assert.ok(re.el('optDrawer').hidden === false, 'a reload in the same tab keeps it open');
+    // the summary strip: in Retro under the nameplate (before the selector), in Plain above the cabinet as before; the same node, never a copy
+    assert.ok(e.el('d_sum').parentNode === e.el('d_face') && e.el('d_sum').nextSibling === e.el('d_scenbar'), 'Retro: the strip is inside the cabinet');
+    e.handlers['skinBtn:click'](); await e.tick();
+    assert.ok(e.el('d_sum').parentNode === e.el('v0') && !e.el('d_face').children.includes(e.el('d_sum')), 'Plain: back above the cabinet');
+    assert.ok(/SIMULATED|NOT SAMPLING/.test(e.el('chipLive').innerHTML) && e.el('d_sum').innerHTML.length > 0, 'and it still renders');
+    e.handlers['skinBtn:click'](); await e.tick();
+    vbtns[2].on.click(); await e.tick(); assert.strictEqual(e.el('d_sum').parentNode, e.el('d_face'), 'Retro on another view: the strip stays in the cabinet (the Dashboard is hidden anyway)');
     const pl = makeEnv(statesFor(1, idle), 'v0', OVF, [], { 'shadetree.skin': 'plain' }); await pl.tick();
     assert.ok(pl.el('ctl').parentNode.id === 'menuStatus' && pl.el('optDrawer').hidden === true, 'Plain Dashboard: the toolbar as before');
     // the switches: role and state, both state names, a fixed name

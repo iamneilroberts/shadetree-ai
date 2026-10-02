@@ -327,7 +327,8 @@ def test_handheld_alert_repeats_the_notices_inside_the_frame_using_tokens_only()
     assert "background: var(--msg-bg)" in body and "color: var(--amber)" in body  # the --amber on --msg-bg pair is held by TEXT_PAIRS
 
 
-_CAB_MEDIA = (None, "(max-width: 900px)", "(max-width: 600px)", "(max-width: 360px)", "(min-width: 701px)", "(min-width: 701px) and (prefers-reduced-motion: reduce)")  # the Retro cabinet at every width (changed 2026-10-02: it was desktop only); the knob above 700 px
+_CAB_MEDIA = (None, "(max-width: 900px)", "(max-width: 600px)", "(min-width: 701px)", "(min-width: 701px) and (prefers-reduced-motion: reduce)",
+              "(min-width: 1101px)", "(max-width: 1100px)", "(max-width: 800px)")  # 2026-10-02: grilles above 1100 px only, the sticker above 800 px only  # the Retro cabinet at every width (changed 2026-10-02: it was desktop only); the knob above 700 px
 
 
 def _cabinet_rules(css):
@@ -339,13 +340,13 @@ def test_cabinet_chrome_is_retro_only_at_every_width():
     assert rules, "the Dashboard cabinet has CSS"
     assert 'class="dcab"' in HTML and "dcab retro" not in HTML and "retro dcab" not in HTML, "the wrapper never wears the .retro class (it restyles Plain)"
     assert HTML.count('id="clarity"') == 1, "one Clarity button on the page"
-    assert re.search(r'<div class="dcab"><div class="dface">', HTML) and 'class="plate"' in HTML[HTML.index('class="dcab"'):HTML.index('id="v5"')]
+    assert re.search(r'<div class="dcab"><div class="dface" id="d_face">', HTML) and 'class="plate"' in HTML[HTML.index('class="dcab"'):HTML.index('id="v5"')]
     for media, sels, body in rules:
         flat = " ".join(body.split())
         if not all(s.startswith(':root[data-skin="retro"]') for s in sels):
             # unscoped base: only hides the decorative chrome, never gives the wrapper or the face a look
             assert flat in ("display: none;", "display: none"), f"{sels} outside the Retro skin may only be display: none"
-            assert media is None and all(re.search(r"\.dcab \.(plate|screw|knob)$", s) for s in sels), f"{sels}: only plate, screw and knob are hidden unscoped"
+            assert media is None and all(re.search(r"\.dcab \.(plate|screw|knob|ltest)$", s) for s in sels), f"{sels}: only plate, screw, knob and the lamp test are hidden unscoped"
         else:
             assert media in _CAB_MEDIA, f"{sels} gives the cabinet a look in an unexpected media query: {media}"
     scoped = " ".join(" ".join(r[1]) for r in rules if all(s.startswith(':root[data-skin="retro"]') for s in r[1]))
@@ -680,7 +681,7 @@ def test_the_cabinet_has_a_phone_layout_and_the_knob_stays_desktop_only():
     assert "var(--cb-cap-1)" in phone[P + " > .scenbar .ssel"] and "appearance: none" in phone[P + " > .scenbar .ssel"], "the dropdown is a cabinet pushbutton"
     assert "min-width: 44px" in phone[P + " > .scenbar #d_edit"], "44 px controls (the drawer's controls get theirs from the shared touch-target rule)"
     assert not re.search(r"min-height:\s*(?:[0-3]?\d|4[0-3])px", " ".join(phone.values())), "nothing shrinks a control below 44 px"
-    tiny = {s: " ".join(b.split()) for m, ss, b in rules if m == "(max-width: 360px)" for s in ss}
+    tiny = {s: " ".join(b.split()) for m, ss, b in rules if m == "(max-width: 800px)" for s in ss}
     assert tiny[P + " > .plate .sticker"] == "display: none;", "the sticker gives way on the narrowest phones"
     knob = [(m, b) for m, ss, b in rules if any(s.endswith(" .knob") for s in ss) and "display: block" in b]
     assert [m for m, _ in knob] == ["(min-width: 701px)"], "the knob shows only wider than 700 px; at 700 px or less it stays hidden"
@@ -700,3 +701,22 @@ def test_the_retro_dashboard_page_is_gunmetal_not_oxblood(theme):
     assert re.search(r':root\[data-skin="retro"\]\[data-view="v0"\] \{[^}]*--bg: var\(--rd-bg\)', _css()), "the re-point block uses tokens only"
     js = re.search(r"<script>(.*?)</script>", HTML, re.S).group(1)
     assert "document.documentElement.setAttribute('data-view', id)" in js, "show() tells the CSS which view is up"
+
+
+def test_the_nameplate_and_the_handle_share_the_cabinet_centreline():
+    """2026-10-02: the sticker left the plate's row (it pushed the plate off centre); the plate sits in the middle of three columns, two equal."""
+    rules = _cabinet_rules(_css())
+    top = {}
+    for m, ss, b in rules:
+        for sel in ss if m is None else ():
+            top[sel] = top.get(sel, "") + " " + " ".join(b.split())   # every unscoped-width rule for the selector, in order
+    P = _R + "#v0 .dface"
+    assert "grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);" in top[P + " > .plate"], "equal grilles either side"
+    assert "grid-column: 2;" in top[P + " > .plate .np"]
+    sticker = top[P + " > .plate .sticker"]
+    assert "position: absolute;" in sticker and "grid-column" not in sticker, "the sticker is out of the flow, not a sibling cell of the plate"
+    assert "left: 50%;" in top[P + "::before"] and "translateX(-50%)" in top[P + "::before"], "the handle is centred on the body"
+    wide = {s: " ".join(b.split()) for m, ss, b in rules if m == "(min-width: 1101px)" for s in ss}
+    assert "padding-inline: 128px;" in wide[P + " > .plate"], "equal margins keep the sticker clear of the right grille"
+    assert "grid-row: 2;" in top[P + " > .sumbar"] and "border: 0;" in top[P + " > .sumbar"], "the summary strip is a slim line under the plate"
+    assert "grid-area: 3 / 1;" in top[P + " > .scenbar"] and "grid-area: 3 / 2;" in top[P + " > .lamps"], "the selector and the lamps side by side, one row"
