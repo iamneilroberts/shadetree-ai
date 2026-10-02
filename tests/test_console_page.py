@@ -324,14 +324,14 @@ def test_handheld_alert_repeats_the_notices_inside_the_frame_using_tokens_only()
     assert "background: var(--msg-bg)" in body and "color: var(--amber)" in body  # the --amber on --msg-bg pair is held by TEXT_PAIRS
 
 
-_DESKTOP = ("(min-width: 601px)", "(min-width: 601px) and (max-width: 900px)", "(min-width: 701px)", "(min-width: 701px) and (prefers-reduced-motion: reduce)")  # the cabinet is desktop only: wider than a phone
+_CAB_MEDIA = (None, "(max-width: 900px)", "(max-width: 600px)", "(max-width: 360px)", "(min-width: 701px)", "(min-width: 701px) and (prefers-reduced-motion: reduce)")  # the Retro cabinet at every width (changed 2026-10-02: it was desktop only); the knob above 700 px
 
 
 def _cabinet_rules(css):
     return [r for r in _css_rules(css) if any(".dcab" in s or ".dface" in s for s in r[1])]
 
 
-def test_cabinet_chrome_is_retro_desktop_only():
+def test_cabinet_chrome_is_retro_only_at_every_width():
     rules = _cabinet_rules(_css())
     assert rules, "the Dashboard cabinet has CSS"
     assert 'class="dcab"' in HTML and "dcab retro" not in HTML and "retro dcab" not in HTML, "the wrapper never wears the .retro class (it restyles Plain)"
@@ -339,17 +339,16 @@ def test_cabinet_chrome_is_retro_desktop_only():
     assert re.search(r'<div class="dcab"><div class="dface">', HTML) and 'class="plate"' in HTML[HTML.index('class="dcab"'):HTML.index('id="v5"')]
     for media, sels, body in rules:
         flat = " ".join(body.split())
-        if media is None and not all(s.startswith(':root[data-skin="retro"]') for s in sels):
+        if not all(s.startswith(':root[data-skin="retro"]') for s in sels):
             # unscoped base: only hides the decorative chrome, never gives the wrapper or the face a look
             assert flat in ("display: none;", "display: none"), f"{sels} outside the Retro skin may only be display: none"
-            assert all(re.search(r"\.dcab \.(plate|screw|bench|knob)$", s) for s in sels), f"{sels}: only plate, screw, bench and knob are hidden unscoped"
+            assert media is None and all(re.search(r"\.dcab \.(plate|screw|bench|knob)$", s) for s in sels), f"{sels}: only plate, screw, bench and knob are hidden unscoped"
         else:
-            assert media in _DESKTOP, f"{sels} gives the cabinet a look outside the desktop media queries: {media}"
-            assert all(s.startswith(':root[data-skin="retro"] ') for s in sels), f"{sels} is not scoped to the Retro skin"
-    scoped = " ".join(" ".join(r[1]) for r in rules if r[0])
+            assert media in _CAB_MEDIA, f"{sels} gives the cabinet a look in an unexpected media query: {media}"
+    scoped = " ".join(" ".join(r[1]) for r in rules if all(s.startswith(':root[data-skin="retro"]') for s in r[1]))
     for needle in (".dcab::before", ".dcab::after", ".dface", ".dface > .plate", ".screw", ".bench", ".rocker", ".dcab.max"):
-        assert needle in scoped, f"Retro desktop rule for {needle}"
-    hidden = " ".join(" ".join(r[1]) for r in rules if not r[0])
+        assert needle in scoped, f"Retro rule for {needle}"
+    hidden = " ".join(" ".join(r[1]) for r in rules if not all(s.startswith(':root[data-skin="retro"]') for s in r[1]))
     for needle in (".dcab .plate", ".dcab .screw", ".dcab .bench", ".dcab .knob"):
         assert needle in hidden, f"{needle} is hidden by default"
 
@@ -366,7 +365,7 @@ FACE_OVERRIDES = {  # what sits directly on the cabinet's steel body (not inside
 
 def _face_override(css, frag):
     for media, sels, body in _cabinet_rules(css):
-        if media == "(min-width: 601px)" and any(s.endswith(frag) and s.startswith(':root[data-skin="retro"] #v0 .dface ') for s in sels):
+        if media is None and any(s.endswith(frag) and s.startswith(':root[data-skin="retro"] #v0 .dface ') for s in sels):
             m = re.search(r"(?:color:|box-shadow: inset 3px 0 0)\s*var\((--[\w-]+)\)", body)
             if m:
                 return m.group(1)
@@ -450,7 +449,7 @@ def test_the_neutral_row_bar_is_fainter_than_the_scenario_marker_on_every_surfac
 
 
 # ---- feedback wave: text inside the Retro cabinet and the Handheld is readable on its own card --------
-_CAB = [["body"], [_R + "#v0 .dface"]]  # the Dashboard: page ink, then the cabinet body's engraving ink (Retro, desktop only)
+_CAB = [["body"], [_R + "#v0 .dface"]]  # the Dashboard: page ink, then the cabinet body's engraving ink (Retro, every width)
 _HH = [["body"], [".retro"], [".retro .hh-in"]]  # the Handheld: page ink, the device ink, the light face's ink
 _DGAUGE, _HGAUGE = [[".gauge"]], [[".gauge", ".retro .hh .gauge"]]  # a gauge card on the Dashboard, and in the Handheld
 
@@ -614,7 +613,7 @@ def test_cabinet_fonts_are_embedded_data_uris_and_the_stencil_set_uses_them():
     assert HTML.count("@font-face") == 4, "only the weights the cabinet uses"
     root = _block_all(":root")
     assert root["--cb-stencil"].startswith('"Cabinet Stencil"') and root["--cb-label"].startswith('"Archivo Narrow"') and root["--cb-mono"].startswith('"Cabinet Mono"')
-    cab = [(s, b) for m, ss, b in _cabinet_rules(_css()) if m for s in ss]
+    cab = [(s, b) for m, ss, b in _cabinet_rules(_css()) if m is None for s in ss]
     uses = lambda frag, tok: any(s.endswith(frag) and "var(" + tok + ")" in b for s, b in cab)
     assert uses("#v0 .dface", "--cb-label"), "labels and body text in Archivo Narrow"
     assert uses(".plate .np b", "--cb-stencil") and uses(".panel > .ptitle", "--cb-stencil") and uses("#v0 .dface h3.sec", "--cb-stencil"), "plate and legends in the stencil"
@@ -627,7 +626,7 @@ def test_retro_dashboard_indicators_sit_on_pure_black_in_both_themes(theme):
     assert _block_all(":root")["--cb-face"] == "#000000"
     assert p["--g-face"] == "#000000" and p["--g-win"] == "#000000", "dials, LED bar tracks and seven-segment windows are black"
     css = _css()
-    bezel = [b for m, ss, b in _cabinet_rules(css) if m and any(s.endswith("#v0 .dface .gauge .gface") for s in ss)]
+    bezel = [b for m, ss, b in _cabinet_rules(css) if m is None and any(s.endswith("#v0 .dface .gauge .gface") for s in ss)]
     assert bezel and "linear-gradient(var(--cb-face), var(--cb-face)) padding-box" in bezel[0], "the face inside every bezel is black"
     assert any(any(s.endswith("#v0 .dface .win") for s in ss) and "background: var(--cb-face)" in b for m, ss, b in _cabinet_rules(css)), "the code-count window too"
     hh = dict(p); hh.update(_block_all(".retro")); hh.update(_block_all(':root[data-skin="retro"] .stage-pad.retro'))
@@ -664,3 +663,22 @@ def test_rotary_selector_shows_only_on_a_wide_retro_desktop_and_falls_back_to_th
         assert "'" + k + "'" in js, k
     push = [b for m, ss, b in rules if any(s.endswith("#v0 .dface .stab") for s in ss)]
     assert push and "border: 4px solid transparent" in push[0] and "var(--cb-cap-1)" in push[0], "the fallback tabs are chrome-bezelled pushbuttons"
+
+
+def test_the_cabinet_has_a_phone_layout_and_the_knob_stays_desktop_only():
+    rules = _cabinet_rules(_css())
+    phone = {s: " ".join(b.split()) for m, ss, b in rules if m == "(max-width: 600px)" for s in ss}
+    P = _R + "#v0 .dface"
+    assert phone[_R + ".dcab"] == "padding: 0 5px;", "thin end cheeks on a phone"
+    assert "width: 5px" in phone[_R + ".dcab::before"]
+    assert phone[P + "::before"] == "display: none;" and P + "::after" in phone, "no handle or kick plate on a phone"
+    assert "repeat(2, minmax(0, 1fr))" in phone[P + " .gauges"], "gauges two across"
+    assert '"top" "face" "val" "note"' in phone[P + " .gauge"], "the reading under the face, not squeezed beside the name"
+    assert "var(--cb-cap-1)" in phone[P + " > .scenbar .ssel"] and "appearance: none" in phone[P + " > .scenbar .ssel"], "the dropdown is a cabinet pushbutton"
+    assert "min-width: 44px" in phone[P + " > .scenbar #d_edit"] and "min-height: 44px" in phone[P + " .rocker"], "44 px controls"
+    assert not re.search(r"min-height:\s*(?:[0-3]?\d|4[0-3])px", " ".join(phone.values())), "nothing shrinks a control below 44 px"
+    tiny = {s: " ".join(b.split()) for m, ss, b in rules if m == "(max-width: 360px)" for s in ss}
+    assert tiny[P + " > .plate .sticker"] == "display: none;", "the sticker gives way on the narrowest phones"
+    knob = [(m, b) for m, ss, b in rules if any(s.endswith(" .knob") for s in ss) and "display: block" in b]
+    assert [m for m, _ in knob] == ["(min-width: 701px)"], "the knob shows only wider than 700 px; at 700 px or less it stays hidden"
+    assert all(m != "(max-width: 600px)" for m, ss, b in rules if any(".knob" in s for s in ss)), "no phone rule touches the knob"

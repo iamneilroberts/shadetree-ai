@@ -165,13 +165,12 @@
   .retro .lampbox.lit .lens.grn, #v0 .lampbox.lit .lens.grn { background: var(--lens-grn-lit); box-shadow: 0 0 12px var(--led-g); }
   .retro .lampbox b, #v0 .lampbox b { display: block; color: inherit; }
   .retro .lampbox em, #v0 .lampbox em { display: block; font-style: normal; font-weight: 400; letter-spacing: .04em; text-transform: none; font-size: 11px; opacity: .85; }
-  /* Dashboard cabinet: the Retro skin of the Dashboard on a desktop is a 1970s roll-around engine analyzer. End cheeks (.dcab::before/::after, wood
+  /* Dashboard cabinet: the Retro skin of the Dashboard is a 1970s roll-around engine analyzer, on a desktop and (slimmed) on a phone. End cheeks (.dcab::before/::after, wood
      in light, dark steel in dark) frame a hammertone steel body (.dface) with a chrome handle (::before) and a kick plate on casters (::after); the
      nameplate sits between vents with a calibration sticker; controls, lamps and panels are engraved groups; labels and body in Archivo Narrow,
      plate and legends in the stencil face, digits in the mono face. Inside the body the page tokens are re-pointed at the engraving colours.
-     Plain and a phone keep the plain page (chrome hidden, wrapper adds nothing). */
+     Plain keeps the plain page (chrome hidden, wrapper adds nothing). */
   .dcab .plate, .dcab .screw, .dcab .bench, .dcab .knob { display: none; }
-  @media (min-width: 601px) {
     :root[data-skin="retro"] .dcab { position: relative; padding: 30px 24px 64px; }
     :root[data-skin="retro"] .dcab::before, :root[data-skin="retro"] .dcab::after { content: ""; position: absolute; top: 30px; bottom: 64px; width: 24px; background: var(--cb-cheek); }
     :root[data-skin="retro"] .dcab::before { left: 0; border-radius: 8px 0 0 0; }
@@ -231,7 +230,7 @@
     :root[data-skin="retro"] #v0 .dface .tile .big { font: 400 40px/1 var(--cb-mono); }
     :root[data-skin="retro"] #v0 .dface .panel > .ptitle { background: transparent; color: var(--cb-engrave); border-bottom: 0; padding: 11px 14px 0; font: 400 13px var(--cb-stencil); letter-spacing: .14em; }
     :root[data-skin="retro"] #v0 .dface .panel > .ptitle .pnote { font: 600 11px var(--cb-label); letter-spacing: .1em; text-transform: uppercase; color: var(--cb-engrave-soft); }
-    :root[data-skin="retro"] #v0 .dface #d_ready_mount { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 18px; }
+    :root[data-skin="retro"] #v0 .dface #d_ready_mount { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr)); gap: 18px; }
     :root[data-skin="retro"] #v0 .dface #d_ready_mount .panel + .panel { margin-top: 0; }
     :root[data-skin="retro"] #v0 .dface .win, :root[data-skin="retro"] #v0 .dface .clist { background: var(--cb-face); border-color: var(--cb-chrome-3); }
     :root[data-skin="retro"] #v0 .dface .mono { font-family: var(--cb-mono); }
@@ -275,7 +274,6 @@
     :root[data-skin="retro"] #v0 .dface .gauge.out .gface { box-shadow: 0 0 0 2px var(--cb-bad), 0 3px 5px rgba(0,0,0,.3); }
     :root[data-skin="retro"] #v0 .dface svg.dial .df { stroke-width: 1; }
     :root[data-skin="retro"] #v0 .dface svg.dial text { font-family: var(--cb-label); font-weight: 600; }
-  }
   /* the rotary TEST SELECTOR: a radio group (arrow keys, Home, End) driving the same scenario as the tabs; above 700 px, 2 to 7 scenarios, not while editing */
   @media (min-width: 701px) {
     :root[data-skin="retro"] #v0 .dface > .scenbar:has(.knob[data-on="1"]):not(:has(#d_edit[aria-pressed="true"])) .knob { display: block; flex: 1 1 100%; }
@@ -315,13 +313,52 @@
     :root[data-skin="retro"] #d_table.crt .rwrap { padding: 6px; border-width: 6px; border-radius: 10px; }
     :root[data-skin="retro"] #d_table.crt table.rd th, :root[data-skin="retro"] #d_table.crt table.rd td { padding: 5px 6px; }
   }
-  @media (min-width: 601px) and (max-width: 900px) {
+  @media (max-width: 900px) {
     :root[data-skin="retro"] #v0 .dface { grid-template-columns: minmax(0, 1fr); }
     :root[data-skin="retro"] #v0 .dface > .scenbar, :root[data-skin="retro"] #v0 .dface > .lamps, :root[data-skin="retro"] #v0 .dface > .bench { grid-column: 1; grid-row: auto; }
     :root[data-skin="retro"] #v0 .dface > .plate { grid-template-columns: minmax(0, 1fr) auto; }
     :root[data-skin="retro"] #v0 .dface > .plate::before, :root[data-skin="retro"] #v0 .dface > .plate::after { display: none; }
     :root[data-skin="retro"] #v0 .dface > .plate .np { grid-column: 1; } :root[data-skin="retro"] #v0 .dface > .plate .sticker { grid-column: 2; }
     :root[data-skin="retro"] #v0 .dface > .lamps { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  }
+  /* the cabinet on a phone: a phone layout, not a shrunken desktop. Thin cheeks, no handle or kick plate, a compact plate, gauges two across with the
+     reading under the face, the scenario dropdown as a cabinet pushbutton (the knob is desktop only), 44 px controls */
+  @media (max-width: 600px) {
+    :root[data-skin="retro"] .dcab { padding: 0 5px; }
+    :root[data-skin="retro"] .dcab::before, :root[data-skin="retro"] .dcab::after { top: 0; bottom: 0; width: 5px; }
+    :root[data-skin="retro"] #v0 .dface { gap: 14px; padding: 14px 10px 16px; }
+    :root[data-skin="retro"] #v0 .dface::before, :root[data-skin="retro"] #v0 .dface::after { display: none; }
+    :root[data-skin="retro"] #v0 .dface > .plate { gap: 10px; }
+    :root[data-skin="retro"] #v0 .dface > .plate .np { padding: 9px 10px 8px; }
+    :root[data-skin="retro"] #v0 .dface > .plate .np b { font-size: 21px; letter-spacing: .12em; }
+    :root[data-skin="retro"] #v0 .dface > .plate .np > span { margin-top: 5px; font-size: 11.5px; letter-spacing: .14em; }
+    :root[data-skin="retro"] #v0 .dface > .plate .np small { margin-top: 5px; gap: 1px 10px; font-size: 9.5px; letter-spacing: .1em; }
+    :root[data-skin="retro"] #v0 .dface > .plate .sticker { width: 84px; padding: 4px 6px 5px; font-size: 9px; }
+    :root[data-skin="retro"] #v0 .dface > .plate .sticker b { font-size: 12px; }
+    :root[data-skin="retro"] #v0 .dface > .screw:nth-of-type(1), :root[data-skin="retro"] #v0 .dface > .screw:nth-of-type(2) { top: 4px; } :root[data-skin="retro"] #v0 .dface > .screw:nth-of-type(3), :root[data-skin="retro"] #v0 .dface > .screw:nth-of-type(4) { bottom: 4px; }
+    :root[data-skin="retro"] #v0 .dface > .screw:nth-of-type(1), :root[data-skin="retro"] #v0 .dface > .screw:nth-of-type(3) { left: 3px; } :root[data-skin="retro"] #v0 .dface > .screw:nth-of-type(2), :root[data-skin="retro"] #v0 .dface > .screw:nth-of-type(4) { right: 3px; }
+    :root[data-skin="retro"] #v0 .dface > .scenbar, :root[data-skin="retro"] #v0 .dface > .lamps, :root[data-skin="retro"] #v0 .dface > .bench { padding: 34px 10px 10px; }
+    :root[data-skin="retro"] #v0 .dface > .scenbar { flex-wrap: nowrap; align-items: stretch; }
+    :root[data-skin="retro"] #v0 .dface > .scenbar #d_edit { position: relative; top: auto; right: auto; flex: none; min-width: 44px; }
+    :root[data-skin="retro"] #v0 .dface > .scenbar .ssel { flex: 1 1 auto; min-width: 0; appearance: none; border: 4px solid transparent; border-radius: 5px; padding: 6px 34px 6px 12px;
+      background: linear-gradient(45deg, transparent 50%, var(--cb-silk) 50%) right 18px center / 6px 6px no-repeat padding-box, linear-gradient(135deg, var(--cb-silk) 50%, transparent 50%) right 12px center / 6px 6px no-repeat padding-box,
+        linear-gradient(180deg, var(--cb-cap-1), var(--cb-cap-2)) padding-box, linear-gradient(145deg, var(--cb-chrome-1), var(--cb-chrome-2) 45%, var(--cb-chrome-3) 70%, var(--cb-chrome-2)) border-box;
+      color: var(--cb-silk); font: 700 13px/1.1 var(--cb-label); letter-spacing: .12em; text-transform: uppercase; box-shadow: 0 2px 3px rgba(0,0,0,.3); }
+    :root[data-skin="retro"] #v0 .dface > .scenbar .ssel option { background: var(--cb-cap-2); color: var(--cb-silk); }
+    :root[data-skin="retro"] #v0 .dface .rocker { min-height: 44px; }
+    :root[data-skin="retro"] #v0 .dface > .lamps { gap: 12px 4px; }
+    :root[data-skin="retro"] #v0 .dface .gauges { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 10px; }
+    :root[data-skin="retro"] #v0 .dface .gauge { grid-template-columns: minmax(0, 1fr); grid-template-areas: "top" "face" "val" "note"; gap: 5px; }
+    :root[data-skin="retro"] #v0 .dface .gauge .gval { font-size: 18px; }
+    :root[data-skin="retro"] #v0 .dface .gauge .gface { border-width: 6px; border-radius: 6px; }
+    :root[data-skin="retro"] #v0 .dface .gauge .gface.led { padding: 6px 6px; } :root[data-skin="retro"] #v0 .dface .gauge .leds { padding: 8px 6px; }
+    :root[data-skin="retro"] #v0 .dface .panel > .ptitle { flex-wrap: wrap; row-gap: 3px; padding: 10px 10px 0; } :root[data-skin="retro"] #v0 .dface .panel > .ptitle .pnote { flex: 1 1 100%; } :root[data-skin="retro"] #v0 .dface .panel > .pbody { padding: 10px; }
+    :root[data-skin="retro"] #v0 .dface .tile .big { font-size: 30px; }
+    :root[data-skin="retro"] #v0 .dface #d_ready_mount { gap: 14px; }
+  }
+  @media (max-width: 360px) {
+    :root[data-skin="retro"] #v0 .dface > .plate { grid-template-columns: minmax(0, 1fr); }
+    :root[data-skin="retro"] #v0 .dface > .plate .sticker { display: none; }
   }
   .retro .mono, #v0 .mono { font-family: ui-monospace, "DejaVu Sans Mono", Menlo, Consolas, monospace; }
   #v0 .cwrap { display: grid; grid-template-columns: 150px 1fr; gap: 12px; }
