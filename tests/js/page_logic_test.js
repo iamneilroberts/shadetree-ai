@@ -333,6 +333,11 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
   assert.ok(/<span class="chip" id="chipLamp" title="Malfunction indicator lamp \(check-engine light\) as reported by the engine computer">check engine: \?<\/span>/.test(html), 'the check-engine chip explains itself in a tooltip');
   const qTrim = findQ(wEnv.el('o_attn'), '06'); assert(qTrim, 'attention rows have a ? button');
   wEnv.docHandlers.click({ target: qTrim }); assert(/Short-term trim, bank 1/.test(flat(wEnv.el('helpPanel'))) && /now 13/.test(flat(wEnv.el('helpPanel'))), 'row help shows the catalog and the live value');
+  const lvE = makeEnv(statesFor(10, base).concat(statesFor(40, () => Object.assign(base(), { '42': 12.1 }), 10, 4)), 'v0', OVF, [], NOGAUGES());
+  for (let k = 0; k < 10; k++) await lvE.tick();
+  lvE.docHandlers.click({ target: findQ(lvE.el('o_tiles'), '42') }); assert(/now 14\.2 V: normal/.test(flat(lvE.el('helpPanel'))), flat(lvE.el('helpPanel')));
+  for (let k = 0; k < 40; k++) await lvE.tick();
+  assert(/now 12\.1 V: watch \(10 s\)/.test(flat(lvE.el('helpPanel'))) && lvE.el('helpPanel').className === 'open', 'the open popup keeps its now line current: ' + flat(lvE.el('helpPanel')));
 
   // 7) Overview honesty: help ranges not loaded (and a retry), last-seen age, spike vs median, odd help entries
   const noHelp = makeEnv(statesFor(30, base), 'v0', null);

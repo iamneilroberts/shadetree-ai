@@ -887,7 +887,7 @@
       var ul = el('ul'); h.use.forEach(function (x) { ul.appendChild(el('li', '', String(x))); }); box.appendChild(ul);
     }
     if (h.typical) { box.appendChild(el('h5', '', 'Typical / worry if')); box.appendChild(el('p', '', String(h.typical))); }
-    var lv = liveLine(key); if (lv) box.appendChild(el('div', 'live', lv));
+    var lv = liveLine(key); box._live = lv ? box.appendChild(el('div', 'live', lv)) : null;   // render() keeps it current while open
     if (Array.isArray(h.status) && h.status.indexOf('unreviewed') >= 0) box.appendChild(el('div', 'draft', 'Wording drafted by the model, not yet reviewed.'));
     box.className = 'open'; helpKey = key;
     var r = btn.getBoundingClientRect(), w = box.offsetWidth || 360, hgt = box.offsetHeight || 0, below = r.bottom + 8;
@@ -1382,6 +1382,7 @@
     renderUnits();
     if (!helpLoaded() && performance.now() - helpTried > 5000) loadHelp();   // the first fetch failed or is slow: try again
     chips();
+    if (helpKey !== null && $('helpPanel')._live) $('helpPanel')._live.textContent = liveLine(helpKey);
     var view = active();
     if (view === 'v6') renderReadings();
     if (view === 'v0') {
