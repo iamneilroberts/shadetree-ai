@@ -1313,6 +1313,11 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
     const idleBar = makeEnv([{ status: 'idle', demo: false, channels: {}, stats: {}, seq: 0, codes: { read: false, note: null } }], 'v0', OVF); await idleBar.tick();
     assert.ok(/Next: press Start sampling, or load a replay/.test(idleBar.el('d_sum').innerHTML) && /Codes not read/.test(idleBar.el('d_sum').innerHTML), idleBar.el('d_sum').innerHTML);
     assert.ok(/id="d_sum"/.test(html.slice(html.indexOf('id="v0"'), html.indexOf('id="d_panel"'))), 'the bar sits above the gauges');
+    // the Handheld shows the same summary bar (source, lamp, codes and unanswered lists, readings to watch, next action)
+    const hsb = await cdE(Object.assign({}, PART, { unanswered: ['pending'], mil: false }), null, 'v5', () => Object.assign(base(), { '07': 14 }), { 'shadetree.scenario': 'fuel' });
+    const hsh = hsb.el('h_sum').innerHTML;
+    ['Live car · sampling', 'Check engine off', 'No answer for pending codes', '1 to watch', 'Next: keep an eye on LTFT bank 1 first'].forEach(t => assert.ok(hsh.includes(t), t + ' in ' + hsh));
+    assert.ok(hsb.el('h_sum').className === 'sumbar warn' && /id="h_sum"/.test(html.slice(html.indexOf('class="hh-body"'), html.indexOf('id="h_livepane"'))), 'above both Handheld panes');
     // Guided test: an unmatched pattern is "not classified", never "no large error"; no citations to playbooks that are not built
     const guided = async (fi, fr) => {
       const e = makeEnv(statesFor(10, fi).concat(statesFor(45, fi, 10, 4), statesFor(60, fr, 55, 22)), 'v3');

@@ -344,6 +344,7 @@
   .gauge .gnote { color: var(--muted); font-size: 12px; min-height: 18px; }
   .gauge.watch .gnote { color: var(--amber); } .gauge.out .gnote { color: var(--bad); } .gauge.stale .gface { opacity: .55; }
   .sumbar { display: flex; flex-wrap: wrap; gap: 4px 18px; margin: 0 0 10px; padding: 8px 12px; background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-left: 5px solid var(--line); border-radius: 6px; font: 700 14px var(--cond); }
+  .hh .sumbar { gap: 2px 12px; padding: 6px 10px; font-size: 12.5px; }   /* the Handheld repeats the Dashboard's summary bar, smaller */
   .sumbar.bad { border-left-color: var(--bad); } .sumbar.warn { border-left-color: var(--amber); } .sumbar.ok { border-left-color: var(--ok); } .sumbar .on { color: var(--bad); }
 </style>
 </head>
@@ -475,7 +476,7 @@
     <div class="hh-top"><span class="mil"><i class="lens red" id="h_mil" style="width:18px;height:18px"></i><span id="h_miltxt">Check engine</span></span><span class="hlive" id="h_live">&mdash;</span><span class="n mono" id="h_n">0 CODES</span></div>
     <div class="hh-scen"><select class="b" id="h_sel" aria-label="Scenario"></select></div>
     <div class="hh-alert" id="h_alert" hidden></div>
-    <div class="hh-body">
+    <div class="hh-body"><div class="sumbar" id="h_sum" role="status"></div>
       <div class="hh-pane" data-mode="live" id="h_livepane">
         <div class="lamps" id="h_lamps"></div>
         <div class="gauges" id="h_gauges"></div>
@@ -1490,7 +1491,7 @@
     $('h_codes').innerHTML = r.list.length ? codeRows(r.list, 'hh') + '<p class="cfoot">Meanings are plain-words drafts, unreviewed. Hints: general knowledge, unverified.</p>' : '<div class="cnone' + (r.clear ? '' : ' wait') + '" style="padding:150px 0">' + codeEmpty(r.c, r.live) + '</div>';
     var specs = specsFor(curScenario()), ids = Object.keys(st.channels || {}).sort();
     HB.none.textContent = specs.length ? '' : 'No gauges in this scenario. Edit it on the Dashboard.'; HB.none.hidden = specs.length > 0;
-    renderLamps($('h_lamps')); gauges(HB.g, specs);
+    renderSummary($('h_sum')); renderLamps($('h_lamps')); gauges(HB.g, specs);
     pidRows(HB.rows, ids); HB.tnote.textContent = ids.length ? '' : 'No readings yet.'; HB.tnote.hidden = ids.length > 0;
     $('h_tblbtn').textContent = 'All readings' + (ids.length ? ' (' + ids.length + ')' : '') + ' ▾';
   }
