@@ -1329,6 +1329,13 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
     assert.ok(/Pattern not classified/.test(high) && !/No large/.test(high) && /bank 1 LTFT 25\.0 % idle, 25\.0 % at 2500 rpm/.test(high), high);
     const noRev = await guided(idle, idle);
     assert.ok(/Pattern not classified/.test(noRev) && /averaged 700 rpm/.test(noRev), 'both captures at idle: ' + noRev);
+    // a new run (Stop then Start, a replay loaded or left) clears the captures: they belong to the old run
+    const nr = makeEnv(statesFor(10, idle).concat(statesFor(45, idle, 10, 4), statesFor(5, idle).map(st => Object.assign(st, { run: 2 }))), 'v3');
+    for (let k = 0; k < 10; k++) await nr.tick(); nr.handlers['go_idle:click']();
+    for (let k = 0; k < 45; k++) await nr.tick();
+    assert.ok(nr.el('st_idle').className === 'step done' && /Warm idle/.test(nr.el('results').innerHTML), 'captured in run 1');
+    for (let k = 0; k < 5; k++) await nr.tick();
+    assert.ok(/No captures yet/.test(nr.el('results').innerHTML) && nr.el('st_idle').className === 'step active' && nr.el('tx_idle').textContent === '', 'run 2 starts with no captures');
     assert.ok(!/ref:playbook/.test(html) && /\[general knowledge, unverified\]/.test(env.el('verdict').innerHTML), 'unbuilt playbook ids are gone');
   }
 

@@ -534,7 +534,7 @@
   function ingest(st, asked) {
     // a new run (any viewer, or Claude, can start one) restarts the sequence numbers: start over
     if (st.run !== runId || st.seq < lastSeq) {
-      resetBuffers(); runId = st.run;
+      resetBuffers(); runId = st.run; resetCaps();   // captures from another run (or source) are not this run's
       if (asked > 0) { state = st; return true; }   // the reply left out the new run's samples (they are older than `asked`): ask again from 0
     }
     state = st; fetchedAt = performance.now(); tNow = st.now;
@@ -618,6 +618,11 @@
     if (!cap) return;
     $('st_' + cap.id).className = 'step'; $('tx_' + cap.id).textContent = 'cancelled: ' + why;
     $('pg_' + cap.id).style.width = '0'; $('go_' + cap.id).disabled = false; cap = null;
+  }
+  function resetCaps() {   // back to the page's opening steps: no captures, step 1 active
+    cap = null; results = {};
+    ['idle', 'rev'].forEach(function (id) { $('st_' + id).className = id === 'idle' ? 'step active' : 'step'; $('tx_' + id).textContent = ''; $('pg_' + id).style.width = '0'; $('go_' + id).disabled = false; });
+    renderResults();
   }
   function startCap(id) {
     if (cap) return;
@@ -1538,7 +1543,7 @@
       setTimeout(function () { b.textContent = 'Save run'; }, 2500);
     });
   });
-  $('scenario').addEventListener('change', function (e) { post('/api/sim', { scenario: e.target.value }); results = {}; renderResults(); });
+  $('scenario').addEventListener('change', function (e) { post('/api/sim', { scenario: e.target.value }); resetCaps(); });
   $('rev').addEventListener('click', function () {
     var on = $('rev').textContent.indexOf('Rev') === 0;
     post('/api/sim', { rev: on }).then(function () {
