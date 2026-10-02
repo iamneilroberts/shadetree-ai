@@ -787,6 +787,29 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
     const off = await dash({ 'shadetree.scenario': 'towing' }, { scenariosFail: true });
     assert.strictEqual(off.el('d_tabs').children.length, 5, 'no server list: the built-ins'); assert.strictEqual(off.el('d_sel').value, 'general');
   }
+  {   // gauge titles: a short name with no unit (the value line carries it); the old "Name (unit)" is the tooltip; other PIDs fall back to their name
+    const NAMES = { '04': 'calculated_engine_load', '0D': 'vehicle_speed', '11': 'throttle_position', '0E': 'timing_advance', '0F': 'intake_air_temp', '44': 'commanded_equivalence_ratio', '99': 'some_very_long_reading_name' };
+    const UNITS = { '04': '%', '0D': 'km/h', '11': '%', '0E': 'deg', '0F': 'C', '44': 'ratio', '99': '' };
+    const named = statesFor(4, () => Object.assign(base(), { '0D': 40, '11': 12, '0E': 10, '0F': 30, '44': 1, '99': 3 }))
+      .map(st => { for (const p in NAMES) Object.assign(st.channels[p], { name: NAMES[p], unit: UNITS[p] }); return st; });
+    const gName = (g) => g.children[0].children[0];   // .gtop > .gname
+    for (const sc of ['general', 'fuel', 'cooling', 'idle', 'charging']) for (const units of ['metric', 'us']) {
+      const e = await dash({ 'shadetree.scenario': sc, 'shadetree.units': units }, {}, named);
+      assert.ok(dGauges(e).length >= 4, sc);
+      for (const g of dGauges(e)) {
+        const nm = gName(g), t = nm.textContent, tip = nm.getAttribute('title') || '', tag = sc + ' ' + units + ' ' + g.getAttribute('data-key');
+        assert.ok(t.length >= 3 && t.length <= 14 && !t.includes('('), tag + ' gauge title is short and has no unit: ' + t);
+        assert.ok(tip.length > t.length || tip === t, tag + ' tooltip: ' + tip);
+      }
+    }
+    const sp = await dash({ 'shadetree.scenario': 'general', 'shadetree.units': 'us' }, {}, named), spG = dGauges(sp).filter(g => g.getAttribute('data-key') === '0D:dial')[0];
+    assert.strictEqual(gName(spG).textContent, 'Speed'); assert.strictEqual(gName(spG).getAttribute('title'), 'Vehicle speed (mph)', 'the tooltip has the full name and unit');
+    assert.ok(spG.children.some(c => c.className === 'gval' && c.textContent === '25 mph'), 'the value line keeps the unit');
+    const fb = await dash({ 'shadetree.scen.general': JSON.stringify([{ pid: '99', form: 'seven' }]) }, {}, named), fbN = gName(dGauges(fb)[0]);
+    assert.strictEqual(fbN.textContent, 'Some very long reading name', 'a PID with no short title falls back to its name (the CSS ellipsis shortens it)');
+    assert.strictEqual(fbN.getAttribute('title'), 'Some very long reading name'); assert.strictEqual(fbN.children.length, 0, 'text, not markup');
+    const tbl = flat(sp.el('d_table')); assert.ok(/Vehicle speed \(mph\)/.test(tbl), 'the table keeps the full name and unit');
+  }
   // Dashboard honesty: a PID not in the run is dimmed, never a zero; a run with no channels says so
   {
     const e = await dash();   // base() has no 0D, so General's speed gauge is dim and says why

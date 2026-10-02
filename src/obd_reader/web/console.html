@@ -974,17 +974,19 @@
     function need(x) { return x === null ? 0 : String(Math.round(Math.abs(x))).length + it.dp + (x < 0 ? 1 : 0); }
     return Math.max(3, Math.min(7, Math.max(need(it.lo), need(it.hi), need(it.v))));
   }
-  function makeGauge(it) {   // a gauge card: name (unit) and its ?, the face, a value line and a note
+  function makeGauge(it) {   // a gauge card: a short name and its ?, the face, a value line (with the unit) and a note
     var root = el('div', 'gauge'), top = el('div', 'gtop'), name = el('span', 'gname'), face = el('div', 'gface'), val = el('div', 'gval'), note = el('div', 'gnote');
     root.setAttribute('data-key', it.key);
     top.appendChild(name); top.appendChild(qbtn(it.pid));
     [top, face, val, note].forEach(function (c) { root.appendChild(c); });
     return { root: root, name: name, face: face, val: val, note: note };
   }
+  var GTITLE = { '0C': 'Engine speed', '0D': 'Speed', '05': 'Coolant', '04': 'Engine load', '11': 'Throttle', '0B': 'MAP', '42': 'Battery',
+    '06': 'STFT bank 1', '07': 'LTFT bank 1', '08': 'STFT bank 2', '09': 'LTFT bank 2', '44': 'Target lambda', '0E': 'Spark advance', '0F': 'Intake air' };   // short gauge titles (the value line shows the unit)
   function updGauge(nd, it) {
-    var u = unitOf(it.pid), name = pidName(it.pid);
+    var u = unitOf(it.pid), name = pidName(it.pid), full = name.charAt(0).toUpperCase() + name.slice(1);
     nd.root.className = 'gauge ' + it.form + (it.present ? '' : ' dim') + (it.s === 'watch' || it.s === 'out' ? ' ' + it.s : '');
-    nd.name.textContent = name.charAt(0).toUpperCase() + name.slice(1) + (u ? ' (' + u + ')' : '');
+    nd.name.textContent = GTITLE[it.pid] || full; nd.name.setAttribute('title', full + (u ? ' (' + u + ')' : ''));
     nd.note.textContent = it.note;
     nd.val.textContent = it.form === 'seven' ? '' : fmt(it.v, it.dp) + (u && it.v !== null ? ' ' + u : '');
     if (it.form === 'dial') nd.face.innerHTML = dialSvg(it.v, it.lo, it.hi, it.majors, it.zones, name, it.div);   // numbers and fixed markup; the name is escaped
