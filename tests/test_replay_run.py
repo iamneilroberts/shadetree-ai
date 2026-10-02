@@ -258,3 +258,18 @@ def test_demo_provenance_and_unanswered_codes_survive_loading():
     assert r.demo is True and r.codes["mil"] is None and r.codes["unanswered"] == ["pending", "mil"]
     o["codes"] = {"read": False, "note": "the car did not answer", "mil": False}
     assert rr.load_run(o).codes == {"read": False, "note": "the car did not answer", "mil": False}
+
+
+def test_readiness_and_freeze_frame_blocks_are_checked_and_a_bad_one_is_dropped():
+    o = run_obj()
+    o["readiness"] = {"read": True, "mil": False, "dtc_count": 0, "ignition": "spark",
+                      "monitors": {"misfire": {"supported": True, "complete": True}, "egr": {"supported": False, "complete": None}}}
+    o["freeze_frame"] = {"read": True, "dtc": "P0171", "pids": {"05": {"name": "coolant_temp", "unit": "C", "value": 90, "label": None}}}
+    r = rr.load_run(o)
+    assert r.readiness["monitors"]["egr"] == {"supported": False, "complete": None} and r.freeze_frame["pids"]["05"]["value"] == 90.0
+    for bad in ({"monitors": {"<b>": {"supported": True}}}, {"ignition": "steam"}, {"dtc_count": True}):
+        assert rr.load_run({**o, "readiness": {**o["readiness"], **bad}}).readiness is None
+    for bad in ({"dtc": "X1234"}, {"pids": {"5": {}}}, {"pids": {"05": {"name": "x", "unit": None, "value": float("nan")}}}):
+        assert rr.load_run({**o, "freeze_frame": {**o["freeze_frame"], **bad}}).freeze_frame is None
+    o["freeze_frame"] = {"read": False, "note": "the car did not answer the freeze-frame request"}
+    assert rr.load_run(o).freeze_frame == o["freeze_frame"]

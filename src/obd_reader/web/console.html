@@ -321,6 +321,12 @@
   .panel > .ptitle .pname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .panel > .ptitle .pnote { font-weight: 400; letter-spacing: .04em; text-transform: none; }
   .panel > .pbody { padding: 12px 14px; min-width: 0; }
+  .rdhd { font: 700 13px var(--cond); letter-spacing: .04em; margin: 0 0 8px; }
+  .mons { display: grid; gap: 2px 14px; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
+  .mon { display: flex; justify-content: space-between; gap: 8px; font-size: 12.5px; padding: 3px 0; border-bottom: 1px dotted var(--line); }
+  .mon b { font: 700 11px var(--cond); letter-spacing: .06em; text-transform: uppercase; opacity: .7; }
+  .mon.complete b { color: var(--ok); opacity: 1; } .mon.incomplete b { color: var(--amber); opacity: 1; }
+  table.ff td:last-child { text-align: right; } .hsec { font: 700 12px var(--cond); letter-spacing: .12em; text-transform: uppercase; margin: 16px 0 6px; }
   .gauges { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
   @media (min-width: 601px) { .gauges { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); } }   /* wider cards where there is room, so long names fit; a phone keeps two side by side */
   .hh .gauges { grid-template-columns: repeat(2, 1fr); }   /* the Handheld frame is phone width on any screen: always two across */
@@ -431,6 +437,7 @@
     <div id="d_panel"></div>
     <div class="lamps" id="d_lamps"></div>
     <div id="d_codes_mount"></div>
+    <div id="d_ready_mount"></div>
     <div id="d_strip">
       <h3 class="sec" id="o_health">Health</h3>
       <div class="tiles" id="o_tiles"></div>
@@ -1089,6 +1096,40 @@
     cp.list.innerHTML = r.list.length ? codeRows(r.list, 'cab') : '<div class="cnone' + (r.clear ? '' : ' wait') + '">' + codeEmpty(r.c, r.live) + '</div>';
     $('d_codes_mount').hidden = !r.list.length;
   }
+  /* shared parts: Freeze frame and Readiness (read once with the codes); data the car did not give says why, never a pass */
+  var MON = { misfire: 'Misfire', fuel_system: 'Fuel system', components: 'Components', catalyst: 'Catalyst', heated_catalyst: 'Heated catalyst', evap: 'EVAP',
+    secondary_air: 'Secondary air', ac_refrigerant: 'A/C refrigerant', o2_sensor: 'O2 sensor', o2_sensor_heater: 'O2 sensor heater', egr: 'EGR / VVT' };
+  var MONRANK = { incomplete: 0, unknown: 1, complete: 2, 'not supported': 3 };
+  function notRead(b, what) { return '<p class="note">' + esc(b.note || (source().sampling ? 'Reading ' + what + '\u2026' : 'Start sampling to read ' + what + '.')) + '</p>'; }
+  function pidTitle(p, fb) { var e = HELP.pids[p]; return GTITLE[p] || (e && typeof e.title === 'string' ? e.title : '') || fb; }
+  function readyHtml() {
+    var r = (state && state.readiness) || { read: false };
+    if (!r.read) return notRead(r, 'the monitors');
+    var ms = r.monitors || {}, rows = Object.keys(ms).map(function (k) {
+      var m = ms[k]; return { k: k, w: !m.supported ? 'not supported' : m.complete === true ? 'complete' : m.complete === false ? 'incomplete' : 'unknown' };
+    }), sup = rows.filter(function (x) { return x.w !== 'not supported'; }), done = sup.filter(function (x) { return x.w === 'complete'; });
+    rows.sort(function (a, b) { return MONRANK[a.w] - MONRANK[b.w]; });   // incomplete first: what still has to run
+    return '<p class="rdhd">' + esc('Check engine ' + (r.mil === true ? 'ON' : r.mil === false ? 'off' : '?') + ' \u00b7 ' + r.dtc_count + ' code' + (r.dtc_count === 1 ? '' : 's') +
+      ' counted by the car \u00b7 ' + done.length + ' of ' + sup.length + ' supported monitors complete') + '</p><div class="mons">' + rows.map(function (x) {
+      return '<div class="mon ' + x.w.replace(' ', '-') + '"><span>' + esc(MON[x.k] || x.k.replace(/_/g, ' ')) + '</span><b>' + x.w + '</b></div>';
+    }).join('') + '</div><p class="cfoot">Incomplete: that self-test has not finished since the codes were last cleared [general knowledge, unverified].</p>';
+  }
+  function ffShown() { var f = (state && state.freeze_frame) || {}, c = (state && state.codes) || {}; return f.read === true || !!(c.read && c.stored && c.stored.length); }
+  function ffVal(p, x) {
+    if (x.label) return x.label;
+    var u = x.unit, c = US ? ((p === '0B' || p === '33') && u === 'kPa' ? INHG : CONV[u]) : null;
+    return c ? c[1](x.value).toFixed(c[2]) + ' ' + c[0] : fmtAny(x.value) + (u ? ' ' + (u === 'C' ? '\u00b0C' : u) : '');
+  }
+  function ffHtml() {
+    var f = (state && state.freeze_frame) || { read: false };
+    if (!f.read) return notRead(f, 'the freeze frame');
+    if (!f.dtc) return '<p class="note">The car reports no freeze frame stored.</p>';
+    var ps = f.pids || {}, ks = Object.keys(ps).sort();
+    return '<p class="rdhd">Readings frozen when ' + esc(f.dtc) + ' was set</p>' + (!ks.length ? '<p class="note">No readings came with it.</p>' : '<table class="rd ff"><tbody>' + ks.map(function (p) {
+      return '<tr><td>' + esc(pidTitle(p, String(ps[p].name).replace(/_/g, ' '))) + ' (' + esc(p) + ')</td><td>' + esc(ffVal(p, ps[p])) + '</td></tr>'; }).join('') + '</tbody></table>');
+  }
+  function setHtml(box, h) { if (box._sig !== h) { box._sig = h; box.innerHTML = h; } }
+  function renderReady(rp, fp) { setHtml(fp.body, ffHtml()); fp.root.hidden = !ffShown(); setHtml(rp.body, readyHtml()); }
   var BUILTIN = [
     { id: 'general', name: 'General', gauges: [['0C','dial'],['0D','dial'],['05','dial'],['04','bar'],['11','bar'],['0B','bar'],['42','seven'],['06','seven']] },
     { id: 'fuel', name: 'Fuel trims', gauges: [['06','bar'],['07','bar'],['08','bar'],['09','bar'],['44','dial'],['0B','dial'],['0C','dial'],['04','seven']] },
@@ -1208,7 +1249,8 @@
     if (!DB) {
       var p = panel(''), t = pidTableEl(), g = el('div', 'gauges');
       p.body.appendChild(g); $('d_panel').appendChild(p.root); $('d_table').appendChild(t.root);
-      DB = { cp: codesPanel(), p: p, g: g, rows: t.body, none: el('p', 'note'), tnote: el('p', 'note') };
+      DB = { cp: codesPanel(), fp: panel('Freeze frame'), rp: panel('Readiness monitors'), p: p, g: g, rows: t.body, none: el('p', 'note'), tnote: el('p', 'note') };
+      [DB.fp, DB.rp].forEach(function (x) { x.plate.appendChild(el('span', 'pnote', 'read at run start, not live')); $('d_ready_mount').appendChild(x.root); });
       $('d_table').appendChild(DB.tnote);
       p.body.insertBefore(DB.none, g);
       $('d_codes_mount').appendChild(DB.cp.root);
@@ -1217,7 +1259,7 @@
     var sc = curScenario(), specs = ED.on ? ED.draft : specsFor(sc), chs = (state && state.channels) || {}, ids = Object.keys(chs).sort(), mine = {};
     if (ED.on && (!ED.box || ED.sig !== ids.join())) drawEditor();   // the editor is rebuilt on actions and when the PIDs in the run change, not every poll
     DB.p.name.textContent = sc.name; DB.none.textContent = specs.length ? '' : 'No gauges. Add one or Reset.'; DB.none.hidden = specs.length > 0;
-    renderSummary($('d_sum')); gauges(DB.g, specs); renderLamps($('d_lamps')); renderCodes(DB.cp);
+    renderSummary($('d_sum')); gauges(DB.g, specs); renderLamps($('d_lamps')); renderCodes(DB.cp); renderReady(DB.rp, DB.fp);
     specs.forEach(function (s) { mine[s.pid] = true; });   // keys are two-hex-digit PIDs (cleanSpecs), so a plain object is safe
     pidRows(DB.rows, ids); DB.tnote.textContent = ids.length ? '' : 'No readings yet.'; DB.tnote.hidden = ids.length > 0;
     Array.prototype.forEach.call(DB.rows.children, function (r) { r.classList.toggle('scen', mine[r.getAttribute('data-key')] === true); });
@@ -1505,7 +1547,8 @@
     $('h_miltxt').textContent = r.mil ? 'Check engine ON' : r.c.mil === false ? 'Check engine off' : 'Check engine ?';
     $('h_n').textContent = r.c.read ? r.n + (r.n === 1 ? ' CODE' : ' CODES') : '-- CODES'; $('h_n').className = 'n mono' + (r.clear ? ' zero' : '');
     var lv = $('h_live'), src = source(); lv.textContent = src.word; lv.className = 'hlive ' + (src.sampling ? 'on' : 'off');
-    $('h_codes').innerHTML = '<p class="cfoot">Read at run start, not live.</p>' + (r.list.length ? codeRows(r.list, 'hh') + '<p class="cfoot">Meanings are plain-words drafts, unreviewed. Hints: general knowledge, unverified.</p>' : '<div class="cnone' + (r.clear ? '' : ' wait') + '" style="padding:150px 0">' + codeEmpty(r.c, r.live) + '</div>');
+    $('h_codes').innerHTML = '<p class="cfoot">Read at run start, not live.</p>' + (r.list.length ? codeRows(r.list, 'hh') + '<p class="cfoot">Meanings are plain-words drafts, unreviewed. Hints: general knowledge, unverified.</p>' : '<div class="cnone' + (r.clear ? '' : ' wait') + '" style="padding:40px 0">' + codeEmpty(r.c, r.live) + '</div>') +
+      (ffShown() ? '<h3 class="hsec">Freeze frame</h3>' + ffHtml() : '') + '<h3 class="hsec">Readiness monitors</h3>' + readyHtml();
     var specs = specsFor(curScenario()), ids = Object.keys(st.channels || {}).sort();
     HB.none.textContent = specs.length ? '' : 'No gauges in this scenario. Edit it on the Dashboard.'; HB.none.hidden = specs.length > 0;
     renderSummary($('h_sum')); renderLamps($('h_lamps')); gauges(HB.g, specs);

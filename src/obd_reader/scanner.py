@@ -146,13 +146,18 @@ def _undecoded(transport: Transport, advertised: list[str], warnings: list[str])
 
 
 def _freeze_frame(transport: Transport) -> FreezeFrame | None:
-    """Mode 02 frame 0: the DTC that triggered it, then every decodable supported PID."""
+    return read_freeze_frame(transport)[1]
+
+
+def read_freeze_frame(transport: Transport) -> tuple[bool, FreezeFrame | None]:
+    """Mode 02 frame 0: the DTC that triggered it, then every decodable supported PID.
+    The flag says whether any ECU answered 020200, so "no answer" and "no frame stored" stay apart."""
     dtc_payloads = [p for p in parse_all(transport.send("020200"), 0x42)
                     if len(p) >= 5 and p[1] == 0x02 and p[2] == 0x00]
     # The ECU that has a frame is the one reporting a non-zero DTC (another ECU may answer first with 0000).
     idx = next((i for i, p in enumerate(dtc_payloads) if p[3] or p[4]), None)
     if idx is None:
-        return None
+        return bool(dtc_payloads), None
     hi, lo = dtc_payloads[idx][3], dtc_payloads[idx][4]
     values: dict[str, PidValue] = {}
     for pid in sorted(_walk_pages(transport, 0x02)):
@@ -166,7 +171,7 @@ def _freeze_frame(transport: Transport) -> FreezeFrame | None:
             v = decode_pid(pid, got[idx][3:])
             if v is not None:
                 values[pid] = v
-    return FreezeFrame(dtc=decode_dtc(hi, lo), pids=values)
+    return True, FreezeFrame(dtc=decode_dtc(hi, lo), pids=values)
 
 
 def scan(

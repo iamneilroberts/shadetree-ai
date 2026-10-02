@@ -18,6 +18,7 @@ _HEX2 = re.compile(r"[0-9A-F]{2}")
 _NAME = re.compile(r"[A-Za-z0-9T:_.-]{1,100}\.json")
 _CODE = re.compile(r"[PCBU][0-9A-F]{4}")
 _VIN_RUN = re.compile(r"[A-HJ-NPR-Z0-9]{17}")   # any 17 VIN characters in a row, checked on the upper-cased label
+_MON = re.compile(r"[a-z0-9_]{1,40}")
 _STAMP = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}Z")
 META_TEXT = {"make": 40, "model": 40, "title": 80}
 MIN_YEAR, MAX_YEAR = 1996, 2100
@@ -35,6 +36,8 @@ class Run:
     vehicle: dict | None = None
     times: list = field(default_factory=list)
     demo: bool = False  # recorded from the simulator, not a car
+    readiness: dict | None = None
+    freeze_frame: dict | None = None
 
     def index_after(self, pos: float) -> int:
         return bisect.bisect_right(self.times, pos)
@@ -112,6 +115,49 @@ def _mode06(m) -> dict | None:
     return {"read": True, "note": None, "mids": [x for x in mids if isinstance(x, str) and _HEX2.fullmatch(x)], "results": out}
 
 
+def _not_read(x) -> dict | None:
+    """A block saved as not read keeps its short note (why), so a replay does not call it missing from the file."""
+    n = x.get("note") if isinstance(x, dict) and x.get("read") is False else None
+    return {"read": False, "note": n} if isinstance(n, str) and 0 < len(n) <= 200 else None
+
+
+def _readiness(r) -> dict | None:
+    """Mode 01 PID 01 as saved: lamp, code count, ignition and up to 16 monitors. Anything malformed: not stored."""
+    if not isinstance(r, dict) or r.get("read") is not True:
+        return _not_read(r)
+    mons, n, ign = r.get("monitors"), r.get("dtc_count"), r.get("ignition")
+    if not isinstance(mons, dict) or len(mons) > 16 or type(n) is not int or not 0 <= n <= 1000 or ign not in ("spark", "compression"):
+        return None
+    out = {}
+    for k, m in mons.items():
+        if not (isinstance(k, str) and _MON.fullmatch(k) and isinstance(m, dict) and isinstance(m.get("supported"), bool)
+                and m.get("complete") in (True, False, None)):
+            return None
+        out[k] = {"supported": m["supported"], "complete": m.get("complete")}
+    mil = r.get("mil") if isinstance(r.get("mil"), bool) else None
+    return {"read": True, "note": None, "mil": mil, "dtc_count": n, "ignition": ign, "monitors": out}
+
+
+def _freeze(f) -> dict | None:
+    """Mode 02 frame 0 as saved: the code that set it (or none stored) and up to 64 decoded readings."""
+    if not isinstance(f, dict) or f.get("read") is not True:
+        return _not_read(f)
+    dtc, pids = f.get("dtc"), f.get("pids")
+    if not (dtc is None or isinstance(dtc, str) and _CODE.fullmatch(dtc)) or not isinstance(pids, dict) or len(pids) > 64:
+        return None
+    out = {}
+    for pid, v in pids.items():
+        if not (isinstance(pid, str) and _HEX2.fullmatch(pid) and isinstance(v, dict)):
+            return None
+        label = v.get("label")
+        try:
+            out[pid] = {"name": _text(v.get("name")), "unit": _text(v.get("unit"), allow_none=True), "value": _num(v.get("value")),
+                        "label": label if isinstance(label, str) and len(label) <= MAX_TEXT else None}
+        except ValueError:
+            return None
+    return {"read": True, "note": None, "dtc": dtc, "pids": out}
+
+
 def _vehicle(v) -> dict | None:
     key = v.get("key") if isinstance(v, dict) else None
     if isinstance(key, str) and KEY_RE.fullmatch(key):
@@ -157,7 +203,8 @@ def load_run(obj) -> Run:
                rate_hz=rate,
                protocol=proto if isinstance(proto, str) and len(proto) <= MAX_TEXT else None,
                names=names, sweeps=sweeps, codes=_codes(obj.get("codes")), mode06=_mode06(obj.get("mode06")),
-               vehicle=_vehicle(obj.get("vehicle")), times=[t for t, _ in sweeps], demo=obj.get("demo") is True)
+               vehicle=_vehicle(obj.get("vehicle")), times=[t for t, _ in sweeps], demo=obj.get("demo") is True,
+               readiness=_readiness(obj.get("readiness")), freeze_frame=_freeze(obj.get("freeze_frame")))
 
 
 def clean_meta(m) -> dict:

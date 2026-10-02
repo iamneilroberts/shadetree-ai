@@ -67,6 +67,16 @@ _CODES = {
 }
 
 
+# Mode 01 PID 01 bytes B C D (spark ignition): misfire, fuel system and components supported; catalyst, EVAP,
+# O2 sensor, O2 heater and EGR supported; D = which of those have not completed (made up: EVAP on the faulty cars)
+_MONITORS = {"healthy": (0x07, 0xE5, 0x00), "rich": (0x07, 0xE5, 0x04), "lean": (0x07, 0xE5, 0x04)}
+# Mode 02 frame 0 for a car with a stored code: the readings frozen when its first stored code was set (made up)
+_FROZEN = {
+    "rich": {"03": 1, "04": 24, "05": 38, "06": -9, "07": -21, "0B": 33, "0C": 1150, "0D": 0},
+    "lean": {"03": 2, "04": 19, "05": 90, "06": 9, "07": 17, "0B": 34, "0C": 690, "0D": 0},
+}
+
+
 def _dtc_reply(sid: int, codes: list[int]) -> str:
     return " ".join(f"{b:02X}" for b in [sid, len(codes)] + [x for c in codes for x in (c >> 8, c & 0xFF)])
 
@@ -131,6 +141,23 @@ class SimPort:
                 bits |= 1 << (31 - i)
         return f"{sid} {base:02X} " + " ".join(f"{b:02X}" for b in bits.to_bytes(4, "big"))
 
+    def _mode02(self, pid: str) -> str:
+        """Freeze frame 0: the support bitmap, the code that stored it (0000: none) and its frozen readings."""
+        stored, frozen = _CODES[self.scenario][0], _FROZEN.get(self.scenario, {})
+        hexs = lambda raw: " ".join(f"{x:02X}" for x in raw)  # noqa: E731
+        if pid in ("00", "20", "40"):
+            bits = 0
+            for p in [2, *(int(k, 16) for k in frozen)] if stored else []:
+                if int(pid, 16) < p <= int(pid, 16) + 32:
+                    bits |= 1 << (31 - (p - int(pid, 16) - 1))
+            return f"42 {pid} 00 " + hexs(bits.to_bytes(4, "big")) if bits else "NO DATA"
+        if pid == "02":
+            c = stored[0] if stored else 0
+            return f"42 02 00 {c >> 8:02X} {c & 0xFF:02X}"
+        if stored and pid in frozen:
+            return f"42 {pid} 00 " + hexs(ENCODERS[pid](frozen[pid]))
+        return "NO DATA"
+
     def write(self, data: bytes) -> None:
         cmd = data.decode("ascii").rstrip("\r")
         if cmd == "010C":
@@ -155,7 +182,10 @@ class SimPort:
             self._pending = _dtc_reply({"03": 0x43, "07": 0x47, "0A": 0x4A}[cmd], {"03": stored, "07": pending, "0A": []}[cmd]) + "\r"
         elif cmd == "0101":
             stored, _ = _CODES[self.scenario]
-            self._pending = f"41 01 {(0x80 if stored else 0) | len(stored):02X} 00 00 00\r"
+            b, c, d = _MONITORS[self.scenario]
+            self._pending = f"41 01 {(0x80 if stored else 0) | len(stored):02X} {b:02X} {c:02X} {d:02X}\r"
+        elif cmd.startswith("02") and len(cmd) == 6 and cmd.endswith("00"):
+            self._pending = self._mode02(cmd[2:4]) + "\r"
         elif cmd == "0902":
             b = [0x49, 0x02, 0x01] + list(SIM_VIN.encode("ascii"))
             fr = lambda chunk: " ".join(f"{x:02X}" for x in chunk)

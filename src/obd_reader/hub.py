@@ -17,9 +17,11 @@ from obd_reader.dtc_text import describe
 from obd_reader.elm import decode_dtc_list, decode_supported, parse_all
 from obd_reader.live import MAX_HZ, MAX_PIDS, MIN_HZ, LiveLimitError, read_pid_value, summarize, validate_pids
 from obd_reader.mode06 import read_all as read_mode06
-from obd_reader.pids import PIDS
+from obd_reader.pids import PIDS, pid_label
 from obd_reader.profiles import ProfileStore
+from obd_reader.readiness import parse_readiness
 from obd_reader.replay_run import Run
+from obd_reader.scanner import read_freeze_frame
 from obd_reader.session import Session
 from obd_reader.simulator import SimPort
 from obd_reader.snapshot import VIN_RE, LiveSample, Series
@@ -81,6 +83,8 @@ class LiveHub:
         self._t0 = self._last_at = self._deadline = None
         self._adapter: dict = {"chip": None, "ati": None, "protocol": None}
         self._codes: dict = {"read": False, "note": None}
+        self._ready: dict = {"read": False, "note": None}   # Mode 01 PID 01: lamp, code count, monitors (read with the codes)
+        self._ff: dict = {"read": False, "note": None}      # Mode 02 frame 0 (read after the codes, only with a stored code)
         self._unsupported: list[str] = []
         self._missed: set[str] = set()
         self._extras: list[str] = []
@@ -161,6 +165,8 @@ class LiveHub:
                 self._adapter = {"chip": None, "ati": "replay", "protocol": run.protocol}
                 self._codes = run.codes or {"read": False, "note": "not stored in this run"}
                 self._m06 = run.mode06 or {"read": False, "note": "not stored in this run", "mids": [], "results": []}
+                self._ready = run.readiness or {"read": False, "note": "not in this recording"}
+                self._ff = run.freeze_frame or {"read": False, "note": "not in this recording"}
                 self._vehicle = run.vehicle
                 self._ch = {p: deque(maxlen=self._max) for p in run.names}
                 for t, vals in run.sweeps:
@@ -312,6 +318,8 @@ class LiveHub:
                             if not self._stop.is_set():
                                 self._read_codes(t)
                             if not self._stop.is_set():
+                                self._read_freeze_frame(t)
+                            if not self._stop.is_set():
                                 self._read_mode06(t)
                     else:
                         silent += 1
@@ -427,6 +435,8 @@ class LiveHub:
         if self._sim is None and "15765" not in proto:
             with self._data_lock:
                 self._codes = {"read": False, "note": f"trouble codes not supported yet on {proto or 'this'} protocol"}
+                self._ready = {"read": False, "note": f"readiness not supported yet on {proto or 'this'} protocol"}
+                self._ff = {"read": False, "note": f"freeze frame not supported yet on {proto or 'this'} protocol"}
             return
         # An answer with no codes is an empty list; no answer (NO DATA, a negative or garbled reply) is named in
         # `unanswered`, so the page never turns silence into "no codes" or "lamp off".
@@ -446,9 +456,38 @@ class LiveHub:
         if mil is None:
             missed.append("mil")
         read = len([k for k in missed if k != "mil"]) < 3
+        ignition, monitors = parse_readiness(status)  # the same 0101 answer: each ECU counts its own codes
+        ready = ({"read": True, "note": None, "mil": mil, "dtc_count": sum(p[2] & 0x7F for p in status), "ignition": ignition,
+                  "monitors": {k: m.model_dump() for k, m in monitors.items()}} if ignition else
+                 {"read": False, "note": "the car did not answer the readiness request (Mode 01 PID 01)"})
         with self._data_lock:
+            self._ready = ready
             self._codes = ({"read": True, "note": None, **out, "mil": mil, "unanswered": missed} if read else
                            {"read": False, "note": "the car did not answer the trouble-code requests", "mil": mil})
+
+    def _read_freeze_frame(self, t) -> None:
+        """Mode 02 frame 0, once per run, only when a stored code was read (as scan() does). CAN only, as the codes."""
+        if self._sim is None and "15765" not in (self._adapter["protocol"] or ""):
+            return  # non-CAN: _read_codes already said why
+        with self._data_lock:
+            codes = dict(self._codes)
+        if not codes.get("read"):
+            ff = {"read": False, "note": "not requested: the trouble codes were not read"}
+        elif not codes.get("stored"):
+            ff = {"read": False, "note": "not requested: no stored code" if "stored" not in codes.get("unanswered", [])
+                  else "not requested: the stored-code list did not answer"}
+        else:
+            answered, frame = read_freeze_frame(t)
+            if not answered:
+                ff = {"read": False, "note": "the car did not answer the freeze-frame request"}
+            elif frame is None:
+                ff = {"read": True, "note": None, "dtc": None, "pids": {}}  # answered: no frame stored
+            else:
+                ff = {"read": True, "note": None, "dtc": frame.dtc,
+                      "pids": {p: {"name": v.name, "unit": v.unit, "value": v.value, "label": pid_label(p, v.value)}
+                               for p, v in frame.pids.items()}}
+        with self._data_lock:
+            self._ff = ff
 
     def _sweep(self, t, pids: list[str], now: float) -> bool:
         """Read every PID once, then publish the whole sweep at once (a viewer never sees half of one)."""
@@ -495,6 +534,7 @@ class LiveHub:
             status, message, hz, run = self.status, self.message, self.hz, self._run_id
             adapter, st, codes = dict(self._adapter), list(self._sweep_t), dict(self._codes)
             unsupported, extras, m06 = list(self._unsupported), list(self._extras), dict(self._m06)
+            ready, ff = dict(self._ready), dict(self._ff)
             tiers = None if self._tiers is None else dict(self._tiers)
             vehicle = None if self._vehicle is None else dict(self._vehicle)
             # only sweeps up to `seq`: anything newer is not complete yet
@@ -527,7 +567,7 @@ class LiveHub:
             "seconds_left": (max(0.0, round(deadline - self._clock(), 1))
                              if status == "running" and deadline else None),
             "adapter": adapter, "codes": codes, "unsupported": unsupported,
-            "extras": extras, "tiers": tiers, "mode06": m06, "vehicle": vehicle, "replay": replay,
+            "extras": extras, "tiers": tiers, "mode06": m06, "readiness": ready, "freeze_frame": ff, "vehicle": vehicle, "replay": replay,
             "channels": channels, "stats": stats,
         }
 
@@ -568,13 +608,14 @@ class LiveHub:
                                 samples=[(tt, v) for s, tt, v in d if s <= seq])
                       for p, d in self._full.items()}
             codes, m06, key, tr = dict(self._codes), dict(self._m06), self._key, self._transcript
+            ready, ff = dict(self._ready), dict(self._ff)
         ls = LiveSample(duration_s=self.state()["now"], rate_hz=self.hz or 0.0, series=series)
         rdir = Path(self._s.config.home) / "runs"
         rdir.mkdir(parents=True, exist_ok=True)
         path = rdir / f"{datetime.now(timezone.utc):%Y-%m-%dT%H-%M-%SZ}-{label}.json"
         with open(path, "x", encoding="utf-8") as fh:
             json.dump({"kind": "live_run", "demo": self._sim is not None, "adapter": self._adapter,
-                       "live_sample": ls.model_dump(mode="json"), "codes": codes, "mode06": m06,
+                       "live_sample": ls.model_dump(mode="json"), "codes": codes, "mode06": m06, "readiness": ready, "freeze_frame": ff,
                        "vehicle": {"key": key} if key else None, "transcript": tr}, fh, indent=2)
         with self._data_lock:
             self._saved = (path, seq)

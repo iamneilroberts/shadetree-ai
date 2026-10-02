@@ -1351,5 +1351,29 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
     assert.ok(!/ref:playbook/.test(html) && /\[general knowledge, unverified\]/.test(env.el('verdict').innerHTML), 'unbuilt playbook ids are gone');
   }
 
+  {   // Readiness and freeze frame: shown from the run's one read; not read, no answer and not in this recording each say so, never a pass
+    const H = (n) => { let s = n.innerHTML || ''; (n.children || []).forEach(c => { s += ' ' + H(c); }); return s; };
+    const R = { read: true, note: null, mil: true, dtc_count: 2, ignition: 'spark', monitors: { misfire: { supported: true, complete: true }, evap: { supported: true, complete: false }, egr: { supported: false, complete: null } } };
+    const F = { read: true, note: null, dtc: 'P0117', pids: { '05': { name: 'coolant_temp', unit: 'C', value: 38, label: null }, '03': { name: 'fuel_system_status', unit: null, value: 1, label: 'Open loop, engine cold' } } };
+    const C = { read: true, note: null, mil: true, unanswered: [], stored: [{ code: 'P0117', desc: 'd', hint: '' }], pending: [], permanent: [] };
+    const rd = async (extra, view = 'v0', store = {}, status = 'running') => { const e = makeEnv(statesFor(3, base).map(s => Object.assign(s, { status }, extra)), view, OVF, [], store); for (let k = 0; k < 3; k++) await e.tick(); return e; };
+    const e = await rd({ readiness: R, freeze_frame: F, codes: C }), d = H(e.el('d_ready_mount'));
+    assert.ok(/2 codes counted by the car · 1 of 2 supported monitors complete/.test(d) && d.indexOf('EVAP') < d.indexOf('Misfire') && d.indexOf('Misfire') < d.indexOf('EGR / VVT'), 'incomplete first, then complete, then not supported: ' + d);
+    assert.ok(/<b>incomplete<\/b>/.test(d) && /<b>not supported<\/b>/.test(d) && /Readings frozen when P0117 was set/.test(d) && /38 °C/.test(d) && /Open loop, engine cold/.test(d), d);
+    assert.ok(/100 °F/.test(H((await rd({ readiness: R, freeze_frame: F, codes: C }, 'v0', { 'shadetree.units': 'us' })).el('d_ready_mount'))), 'frozen readings follow the Units button');
+    const hh = (await rd({ readiness: R, freeze_frame: F, codes: C }, 'v5')).el('h_codes').innerHTML;
+    assert.ok(/Freeze frame/.test(hh) && /Readiness monitors/.test(hh) && /<b>incomplete<\/b>/.test(hh), 'Handheld Codes shows both');
+    const CLR = Object.assign({}, C, { mil: false, stored: [] });
+    const idleE = await rd({ readiness: { read: false, note: null }, freeze_frame: { read: false, note: null }, codes: { read: false, note: null } }, 'v0', {}, 'idle'), di = H(idleE.el('d_ready_mount'));
+    assert.ok(/Start sampling to read the monitors\./.test(di) && !/complete/.test(di), 'not read yet: says so, no monitor states');
+    const noAns = await rd({ readiness: { read: false, note: 'the car did not answer the readiness request (Mode 01 PID 01)' }, freeze_frame: { read: false, note: 'not requested: no stored code' }, codes: CLR });
+    assert.ok(/did not answer the readiness request/.test(H(noAns.el('d_ready_mount'))) && !/complete/.test(H(noAns.el('d_ready_mount'))), 'no answer is not a pass');
+    const ffRoot = (x) => x.el('d_ready_mount').children[0];
+    assert.strictEqual(ffRoot(noAns).hidden, true, 'no stored code: no freeze-frame panel (the summary bar says no codes)');
+    const rec = await rd({ readiness: { read: false, note: 'not in this recording' }, freeze_frame: { read: false, note: 'not in this recording' }, codes: C });
+    assert.ok(ffRoot(rec).hidden === false && /not in this recording/.test(H(ffRoot(rec))) && /not in this recording/.test(H(rec.el('d_ready_mount').children[1])), 'an old recording with a code says the frame is not in it');
+    assert.ok(/no freeze frame stored/.test(H(ffRoot(await rd({ freeze_frame: { read: true, note: null, dtc: null, pids: {} }, codes: C })))), 'answered with no frame');
+  }
+
   console.log('page logic OK');
 })().catch(e => { console.error('FAIL', e.message); process.exit(1); });

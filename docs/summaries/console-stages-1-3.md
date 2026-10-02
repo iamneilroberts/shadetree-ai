@@ -26,5 +26,8 @@ Not seen on a real adapter or real phone: all of this was checked against the si
 - Handheld repeats the Dashboard summary bar (`#h_sum`). Guided test captures reset on a new run or simulated scenario. Engine-off battery band now ends at the running high limits (24 V at 0 rpm is out of range). Codes panels say "read at run start, not live". An open help popup keeps its "now" line current.
 - Phone Handheld has one scroller (page footer hidden, its caveat inside the frame). 44 px touch targets at 600 px or less and on coarse pointers (`--topbar-h` 57 px). An open Menu leaves room to scroll Handheld's nav above the replay bar. The help dialog takes focus, is `aria-modal` and labelled, and Esc returns focus to its `?`. Page budget is now 150,000 bytes.
 
+## Scenario gaps (2026-10-02, branch worktree-scenario-gaps)
+- Readiness monitors and the freeze frame on the console: the hub reads them once per run with the codes (readiness from the same 0101 answer; Mode 02 only when a stored code was read), saved runs store them, old files replay them as "not in this recording". Dashboard panels after Codes; Handheld's Codes pane lists both. The simulator now answers monitor bytes and a Mode 02 frame (rich, lean).
+
 ## Left over
 Open phone/Handheld polish (Clarity rocker stays on in Handheld after switching to Plain, lamps wrap at 390 px, replay bar fit at 360 px) and the real-car verification pass are listed in the 2026-10-02 stocktake handoff, not here. `ConsoleService` / MCP `open_console` still cannot pass `--scenarios`.

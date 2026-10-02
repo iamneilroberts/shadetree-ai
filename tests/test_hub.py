@@ -873,3 +873,40 @@ def test_a_replayed_simulation_says_so(tmp_path):
     hub.start_replay(load_run(obj), "sim.json", playing=False)
     assert hub.state()["replay"]["demo"] is True and hub.state()["demo"] is False
     hub.exit_replay()
+
+
+def test_readiness_and_freeze_frame_are_read_once_with_the_codes_and_carried_in_state(tmp_path):
+    st = _state_when(tmp_path, SimPort("rich"), lambda s: s["freeze_frame"]["read"])
+    r, ff = st["readiness"], st["freeze_frame"]
+    assert r["read"] is True and r["mil"] is True and r["dtc_count"] == 2 and r["ignition"] == "spark"
+    assert r["monitors"]["evap"] == {"supported": True, "complete": False} and r["monitors"]["catalyst"]["complete"] is True
+    assert r["monitors"]["secondary_air"] == {"supported": False, "complete": None}
+    assert ff["dtc"] == "P0117" and ff["pids"]["05"]["value"] == 38 and ff["pids"]["05"]["unit"] == "C"
+    assert ff["pids"]["03"]["label"] == "Open loop, engine cold"
+
+
+def test_no_stored_code_means_no_freeze_frame_request_and_it_says_so(tmp_path):
+    st = _state_when(tmp_path, SimPort("healthy"), lambda s: s["freeze_frame"]["note"])
+    assert st["freeze_frame"] == {"read": False, "note": "not requested: no stored code"} and st["readiness"]["read"] is True
+
+
+def test_unanswered_readiness_and_freeze_frame_are_not_read_never_empty(tmp_path):
+    st = _state_when(tmp_path, _SilentSim("rich", ["0101", "020200"]), lambda s: s["freeze_frame"]["note"])
+    assert st["readiness"] == {"read": False, "note": "the car did not answer the readiness request (Mode 01 PID 01)"}
+    assert st["freeze_frame"] == {"read": False, "note": "the car did not answer the freeze-frame request"}
+
+
+def test_saved_run_replays_readiness_and_freeze_frame_and_an_old_file_says_not_in_this_recording(tmp_path):
+    hub, _, _ = make(tmp_path)
+    hub.start(DEFAULT_PIDS, hz=10, seconds=30)
+    assert wait_for(lambda: hub.state()["freeze_frame"]["read"] and hub.state()["seq"] >= 4)
+    hub.stop()
+    data = json.loads(hub.save_run("trip").read_text())
+    hub2, _, _ = make(tmp_path)
+    hub2.start_replay(load_run(data), "a.json", playing=False)
+    st = hub2.state()
+    assert st["readiness"] == data["readiness"] and st["freeze_frame"] == data["freeze_frame"] and st["freeze_frame"]["dtc"] == "P0117"
+    hub2.start_replay(load_run(_run_obj()), "old.json", playing=False)
+    st = hub2.state()
+    assert st["readiness"] == st["freeze_frame"] == {"read": False, "note": "not in this recording"}
+    hub2.exit_replay()
