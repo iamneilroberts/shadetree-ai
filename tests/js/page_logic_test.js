@@ -29,7 +29,7 @@ function makeEnv(states, viewId = 'v0', help = null, runs = [], store = {}, page
   let timer = null, i = 0, now = 0;
   const sandbox = {
     console, URLSearchParams, Promise, Math, Object, Array, Number, String, JSON, Date, parseInt, isFinite,
-    document: { documentElement: el('html'), getElementById: el, querySelectorAll: () => [], querySelector: () => ({ id: viewId }),
+    document: { documentElement: el('html'), getElementById: el, querySelectorAll: (sel) => (sel === '.vbtn' ? (page.vbtns || []) : []), querySelector: () => ({ id: viewId }),
                 createElement: () => makeNode('new', handlers), addEventListener(t, fn) { docHandlers[t] = fn; } },
     window: { addEventListener() {}, devicePixelRatio: 1, innerWidth: 500, innerHeight: 800, __shadetreeParts: page.noHook ? undefined : (p) => { parts = p; } },
     location: { search: page.search || '?t=abc', hash: '' }, history: { replaceState() {} },
@@ -954,6 +954,27 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
     emp.el('d_edit').on.click(); let edE = null; walk(emp.el('d_panel'), n => { if (n.id === 'd_editor') edE = n; });
     assert.ok(flat(edE).includes('Start sampling or load a replay to add readings'), 'the editor says so');
     assert.ok(!flat(E4.e.el('d_table')).includes('No readings yet'), 'and only when the run is empty');
+  }
+
+  // Phone Menu: a real button toggles a menu-open class on the topbar (CSS collapses the tabs, chips and controls behind it at phone width); a view pick closes it
+  {
+    const mkBtns = () => ['v0', 'v3', 'v4', 'v5', 'v6'].map(v => { const b = makeNode('vb_' + v, {}); b.dataset.view = v; return b; });
+    const vb = mkBtns(), m = makeEnv(statesFor(2, idle), 'v0', OVF, [], {}, { narrow: true, vbtns: vb }); await m.tick();
+    const top = m.el('topbar'), btn = m.el('menuBtn'), open = () => top.className.split(' ').includes('menu-open');
+    assert.ok(/<button type="button"[^>]*id="menuBtn"[^>]*aria-expanded="false"[^>]*aria-controls="[^"]+"[^>]*>Menu<\/button>/.test(html), 'a real Menu button, collapsed, with aria-controls');
+    assert.ok(/<header class="topbar" id="topbar">\s*<div class="brand">[^<]*<\/div>\s*<button[^>]*id="menuBtn"/.test(html), 'the Menu button sits next to the brand');
+    assert.ok(btn.on.click, 'Menu is wired'); assert.ok(!open(), 'collapsed by default');
+    btn.on.click(); assert.ok(open(), 'tapping opens'); assert.strictEqual(btn.getAttribute('aria-expanded'), 'true');
+    btn.on.click(); assert.ok(!open(), 'tapping again closes'); assert.strictEqual(btn.getAttribute('aria-expanded'), 'false');
+    btn.on.click(); vb[2].on.click(); assert.ok(!open(), 'picking a view closes the menu'); assert.strictEqual(btn.getAttribute('aria-expanded'), 'false');
+    assert.ok(vb[2].className.includes('is-active'), 'and navigates');
+    // Handheld: the Menu stays (the topbar is not hidden there), and opening it reaches the view tabs
+    const hv = mkBtns(), h = makeEnv(statesFor(2, idle), 'v5', OVF, [], { 'shadetree.skin': 'retro' }, { narrow: true, vbtns: hv, search: '?example=x.json' }); await h.tick();
+    h.el('menuBtn').on.click(); assert.ok(h.el('topbar').className.includes('menu-open'), 'Handheld: Menu opens');
+    hv[0].on.click(); assert.ok(hv[0].className.includes('is-active') && !h.el('topbar').className.includes('menu-open'), 'Handheld: Dashboard is one tap away from the menu');
+    // desktop: nothing in the script depends on width, the CSS hides the button
+    const dk = makeEnv(statesFor(2, idle), 'v0', OVF, [], {}, { narrow: false, vbtns: mkBtns() }); await dk.tick();
+    assert.ok(!dk.el('topbar').className.includes('menu-open'), 'desktop: nothing collapsed or opened');
   }
 
   console.log('page logic OK');

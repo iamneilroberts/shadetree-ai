@@ -63,9 +63,25 @@ def test_handheld_frame_has_a_fixed_size_so_switching_modes_never_resizes_it():
     assert re.findall(r'<div class="hh-pane" data-mode="(\w+)"', HTML) == ["codes", "live", "trims", "status"]
 
 
-def test_phone_width_hides_the_page_chrome_and_fills_the_screen_for_the_handheld_view():
+def test_phone_width_hides_the_status_and_controls_but_keeps_the_topbar_menu_for_the_handheld_view():
     media = HTML[HTML.index("@media (max-width: 430px)"):]
-    assert "#v5.is-active) .topbar" in media and "100dvh" in media
+    assert "100dvh" in media
+    hide = re.search(r"([^{}]*)\{ display: none; \}", media).group(1)
+    assert "#v5.is-active) .topbar:not(.menu-open) + .status" in hide, "Handheld shows the status and controls once the Menu is open"
+    assert not re.search(r"\.topbar(?!:not)", hide), "the topbar (with the Menu button) stays in Handheld"
+
+
+def test_phone_menu_collapse_lives_in_the_600px_query_and_uses_no_colour_literals():
+    css = _css()
+    assert re.search(r"\.menubtn \{[^}]*display: none", css), "no Menu button outside the phone query"
+    m = re.search(r"@media \(max-width: 600px\) \{\s*\.topbar \.menubtn \{(.*?)\n  \}", css, re.S)
+    assert m, "one 600px block holds the Menu rules"
+    block = m.group(0)
+    assert "display: inline-block" in block and ":not(.menu-open)" in block and "display: none" in block
+    assert not re.search(r"#[0-9a-fA-F]{3,8}\b|rgba?\(", block)
+    narrower = css[css.index("@media (max-width: 430px)"):]
+    narrower = narrower[:narrower.index("\n  }") + 4]  # the Handheld phone block is inside the 600px range too
+    assert ".menu-open" not in css.replace(block, "").replace(narrower, ""), "nothing collapses above 600px"
 
 
 # ---- console stage 1: the features every stage must keep (spec "Retained features") ----------------

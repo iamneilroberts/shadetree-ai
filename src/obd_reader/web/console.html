@@ -212,12 +212,19 @@
   .retro .hhwrap { padding-top: 0; }
   @media (max-width: 900px) { .retro .row { grid-template-columns: 1fr; } .retro .cwrap { grid-template-columns: 1fr; } }
   @media (max-width: 430px) {
-    body:has(#v5.is-active) .topbar, body:has(#v5.is-active) .status, body:has(#v5.is-active) .banner, body:has(#v5.is-active) .msgbar { display: none; }
+    body:has(#v5.is-active) .topbar:not(.menu-open) + .status, body:has(#v5.is-active) .banner, body:has(#v5.is-active) .msgbar { display: none; }
     body:has(#v5.is-active) .stage { padding: 0; }
     #v5 .stage-pad { padding: 0; }
-    .retro .hh { width: 100%; height: 100dvh; padding: 0; border-radius: 0; background: none; box-shadow: none; }
+    .retro .hh { width: 100%; height: calc(100dvh - 50px); padding: 0; border-radius: 0; background: none; box-shadow: none; }
     .retro .hh-in { border: 0; border-radius: 0; }
     .retro .hh-top { height: 60px; } .retro .hh-body { padding: 8px; } .retro .hh-size { display: none; }
+  }
+  .menubtn { display: none; }
+  @media (max-width: 600px) {
+    .topbar .menubtn { display: inline-block; margin-left: auto; min-height: 36px; padding: 5px 16px; }
+    .topbar:not(.menu-open) .switcher, .topbar:not(.menu-open) + .status { display: none; }
+    .topbar { flex-wrap: nowrap; min-height: 49px; box-sizing: border-box; padding: 6px 12px; } .topbar.menu-open { flex-wrap: wrap; }
+    .switcher { flex: 1 1 100%; margin-left: 0; }
   }
   .banner[hidden], [hidden] { display: none !important; }
   .msgbar { padding: 8px 16px; background: var(--msg-bg); border-bottom: 1px solid var(--amber); color: var(--amber); font-size: 13px; }
@@ -328,9 +335,10 @@
 <body>
 <div class="banner" id="demoBanner" hidden>Demo &mdash; simulated engine, no car connected</div>
 <div class="banner" id="replayBanner" hidden></div>
-<header class="topbar">
+<header class="topbar" id="topbar">
   <div class="brand">shadetree-ai console</div>
-  <nav class="switcher" role="tablist" aria-label="Layouts">
+  <button type="button" class="b menubtn" id="menuBtn" aria-expanded="false" aria-controls="viewNav menuStatus">Menu</button>
+  <nav class="switcher" id="viewNav" role="tablist" aria-label="Layouts">
     <button class="vbtn is-active" data-view="v0" role="tab">Dashboard</button>
     <button class="vbtn" data-view="v3" role="tab">Guided test</button>
     <button class="vbtn" data-view="v4" role="tab">Analyzer</button>
@@ -338,7 +346,7 @@
     <button class="vbtn" data-view="v6" role="tab">All readings</button>
   </nav>
 </header>
-<div class="status">
+<div class="status" id="menuStatus">
   <span class="chip" id="chipConn"><b>no adapter</b></span>
   <span class="chip" id="chipCar">car ?</span>
   <span class="chip" id="chipLamp">lamp ?</span>
@@ -1475,7 +1483,10 @@
   $('go_rev').addEventListener('click', function () { startCap('rev'); });
 
   var btns = document.querySelectorAll('.vbtn'), views = document.querySelectorAll('.view');
+  function setMenu(open) { $('topbar').classList.toggle('menu-open', open); $('menuBtn').setAttribute('aria-expanded', open ? 'true' : 'false'); }
+  $('menuBtn').addEventListener('click', function () { setMenu(!$('topbar').className.split(' ').includes('menu-open')); });
   function show(id) {
+    setMenu(false);
     Array.prototype.forEach.call(btns, function (b) { b.classList.toggle('is-active', b.dataset.view === id); });
     Array.prototype.forEach.call(views, function (v) { v.classList.toggle('is-active', v.id === id); });
     render();
