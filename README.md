@@ -2,7 +2,7 @@
 
 A **read-only** OBD-II diagnostic assistant for DIY mechanics. Plug in an adapter, scan the car into a snapshot, and troubleshoot with Claude using that snapshot plus cited reference material.
 
-> **Status (2026-09-30):** working and tested (712 tests), still early. It can scan a car read-only, replay recorded scans without a car, serve 17 read-only MCP tools to Claude, and show live data in a local web console. The reference store and guided playbooks are not built yet. See [What works today](#what-works-today) and [docs/design.md](docs/design.md).
+> **Status (2026-10-02):** working and tested (792 tests), still early. It can scan a car read-only, probe it and write a VIN-free report you can share, replay recorded scans without a car, serve 17 read-only MCP tools to Claude, and show live data in a local web console. The reference store and guided playbooks are not built yet. See [What works today](#what-works-today) and [docs/design.md](docs/design.md).
 
 ## Quick start
 
@@ -48,13 +48,17 @@ With an adapter (OBDLink EX tested; the car parked, ignition on, engine off):
 | Car identification and learned profile (partial VIN key, per-car list of PIDs that never answer), CAN cars only | done | 2024 Ridgeline: the VIN request (`0902`, one ECU, multi-frame) parsed, the partial key was derived and a profile file was written. A second run that loads the profile (car seen before) has **not** been checked |
 | Trouble codes on the console (Modes 03/07/0A + lamp), CAN cars only | done | 2024 Ridgeline (CAN 29/500, two ECUs): Modes 03, 07, 0A and the lamp bit read; the car had no codes and the lamp was off. A car that has codes has **not** been seen yet |
 | Mode 06 test results (MCP tool and console Readings tab) | done; reply layout is 9-byte groups `MID TID UASID value min max` | 2024 Ridgeline: 20 MIDs, 53 results, all within limits; values are raw (unit scaling not applied) |
+| `probe` command: a scan plus one Mode 06 MID-bitmap pass, reply classes and latencies, undecoded Mode 01 PIDs, Mode 09 CAL ID/CVN/ECU name, ATRV/STDI; writes `probes/<id>.json` and `.md` with no VIN, VIN serial or transcript (a test and a write-time check guard this) | done, tested on replay fixtures and a local fake adapter | **not verified** on a real adapter (does the Ridgeline answer `0600`, `0904` multi-frame, how it answers unsupported PIDs) |
+| Console: readiness monitors and freeze frame panels (Dashboard and Handheld), scenario PID requests (`POST /api/focus`, only PIDs the car's bitmap lists), unsupported PIDs named | done, tested (Python and page logic) and viewed in a headless browser on the simulator | **not verified** on a real car |
+| Honda/Acura DTC meanings (P1456, P1457, P2646, P2647, P3400, P3497) picked by make from the VIN, and a VCM note in the fuel-trim help | done; model-drafted, unreviewed, uncertain wording flagged in the hints | Austin or a service manual must review; only manufacturer code `5FP` is confirmed |
 | 29-bit ECU header attribution | written | **not verified** on a real car |
 | Legacy protocols (J1850, ISO 9141, KWP) | scanner skips DTC/VIN decode on non-CAN | **not built yet** (needs Austin's older cars) |
 | Reference store, DTC lookup, playbooks, `check_citations` | not built | n/a |
 
 ## Roadmap
 
-1. Run the console and Mode 06 against the Ridgeline; confirm the 29-bit header parse.
+1. Run `shadetree-ai probe` and the console against the Ridgeline: confirm Mode 09 reads, reply classes, Mode 06, Mode 02/readiness and the 29-bit header parse.
+   Then: quirks file keyed by vehicle key (probe step 4); the Terminal skin (issue #1).
 2. Legacy-protocol scans (non-CAN DTC and VIN layouts) on Austin's older cars.
 3. Reference store with provenance-tagged records, NHTSA lookups, and the grounding check.
 4. Author and review the first playbooks (P0171/P0174, misfire, P0420, charging, parasitic draw).

@@ -33,3 +33,5 @@ Not seen on a real adapter or real phone: all of this was checked against the si
 
 ## Left over
 Open phone/Handheld polish (Clarity rocker stays on in Handheld after switching to Plain, lamps wrap at 390 px, replay bar fit at 360 px) and the real-car verification pass are listed in the 2026-10-02 stocktake handoff, not here. `ConsoleService` / MCP `open_console` still cannot pass `--scenarios`.
+
+Still open after the polish pass and scenario gaps (2026-10-02): Clarity rocker below 44 px on the Retro desktop view; no focus trap in the help dialog; fuel trims read "normal" with the engine off (should be neutral); the help "now" line for RPM shows decimals; `#v5` at desktop width loads scrolled down; per-slot fallback PIDs (MAF to MAP, PID 14 to 24), a total-trim value per bank and a Mode 06 misfire summary in Idle / misfire; MCP `console_data` does not expose readiness or the freeze frame; the Terminal skin (GitHub issue #1). Nothing in this file has run on a real adapter.

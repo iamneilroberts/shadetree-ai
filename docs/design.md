@@ -1,6 +1,6 @@
 # OBD Diagnostic Assistant — Design (draft 1)
 
-_Status: design of record, updated 2026-10-02. Project name `shadetree-ai` (provisional; import package `obd_reader`, repo dir `obd-reader`). Built so far: Phases 1 and 2, the tool layer and MCP server (Phase 3a), and the live console with its Dashboard, scenarios, Retro and Handheld views, replay, help popups and per-car profiles (§7b). **NOT BUILT:** the reference store and grounding checker (Phase 3b), legacy-protocol decode (Phase 4), playbooks and evals (Phase 5), UDS 0x19, Mode 22, and a Mode 05 tool (the allowlist permits Mode 05; no tool or scan step uses it). See the README "What works today" table for hardware-verification status._
+_Status: design of record, updated 2026-10-02. Project name `shadetree-ai` (provisional; import package `obd_reader`, repo dir `obd-reader`). Built so far: Phases 1 and 2, the tool layer and MCP server (Phase 3a), the live console with its Dashboard, scenarios, Retro and Handheld views, replay, help popups, per-car profiles, readiness and freeze-frame panels and scenario PID requests (§7b), and the `probe` command with its VIN-free report (§6). **Next:** the quirks file (probe step 4) and the Terminal skin (GitHub issue #1). **NOT BUILT:** the reference store and grounding checker (Phase 3b), legacy-protocol decode (Phase 4), playbooks and evals (Phase 5), UDS 0x19, Mode 22, and a Mode 05 tool (the allowlist permits Mode 05; no tool or scan step uses it). See the README "What works today" table for hardware-verification status._
 
 ## 1. Purpose
 
