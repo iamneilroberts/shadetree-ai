@@ -21,6 +21,9 @@
   :root[data-theme="light"] {
     --bg: #f3f5f6; --panel: #ffffff; --panel2: #e9edf0; --line: #c9d1d7; --ink: #12171a; --muted: #4f5c65;
     --cyan: #0a7499; --amber: #9a5a00; --ok: #1d7f3a; --bad: #c0361b; --on-accent: #ffffff; --msg-bg: #fff3dc;
+    /* gauge faces: a white face with a dark rim, deeper ink, zones and LEDs, unlit LEDs well below the lit ones (tests hold the contrast) */
+    --g-face: #ffffff; --g-rim: #5b6872; --g-ink: #0b0f12; --g-ink2: #3a464e; --g-needle: #0b0f12;
+    --g-z-ok: #14692f; --g-z-watch: #8a4f00; --g-z-out: #b02a12; --g-ok: #166a2f; --g-warn: #8a5000; --g-bad: #b02a12; --g-seg: #07628a; --g-led-off: #b3bec6;
   }
   /* Retro skin (oxblood): the same tokens with the device palette's colours, so any view can wear it; the device faces keep their own colours */
   :root[data-skin="retro"] {
@@ -29,12 +32,13 @@
     --cond: "Helvetica Neue", Helvetica, Arial, "Liberation Sans", sans-serif;
     --pn-plate-bg: var(--plate-bg); --pn-plate-ink: var(--plate-ink);
     --g-face: var(--meter-face); --g-rim: var(--meter-rim); --g-ink: var(--meter-ink); --g-ink2: var(--meter-ink2); --g-needle: var(--meter-needle);
-    --g-z-ok: #2f8f4a; --g-z-watch: #d99a1e; --g-z-out: var(--meter-zone); --g-seg: var(--code-amber); --g-ok: var(--led-g); --g-warn: var(--led-y); --g-bad: var(--led-r);
+    --g-z-ok: #25793d; --g-z-watch: #a86b00; --g-z-out: var(--meter-zone); --g-seg: var(--code-amber); --g-ok: var(--led-g); --g-warn: var(--led-y); --g-bad: var(--led-r);
     --g-win: var(--win-bg); --g-led-off: var(--led-off); --g-glow: var(--glow);
   }
   :root[data-skin="retro"][data-theme="light"] {
     --bg: #efe9dc; --panel: #f8f4ea; --panel2: #e6dfcf; --line: #c9bca3; --ink: #1d1410; --muted: #5b4e3f;
     --cyan: #8e2a24; --amber: #805300; --ok: #186b31; --bad: #b3170b; --on-accent: #fff6e6; --banner: #e3b04b; --msg-bg: #fbeed0;
+    --g-rim: #5f5944;   /* a darker rim on the pale meter face in light mode */
   }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.45 var(--mono); }
@@ -1416,15 +1420,15 @@
   function dialSvg(v, lo, hi, majors, zones, label, div) {   // the analyzer meter face; zones [{from, to, s: 'ok'|'watch'|'out'}] are coloured arcs; v null draws no needle
     div = div || 1;
     var cx = 110, cy = 118, r = 92, a0 = -50, a1 = 50, s = '<svg class="dial" viewBox="0 0 220 128" role="img" aria-label="' + esc(label) + '">';
-    s += '<rect class="df" x="2" y="2" width="216" height="124" rx="6" stroke-width="2"/>';
+    s += '<rect class="df" x="2" y="2" width="216" height="124" rx="6" stroke-width="3"/>';
     function P(val, rad) { var a = (a0 + (a1 - a0) * (val - lo) / (hi - lo)) * Math.PI / 180; return [cx + rad * Math.sin(a), cy - rad * Math.cos(a)]; }
-    zones.forEach(function (z) { var p = P(z.from, r), q = P(z.to, r); s += '<path class="z-' + z.s + '" d="M' + p[0] + ' ' + p[1] + ' A' + r + ' ' + r + ' 0 0 1 ' + q[0] + ' ' + q[1] + '" stroke-width="6" fill="none"/>'; });
-    var p0 = P(lo, r), p1 = P(hi, r); s += '<path class="da" d="M' + p0[0] + ' ' + p0[1] + ' A' + r + ' ' + r + ' 0 0 1 ' + p1[0] + ' ' + p1[1] + '" stroke-width="2" fill="none"/>';
+    zones.forEach(function (z) { var p = P(z.from, r), q = P(z.to, r); s += '<path class="z-' + z.s + '" d="M' + p[0] + ' ' + p[1] + ' A' + r + ' ' + r + ' 0 0 1 ' + q[0] + ' ' + q[1] + '" stroke-width="7" fill="none"/>'; });
+    var p0 = P(lo, r), p1 = P(hi, r); s += '<path class="da" d="M' + p0[0] + ' ' + p0[1] + ' A' + r + ' ' + r + ' 0 0 1 ' + p1[0] + ' ' + p1[1] + '" stroke-width="2.6" fill="none"/>';
     for (var i = 0; i <= majors; i++) {
       var val = lo + (hi - lo) * i / majors, o = P(val, r + 2), inn = P(val, r - 12), tx = P(val, r - 24);
-      s += '<line class="dt" x1="' + o[0] + '" y1="' + o[1] + '" x2="' + inn[0] + '" y2="' + inn[1] + '" stroke-width="2.4"/>';
+      s += '<line class="dt" x1="' + o[0] + '" y1="' + o[1] + '" x2="' + inn[0] + '" y2="' + inn[1] + '" stroke-width="2.8"/>';
       s += '<text x="' + tx[0] + '" y="' + (tx[1] + 4) + '" font-size="13" font-weight="700" text-anchor="middle" font-family="Helvetica,Arial,sans-serif">' + (Math.round(val / div * 10) / 10) + '</text>';
-      if (i < majors) for (var j = 1; j < 4; j++) { var mv = val + (hi - lo) / majors * j / 4, m1 = P(mv, r + 1), m2 = P(mv, r - 6); s += '<line class="dt" x1="' + m1[0] + '" y1="' + m1[1] + '" x2="' + m2[0] + '" y2="' + m2[1] + '" stroke-width="1.2"/>'; }
+      if (i < majors) for (var j = 1; j < 4; j++) { var mv = val + (hi - lo) / majors * j / 4, m1 = P(mv, r + 1), m2 = P(mv, r - 6); s += '<line class="dt" x1="' + m1[0] + '" y1="' + m1[1] + '" x2="' + m2[0] + '" y2="' + m2[1] + '" stroke-width="1.7"/>'; }
     }
     if (div !== 1) s += '<text class="dx" x="12" y="22" font-size="10" font-weight="700" text-anchor="start" font-family="Helvetica,Arial,sans-serif" letter-spacing="1.5">x' + div + ' RPM</text>';
     if (v !== null && v !== undefined) { var nv = P(Math.max(lo, Math.min(hi, v)), r - 6); s += '<line class="dn" x1="' + cx + '" y1="' + cy + '" x2="' + nv[0] + '" y2="' + nv[1] + '" stroke-width="3" stroke-linecap="round"/>'; }

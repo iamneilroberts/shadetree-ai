@@ -208,6 +208,38 @@ def test_every_skin_and_theme_keeps_text_readable(skin, theme):  # Review Focus 
     assert low == [], f"{skin}/{theme} text below WCAG AA 4.5:1: {low}"
 
 
+def _over(fg, bg):
+    """fg composited over the opaque hex bg (the unlit-LED token is a translucent white in Retro)."""
+    m = re.fullmatch(r"rgba\((\d+),(\d+),(\d+),([.\d]+)\)", fg.replace(" ", ""))
+    if not m:
+        return fg
+    a, base = float(m[4]), [int(bg[i:i + 2], 16) for i in (1, 3, 5)]
+    return "#%02x%02x%02x" % tuple(round(a * int(m[i + 1]) + (1 - a) * base[i]) for i in range(3))
+
+
+GAUGE_PAIRS = [  # (foreground token, background token, minimum contrast, why, light themes only)
+    ("--g-ink", "--g-face", 7.0, "dial text, ticks and arc", False), ("--g-ink2", "--g-face", 4.5, "dial small text", False),
+    ("--g-needle", "--g-face", 4.5, "needle", False), ("--g-z-ok", "--g-face", 3.0, "ok zone arc", False),
+    ("--g-z-watch", "--g-face", 3.0, "watch zone arc", False), ("--g-z-out", "--g-face", 3.0, "out zone arc", False),
+    ("--g-rim", "--g-face", 3.0, "dial rim", True),
+    ("--g-ok", "--g-win", 3.0, "lit LED", False), ("--g-warn", "--g-win", 3.0, "lit LED", False), ("--g-bad", "--g-win", 3.0, "lit LED", False),
+    ("--g-seg", "--g-win", 3.0, "lit LED", False),
+    ("--g-ok", "--g-win", 4.5, "seven-segment digits", False), ("--g-warn", "--g-win", 4.5, "seven-segment digits", False),
+    ("--g-bad", "--g-win", 4.5, "seven-segment digits", False), ("--g-seg", "--g-win", 4.5, "seven-segment digits", False),
+]
+
+
+@pytest.mark.parametrize("skin,theme", [("plain", "dark"), ("plain", "light"), ("retro", "dark"), ("retro", "light")])
+def test_every_skin_and_theme_keeps_gauge_faces_high_contrast(skin, theme):
+    p = _palette(skin, theme)
+    low = [(a, b, need, why, round(_contrast(p[a], p[b]), 2)) for a, b, need, why, light_only in GAUGE_PAIRS
+           if (theme == "light" or not light_only) and _contrast(p[a], p[b]) < need]
+    off = _over(p["--g-led-off"], p["--g-win"])
+    low += [(a, "unlit LED", 2.0, "lit vs unlit", round(_contrast(p[a], off), 2)) for a in ("--g-ok", "--g-warn", "--g-bad", "--g-seg")
+            if _contrast(p[a], off) < 2.0]
+    assert low == [], f"{skin}/{theme} gauge pairs below target: {low}"
+
+
 def test_shared_parts_fit_a_phone_width():  # Review Focus 5
     css = _css()
     rule = lambda sel: re.search(r"(?:^|[}\s])" + re.escape(sel) + r"\s*\{([^}]*)\}", css).group(1)
