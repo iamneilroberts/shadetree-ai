@@ -217,6 +217,7 @@
     .retro .hh { width: 100%; height: calc(100dvh - var(--topbar-h)); padding: 0; border-radius: 0; background: none; box-shadow: none; }
     .retro .hh-in { border: 0; border-radius: 0; }
     .retro .hh-top { height: 60px; } .retro .hh-body { padding: 8px; } .retro .hh-size { display: none; }
+    body:has(.rbar:not([hidden])) .hh { height: calc(100dvh - var(--topbar-h) - var(--rbar-h)); }   /* the frame ends above the pinned replay bar */
   }
   :root { --topbar-h: 49px; }
   .menubtn { display: none; }
@@ -225,6 +226,11 @@
     .topbar:not(.menu-open) .switcher, .topbar:not(.menu-open) + .status { display: none; }
     .topbar { flex-wrap: nowrap; min-height: var(--topbar-h); box-sizing: border-box; padding: 6px 12px; } .topbar.menu-open { flex-wrap: wrap; }
     .switcher { flex: 1 1 100%; margin-left: 0; }
+    :root { --rbar-h: 88px; }
+    .rbar:not([hidden]) { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; box-sizing: border-box; height: var(--rbar-h); align-content: center; gap: 6px 8px; padding: 6px 12px; background: var(--panel2); border-bottom: 0; border-top: 1px solid var(--line); }
+    .rbar:not([hidden]) input[type=range] { order: -1; flex: 1 1 100%; min-width: 0; }
+    .rbar:not([hidden]) .tm { flex: 1; min-width: 0; }
+    body:has(.rbar:not([hidden])) .stage { padding-bottom: var(--rbar-h); }   /* room under the pinned replay bar (Handheld's stage padding of 0 wins by specificity; its frame height reserves the bar instead) */
   }
   .banner[hidden], [hidden] { display: none !important; }
   .msgbar { padding: 8px 16px; background: var(--msg-bg); border-bottom: 1px solid var(--amber); color: var(--amber); font-size: 13px; }

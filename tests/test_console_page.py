@@ -354,3 +354,37 @@ def test_text_and_marker_directly_on_the_light_cabinet_face_are_readable(theme):
     if theme == "dark":
         assert any(_contrast(p["--muted"], f) < 4.5 for f in face), "sanity: the page's --muted is unreadable on the face in Retro dark"
     assert not any(s.endswith(".dface .note") for _, ss, _ in _cabinet_rules(css) for s in ss), "a blanket .dface .note would darken notes inside the dark panels"
+
+
+# ---- console stage 3: the replay bar is pinned to the bottom on a phone -----------------------------
+def _rbar_problems(css):
+    """Everything wrong with the phone replay-bar rules in `css` (empty when they hold)."""
+    rules = _css_rules(css)
+    p600 = [r for r in rules if r[0] == "(max-width: 600px)"]
+    p430 = [r for r in rules if r[0] == "(max-width: 430px)"]
+    shown = ".rbar:not([hidden])"
+    bad = []
+    fixed = [b for _, sels, b in p600 if shown in sels]
+    if not fixed or not all(re.search(p, " ".join(fixed[0].split())) for p in
+                            (r"position: fixed;", r"(?<![-\w])bottom: 0;", r"(?<![-\w])left: 0;", r"(?<![-\w])right: 0;", r"z-index: \d+;", r"border-top: [^;]*var\(--line\)", r"background: var\(--panel2\)")):
+        bad.append("the shown bar is not fixed to the bottom edge with a token background and top border inside the 600px block")
+    if any(re.search(r"position:\s*fixed", b) for m, s, b in rules if m != "(max-width: 600px)" and any(".rbar" in x for x in s)):
+        bad.append("the bar is fixed outside the 600px block")
+    if len(re.findall(r"--rbar-h:\s*88px", css)) != 1 or not any(re.search(r"--rbar-h:\s*88px", b) for m, s, b in rules if m in (None, "(max-width: 600px)")):
+        bad.append("--rbar-h is not defined exactly once as 88px")
+    stage = [b for _, sels, b in p600 if "body:has(.rbar:not([hidden])) .stage" in sels]
+    if not stage or "padding-bottom: var(--rbar-h)" not in stage[0]:
+        bad.append("the stage does not reserve --rbar-h while the bar is shown")
+    hh = [b for _, sels, b in p430 if "body:has(.rbar:not([hidden])) .hh" in sels]
+    if not hh or "height: calc(100dvh - var(--topbar-h) - var(--rbar-h))" not in hh[0]:
+        bad.append("the Handheld frame does not end above the bar while it is shown")
+    if re.search(r"88px", "".join(b for m, s, b in rules if any("rbar" in x for x in s) and "--rbar-h:" not in b)):
+        bad.append("a rule hard-codes the bar height")
+    mine = "".join(b for _, s, b in rules if any("rbar" in x for x in s))
+    if re.search(r"#[0-9a-fA-F]{3,8}\b|rgba?\(", mine):
+        bad.append("a colour literal in the bar rules")
+    return bad
+
+
+def test_replay_bar_is_pinned_to_the_bottom_on_a_phone_with_room_reserved():
+    assert _rbar_problems(_css()) == []
