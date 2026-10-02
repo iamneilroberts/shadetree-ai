@@ -22,17 +22,17 @@ function makeNode(id, handlers) {
   return n;
 }
 
-function makeEnv(states, viewId = 'v0', help = null, runs = [], store = {}, page = {}) {   // page: { search, postReply(url, body), prefersLight, narrow, storageThrows }
+function makeEnv(states, viewId = 'v0', help = null, runs = [], store = {}, page = {}) {   // page: { search, hash, absent (ids getElementById answers null for), postReply(url, body), prefersLight, narrow, storageThrows }
   const els = {}, handlers = {}, docHandlers = {}, posts = [];
   let parts = null;   // the page hands its shared parts to window.__shadetreeParts
   function el(id) { return els[id] || (els[id] = makeNode(id, handlers)); }
   let timer = null, i = 0, now = 0;
   const sandbox = {
     console, URLSearchParams, Promise, Math, Object, Array, Number, String, JSON, Date, parseInt, isFinite,
-    document: { documentElement: el('html'), getElementById: el, querySelectorAll: (sel) => (sel === '.vbtn' ? (page.vbtns || []) : []), querySelector: () => ({ id: viewId }),
+    document: { documentElement: el('html'), getElementById: (id) => ((page.absent || []).includes(id) ? null : el(id)), querySelectorAll: (sel) => (sel === '.vbtn' ? (page.vbtns || []) : []), querySelector: () => ({ id: viewId }),
                 createElement: () => makeNode('new', handlers), addEventListener(t, fn) { docHandlers[t] = fn; } },
     window: { addEventListener() {}, devicePixelRatio: 1, innerWidth: 500, innerHeight: 800, __shadetreeParts: page.noHook ? undefined : (p) => { parts = p; } },
-    location: { search: page.search || '?t=abc', hash: '' }, history: { replaceState() {} },
+    location: { search: page.search || '?t=abc', hash: page.hash || '' }, history: { replaceState() {} },
     performance: { now: () => now },
     setInterval: (fn) => { timer = fn; }, encodeURIComponent,
     fetch: (url, opts) => {
@@ -203,21 +203,15 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
     stored: [{ code: 'P0117', desc: 'Engine coolant temperature circuit low input', hint: 'Reads colder than real', known: true },
              { code: 'P0172', desc: '<img src=x onerror=alert(1)>', hint: '', known: false }],
     pending: [{ code: 'P0175', desc: 'System too rich (bank 2)', hint: 'Seen once', known: true }], permanent: [] };
-  const cab = makeEnv(withCodes(3, CODES), 'v4');
+  const codesOf = (e) => { let r = null; walk(e.el('d_codes_mount'), n => { if (n.id === 'd_codes') r = n; }); return r.innerHTML; };
+  const cab = makeEnv(withCodes(3, CODES), 'v0');
   for (let k = 0; k < 3; k++) await cab.tick();
-  const rows = cab.el('a_codes').innerHTML;
-  assert(/P0117/.test(rows) && /STORED/.test(rows) && /PENDING/.test(rows) && /P0175/.test(rows), 'cabinet lists stored and pending codes');
+  const rows = codesOf(cab);
+  assert(/P0117/.test(rows) && /STORED/.test(rows) && /PENDING/.test(rows) && /P0175/.test(rows), 'the Dashboard lists stored and pending codes');
   assert(!/<img/.test(rows) && /&lt;img/.test(rows), 'adapter/ECU-derived text is escaped, never markup');
-  assert.strictEqual(cab.el('a_lp_mil').className, 'lampbox lit', 'MIL lamp lit when the ECU commands it');
-  const cabNone = makeEnv(withCodes(3, { read: true, note: null, stored: [], pending: [], permanent: [], mil: false }), 'v4');
-  for (let k = 0; k < 3; k++) await cabNone.tick();
-  assert(/NO CODES STORED/.test(cabNone.el('a_codes').innerHTML) && cabNone.el('a_lp_mil').className === 'lampbox', 'healthy car: explicit none, lamp off');
-  const cabWait = makeEnv(withCodes(3, { read: false, note: null }, 'idle'), 'v4');
-  for (let k = 0; k < 3; k++) await cabWait.tick();
-  assert(/START SAMPLING TO READ CODES/.test(cabWait.el('a_codes').innerHTML) && !/NO CODES STORED/.test(cabWait.el('a_codes').innerHTML), 'unread codes never look like a clean bill');
-  const cabNote = makeEnv(withCodes(3, { read: false, note: 'trouble codes not supported yet on SAE J1850 PWM protocol' }), 'v4');
+  const cabNote = makeEnv(withCodes(3, { read: false, note: 'trouble codes not supported yet on SAE J1850 PWM protocol' }), 'v0');
   for (let k = 0; k < 3; k++) await cabNote.tick();
-  assert(/NOT SUPPORTED YET/.test(cabNote.el('a_codes').innerHTML), 'unsupported bus is stated');
+  assert(/NOT SUPPORTED YET/.test(codesOf(cabNote)), 'unsupported bus is stated on the Dashboard');
   const hh = makeEnv(withCodes(3, CODES), 'v5');
   for (let k = 0; k < 3; k++) await hh.tick();
   assert.strictEqual(hh.el('h_n').textContent, '3 CODES');
@@ -559,13 +553,11 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
   assert.deepStrictEqual(cells(fs1, '05'), ['Coolant temp (°C)', '41', '20 0:00', '90 62:05', '70', '2.0', '120 1:15 ago'], 'times do not change with units');
   assert.deepStrictEqual(cells(fs1, '0C'), ['Engine speed (rpm)', '700', '—', '—', '—', '—', '—'], 'a channel without stats stays dashes');
 
-  // Analyzer, Handheld and Guided test: labels and digits
-  const an = await uEnv({ '05': 41 }, 'v4', {});
-  assert(/aria-label="41"/.test(an.el('a_ect').innerHTML) && /aria-label="36"/.test(an.el('a_map').innerHTML));
-  assert.strictEqual(an.el('a_ect_u').textContent, '°C'); assert.strictEqual(an.el('a_map_u').textContent, 'KPA');
+  // Dashboard, Handheld and Guided test: labels and digits
+  const an = await uEnv({ '05': 41 }, 'v0', {});
+  assert(/41/.test(flat(an.el('d_table'))) && /°C/.test(flat(an.el('d_table'))) && /kPa/i.test(flat(an.el('d_table'))), 'Dashboard rows in metric: ' + flat(an.el('d_table')).slice(0, 300));
   await toggle(an);
-  assert(/aria-label="106"/.test(an.el('a_ect').innerHTML) && /aria-label="10.6"/.test(an.el('a_map').innerHTML), 'cabinet digits convert');
-  assert.strictEqual(an.el('a_ect_u').textContent, '°F'); assert.strictEqual(an.el('a_map_u').textContent, 'INHG');
+  assert(/106/.test(flat(an.el('d_table'))) && /°F/.test(flat(an.el('d_table'))) && /inHg/.test(flat(an.el('d_table'))), 'Dashboard rows convert to °F and inHg: ' + flat(an.el('d_table')).slice(0, 300));
   const hh2 = await uEnv({ '05': 41 }, 'v5', { 'shadetree.units': 'us' });
   assert(/aria-label="106"/.test(hh2.el('h_ect').innerHTML) && /aria-label="10.6"/.test(hh2.el('h_map').innerHTML), 'handheld digits convert');
   assert.strictEqual(hh2.el('h_ect_u').textContent, '°F'); assert.strictEqual(hh2.el('h_map_u').textContent, 'INHG');
@@ -637,7 +629,7 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
   const sk3 = await thEnv({ 'shadetree.theme': 'light', 'shadetree.skin': 'retro' }, { narrow: false });
   assert.strictEqual(skin(sk3) + '/' + sk3.el('html').getAttribute('data-theme'), 'retro/light', 'skin and theme are independent');
   sk3.handlers['themeBtn:click'](); assert.strictEqual(skin(sk3), 'retro', 'the theme leaves the skin alone');
-  for (const v of ['v0', 'v3', 'v4', 'v5', 'v6']) {   // a render error would surface as DISCONNECTED (poll's catch)
+  for (const v of ['v0', 'v3', 'v5', 'v6']) {   // a render error would surface as DISCONNECTED (poll's catch)
     const e = makeEnv(statesFor(3, idle), v, OVF, [], { 'shadetree.skin': 'retro', 'shadetree.theme': 'light' });
     for (let k = 0; k < 3; k++) await e.tick();
     assert(/LIVE/.test(e.el('chipLive').innerHTML), 'Retro light renders ' + v);
@@ -702,8 +694,6 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
   const g8 = await gOver({}, st => { st.channels['0D'] = { name: 'vehicle_speed', unit: 'km/h', samples: [] }; return st; });
   const wait = gk(gbox(g8, [{ pid: '0D', form: 'dial' }]), '0D:dial');
   assert.strictEqual(gpart(wait, 'gnote').textContent, 'waiting', 'in the run, no sample yet'); assert(!wait.className.includes('dim'));
-  const anv = makeEnv(statesFor(30, () => base()), 'v4', OVF); for (let k = 0; k < 32; k++) await anv.tick();
-  assert(/class="dn"/.test(anv.el('a_vm').innerHTML) && /class="z-out"/.test(anv.el('a_vm').innerHTML), 'analyzer volts meter: needle and red zone');
 
   // PID table: today's All readings rows for any list of PIDs, in the given order (Review Focus 4)
   const pt = makeEnv(speedStates(true), 'v6', OVF, [], {}); for (let k = 0; k < 5; k++) await pt.tick();
@@ -961,7 +951,7 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
 
   // Phone Menu: a real button toggles a menu-open class on the topbar (CSS collapses the tabs, chips and controls behind it at phone width); a view pick closes it
   {
-    const mkBtns = () => ['v0', 'v3', 'v4', 'v5', 'v6'].map(v => { const b = makeNode('vb_' + v, {}); b.dataset.view = v; return b; });
+    const mkBtns = () => ['v0', 'v3', 'v5', 'v6'].map(v => { const b = makeNode('vb_' + v, {}); b.dataset.view = v; return b; });
     const vb = mkBtns(), m = makeEnv(statesFor(2, idle), 'v0', OVF, [], {}, { narrow: true, vbtns: vb }); await m.tick();
     const top = m.el('topbar'), btn = m.el('menuBtn'), open = () => top.className.split(' ').includes('menu-open');
     assert.ok(/<button type="button"[^>]*id="menuBtn"[^>]*aria-expanded="false"[^>]*aria-controls="[^"]+"[^>]*>Menu<\/button>/.test(html), 'a real Menu button, collapsed, with aria-controls');
@@ -1004,6 +994,13 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
     const ml = lean.parts().lampModel();
     assert.ok(ml[1].on && ml[1].e === 'LEAN: outside ±10 %', 'trim above +10 lights LTFT 1'); assert.ok(ml[2].on && /RICH/.test(ml[2].e), 'trim below -10 lights LTFT 2');
     assert.ok(ml[3].on && ml[3].e === 'reads cold', 'coolant at 40 C reads cold');
+  }
+
+  {   // a stale #v4 (the removed Analyzer) opens the default view: the page has no such id, so the fragment is ignored
+    const st = makeEnv(statesFor(4, base), 'v0', OVF, [], {}, { hash: '#v4', absent: ['v4'] });
+    for (let k = 0; k < 4; k++) await st.tick();
+    assert.ok(/LIVE/.test(st.el('chipLive').innerHTML), 'the page renders');
+    assert.ok(st.el('d_lamps').innerHTML.includes('Check engine'), 'and shows the Dashboard (its lamps strip is drawn)');
   }
 
   {   // every code is a row in the Dashboard list (the CSS scrolls it; nothing is dropped here)

@@ -16,7 +16,8 @@ def test_page_is_self_contained_with_no_external_urls():
 
 def test_every_view_button_has_a_matching_section():
     views = set(re.findall(r'data-view="([a-z0-9]+)"', HTML))
-    assert {"v0", "v3", "v4", "v5", "v6"} <= views
+    assert {"v0", "v3", "v5", "v6"} <= views
+    assert "v4" not in views and 'id="v4"' not in HTML, "the Analyzer view is gone: it is the Retro skin of the Dashboard"
     assert "v1" not in views and "v2" not in views
     for view in views:
         assert f'id="{view}"' in HTML
@@ -107,7 +108,7 @@ RETAINED = {
     "Theme": ['id="themeBtn"'],
     "Skin": ['id="skinBtn"', "shadetree.skin"],
     "? help popups": ['id="helpPanel"', "function qbtn", "/api/help"],
-    "Codes and lamp": ['id="chipCodes"', 'id="chipLamp"', 'id="a_codes"', 'id="h_codes"'],
+    "Codes and lamp": ['id="chipCodes"', 'id="chipLamp"', "lst.id = 'd_codes'", 'id="h_codes"'],
     "Guided test": ['data-view="v3"', 'id="go_idle"', 'id="go_rev"', 'id="verdict"'],
     "Upload": ['id="rp_file"'],
     "Transport bar": ['id="rbar"', 'id="rb_restart"', 'id="rb_play"', 'id="rb_speed"', 'id="rb_seek"', 'id="rb_time"', 'id="rb_exit"'],
@@ -290,7 +291,7 @@ def test_cabinet_chrome_is_retro_desktop_only():
     assert rules, "the Dashboard cabinet has CSS"
     assert 'class="dcab"' in HTML and "dcab retro" not in HTML and "retro dcab" not in HTML, "the wrapper never wears the .retro class (it restyles Plain)"
     assert HTML.count('id="clarity"') == 1, "one Clarity button on the page"
-    assert re.search(r'<div class="dcab"><div class="dface">', HTML) and 'class="plate"' in HTML[HTML.index('class="dcab"'):HTML.index('id="v4"')]
+    assert re.search(r'<div class="dcab"><div class="dface">', HTML) and 'class="plate"' in HTML[HTML.index('class="dcab"'):HTML.index('id="v5"')]
     for media, sels, body in rules:
         flat = " ".join(body.split())
         if media is None and not all(s.startswith(':root[data-skin="retro"]') for s in sels):
