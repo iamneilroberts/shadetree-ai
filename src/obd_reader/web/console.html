@@ -313,6 +313,7 @@
   .panel > .ptitle { display: flex; align-items: center; gap: 8px; padding: 6px 12px; background: var(--pn-plate-bg); color: var(--pn-plate-ink);
                      border-bottom: 1px solid var(--line); font: 700 12px var(--cond); letter-spacing: .12em; text-transform: uppercase; }
   .panel > .ptitle .pname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .panel > .ptitle .pnote { font-weight: 400; letter-spacing: .04em; text-transform: none; }
   .panel > .pbody { padding: 12px 14px; min-width: 0; }
   .gauges { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
   @media (min-width: 601px) { .gauges { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); } }   /* wider cards where there is room, so long names fit; a phone keeps two side by side */
@@ -1067,6 +1068,7 @@
   function renderLamps(box) { var h = lampsHtml(lampModel()); if (box._sig !== h) { box._sig = h; box.innerHTML = h; } }
   function codesPanel() {
     var p = panel('Trouble codes'), wrap = el('div', 'cwrap'), box = el('div', 'cntbox'), cnt = el('div', 'win led'), lst = el('div', 'clist');
+    p.plate.appendChild(el('span', 'pnote', 'read at run start, not live'));   // codes are read once when a run starts
     cnt.id = 'd_cnt'; cnt.setAttribute('style', '--c:var(--seg-red)'); lst.id = 'd_codes';
     box.appendChild(cnt); box.appendChild(el('small', '', 'codes found')); wrap.appendChild(box); wrap.appendChild(lst); p.body.appendChild(wrap);
     p.body.appendChild(el('p', 'cfoot', 'Meanings are plain-words drafts, unreviewed. Hints: general knowledge, unverified.'));
@@ -1493,7 +1495,7 @@
     $('h_miltxt').textContent = r.mil ? 'Check engine ON' : r.c.mil === false ? 'Check engine off' : 'Check engine ?';
     $('h_n').textContent = r.c.read ? r.n + (r.n === 1 ? ' CODE' : ' CODES') : '-- CODES'; $('h_n').className = 'n mono' + (r.clear ? ' zero' : '');
     var lv = $('h_live'), src = source(); lv.textContent = src.word; lv.className = 'hlive ' + (src.sampling ? 'on' : 'off');
-    $('h_codes').innerHTML = r.list.length ? codeRows(r.list, 'hh') + '<p class="cfoot">Meanings are plain-words drafts, unreviewed. Hints: general knowledge, unverified.</p>' : '<div class="cnone' + (r.clear ? '' : ' wait') + '" style="padding:150px 0">' + codeEmpty(r.c, r.live) + '</div>';
+    $('h_codes').innerHTML = '<p class="cfoot">Read at run start, not live.</p>' + (r.list.length ? codeRows(r.list, 'hh') + '<p class="cfoot">Meanings are plain-words drafts, unreviewed. Hints: general knowledge, unverified.</p>' : '<div class="cnone' + (r.clear ? '' : ' wait') + '" style="padding:150px 0">' + codeEmpty(r.c, r.live) + '</div>');
     var specs = specsFor(curScenario()), ids = Object.keys(st.channels || {}).sort();
     HB.none.textContent = specs.length ? '' : 'No gauges in this scenario. Edit it on the Dashboard.'; HB.none.hidden = specs.length > 0;
     renderSummary($('h_sum')); renderLamps($('h_lamps')); gauges(HB.g, specs);

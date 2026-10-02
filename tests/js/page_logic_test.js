@@ -1307,6 +1307,8 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
     const sbh = sb.el('d_sum').innerHTML;
     ['Live car · sampling', 'Check engine ON', '2 codes', 'No flags in the 6 readings assessed', 'Next: review the codes below'].forEach(t => assert.ok(sbh.includes(t), t + ' in ' + sbh));
     assert.ok(sb.el('d_sum').className === 'sumbar bad' && sb.el('d_codes_mount').hidden === false, 'codes: the panel shows');
+    assert.ok(/Trouble codes read at run start, not live/.test(flat(sb.el('d_codes_mount'))), 'the Codes panel says codes are not live');
+    for (const c of [(await cdE({ read: true, note: null, mil: true, unanswered: [], stored: [{ code: 'P0117', desc: 'd', hint: '' }], pending: [], permanent: [] }, null, 'v5')).el('h_codes'), (await cdE(CLEAR, null, 'v5')).el('h_codes')]) assert.ok(/Read at run start, not live/.test(c.innerHTML), 'Handheld Codes says so too, with and without codes');
     assert.strictEqual(sb.el('o_note').textContent, 'No flags in the 6 readings assessed');
     const ok = await cdE(CLEAR);
     assert.ok(/No codes stored/.test(ok.el('d_sum').innerHTML) && /Check engine off/.test(ok.el('d_sum').innerHTML) && ok.el('d_sum').className === 'sumbar ok', ok.el('d_sum').innerHTML);
