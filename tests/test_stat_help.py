@@ -67,3 +67,9 @@ def test_metric_numbers_in_the_help_text_come_with_us_equivalents():
 def test_coolant_below_warm_is_watch_so_the_lamp_and_the_gauge_share_one_range():
     assert HELP["05"]["watch"] == {"ok": [60, 105], "out": [None, 112]}
     assert "60 °C (140 °F)" in HELP["05"]["typical"]
+
+
+def test_every_trim_help_notes_that_honda_vcm_can_shift_trims_and_tags_it_unverified():
+    for pid in ("06", "07", "08", "09"):
+        assert "Variable Cylinder Management" in HELP[pid]["typical"], pid
+        assert "[general knowledge, unverified]" in HELP[pid]["typical"], pid

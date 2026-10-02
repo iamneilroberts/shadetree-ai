@@ -15,7 +15,10 @@ def _e(title, measures, use, typical, watch=None, watch_engine_off=None):
 
 
 _TRIM = {"ok": [-10, 10], "out": [-20, 20]}
-_TRIM_TYPICAL = "Within about +/-10 %. Worry if steady beyond +/-10 %; beyond +/-20 % is out of range here."
+_TRIM_TYPICAL = ("Within about +/-10 %. Worry if steady beyond +/-10 %; beyond +/-20 % is out of range here. "
+                 "On a Honda V6 with Variable Cylinder Management (VCM), trims and O2/lambda readings can shift or look "
+                 "unusual while cylinders are switched off, so compare readings taken under the same conditions "
+                 "[general knowledge, unverified].")
 _SHORT_USE = ["Near 0 on both banks means the mix is on target.",
               "Positive on both banks at idle: look for a vacuum leak, weak fuel pressure or a dirty airflow sensor.",
               "Numbers that differ between banks point at one side, such as an injector or an exhaust leak."]
