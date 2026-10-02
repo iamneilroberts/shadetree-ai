@@ -103,7 +103,7 @@ def test_the_honda_example_is_labelled_listed_and_replays_without_the_adapter(tm
         status, body = call("GET", "/api/runs")
         assert status == 200
         honda = next(r for r in body["examples"] if r["name"] == HONDA)
-        assert honda["meta"] == {"make": "Honda", "model": "Ridgeline", "year": 2024, "title": "Ridgeline 6 min drive"}
+        assert honda["meta"] == {"make": "Honda", "model": "Ridgeline", "year": 2024, "title": "Ridgeline 6 min drive (CAN 29-bit, 500 kbit/s)"}
         assert honda["time"] == "2026-09-30T21:32:56Z" and 300 < honda["duration"] < 400
         assert all(r["name"] != HONDA for r in body["runs"]), "the example is not one of My runs"
         assert call("POST", "/api/replay", {"source": "examples", "name": HONDA}) == (200, {"ok": True})
