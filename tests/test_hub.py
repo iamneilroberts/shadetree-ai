@@ -182,8 +182,8 @@ def test_set_sim_only_in_demo(tmp_path):
         real.set_sim(rev=True)
 
 
-def _codes_after_start(tmp_path, scenario):
-    hub, _, _ = make(tmp_path, sim=SimPort(scenario))
+def _codes_after_start(tmp_path, scenario, sim=None):
+    hub, _, _ = make(tmp_path, sim=sim or SimPort(scenario))
     hub.start(DEFAULT_PIDS, hz=10, seconds=30)
     assert wait_for(lambda: hub.state()["codes"]["read"])
     st = hub.state()["codes"]
@@ -792,6 +792,24 @@ def test_an_old_rectangular_run_file_still_loads_and_replays_every_sweep(tmp_pat
     assert hub.state()["seq"] == 10 and hub.state()["stats"]["0C"]["n"] == 10
     hub.exit_replay()
 
+
+class _HondaSim(SimPort):
+    """A car whose VIN has the Ridgeline fixture's WMI (5FP) and that stores P3400."""
+    def write(self, data: bytes) -> None:
+        super().write(data)
+        cmd = data.decode("ascii").rstrip("\r")
+        if cmd == "03":
+            self._pending = "43 01 34 00\r"
+        elif cmd == "0902":
+            from obd_reader.vin import with_check_digit
+            b = [0x49, 0x02, 0x01] + list(with_check_digit("5FPYK3F5?RB000001").encode("ascii"))
+            fr = lambda chunk: " ".join(f"{x:02X}" for x in chunk)
+            self._pending = "\r".join(["014", "0: " + fr(b[:6]), "1: " + fr(b[6:13]), "2: " + fr(b[13:20])]) + "\r"
+
+
+def test_a_honda_car_gets_the_honda_meaning_of_a_make_specific_code(tmp_path):
+    c = _codes_after_start(tmp_path, None, sim=_HondaSim("rich"))
+    assert c["stored"][0]["code"] == "P3400" and "deactivation" in c["stored"][0]["desc"] and c["stored"][0]["known"]
 
 # ---- trust fixes: an unanswered request is never "no codes", "lamp off" or a passed Mode 06 ---------
 class _SilentSim(SimPort):

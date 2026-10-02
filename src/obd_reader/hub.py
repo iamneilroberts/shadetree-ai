@@ -23,7 +23,7 @@ from obd_reader.replay_run import Run
 from obd_reader.session import Session
 from obd_reader.simulator import SimPort
 from obd_reader.snapshot import VIN_RE, LiveSample, Series
-from obd_reader.vehicle import vehicle_key
+from obd_reader.vehicle import make_of, vehicle_key
 
 MAX_RUN_S = 1800.0
 DEFAULT_PIDS = ["0C", "05", "06", "07", "08", "09", "0B", "42"]
@@ -305,12 +305,12 @@ class LiveHub:
                         if self._adapter["protocol"] is None:
                             dp = (t.send("ATDP") or [None])[0]
                             self._adapter["protocol"] = dp.removeprefix("AUTO, ") if dp else None
-                            self._read_codes(t)
+                            prior = self._read_identity(t)  # first: the car's make picks which code meanings apply
+                            for p in (prior["unsupported"] if prior else []):
+                                if p in misses:
+                                    misses[p] = _UNSUPPORTED_SWEEPS - 1
                             if not self._stop.is_set():
-                                prior = self._read_identity(t)
-                                for p in (prior["unsupported"] if prior else []):
-                                    if p in misses:
-                                        misses[p] = _UNSUPPORTED_SWEEPS - 1
+                                self._read_codes(t)
                             if not self._stop.is_set():
                                 self._read_mode06(t)
                     else:
@@ -440,7 +440,7 @@ class LiveHub:
             codes: list[str] = []
             for p in payloads:
                 codes += [c for c in decode_dtc_list(p) if c not in codes]
-            out[k] = [{"code": c, **describe(c)} for c in codes]
+            out[k] = [{"code": c, **describe(c, make_of(self._key))} for c in codes]
         status = [p for p in parse_all(t.send("0101"), 0x41) if len(p) >= 3 and p[1] == 0x01]
         mil = any(p[2] & 0x80 for p in status) if status else None
         if mil is None:

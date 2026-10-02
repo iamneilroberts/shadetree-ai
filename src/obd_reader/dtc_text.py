@@ -38,13 +38,32 @@ _T = {
     "U0100": ("Lost communication with the engine control module", "Check power and ground at the ECM and the CAN wiring"),
 }
 
+# Make-specific meanings, checked before the generic table. Same provenance as above: own wording from
+# general knowledge (no OBDb, no paid or proprietary source), a hint that says so where the exact meaning is unsure.
+MAKE_SOURCE = {"source": "model general knowledge", "confidence": "model_drafted", "review_status": "unreviewed",
+               "license": "MIT (own wording)"}
+_HONDA = {
+    "P1456": ("Honda/Acura: EVAP leak, fuel tank side", "Fuel cap and its seal first, then the tank-side vapor lines"),
+    "P1457": ("Honda/Acura: EVAP leak, canister side", "Canister vent valve and canister hoses are common suspects"),
+    "P2646": ("Rocker arm (VTEC) oil pressure switch A: performance or stuck off, bank 1",
+              "Oil level and condition first. Exact Honda wording unconfirmed: check the service manual"),
+    "P2647": ("Rocker arm (VTEC) oil pressure switch A: stuck on, bank 1",
+              "Oil level and condition first. Exact Honda wording unconfirmed: check the service manual"),
+    "P3400": ("Cylinder deactivation (VCM) system, bank 1",
+              "Oil level and condition first; bank numbering varies by engine"),
+    "P3497": ("Cylinder deactivation (VCM) system, bank 2",
+              "Oil level and condition first. Exact Honda wording unconfirmed: check the service manual"),
+}
+_MAKE = {"Honda": _HONDA, "Acura": _HONDA}
+
 _CAT = {"P": "powertrain", "B": "body", "C": "chassis", "U": "network"}
 
 
-def describe(code: str) -> dict:
-    """{desc, hint, known} for a code such as 'P0171'."""
-    if code in _T:
-        d, h = _T[code]
+def describe(code: str, make: str | None = None) -> dict:
+    """{desc, hint, known} for a code such as 'P0171'; `make` (e.g. 'Honda') picks make-specific meanings first."""
+    t = _MAKE.get(make, {})
+    if code in t or code in _T:
+        d, h = t.get(code) or _T[code]
         return {"desc": d, "hint": h, "known": True}
     kind = _CAT.get(code[:1], "unknown")
     scope = "generic" if code[1:2] == "0" else "manufacturer-specific"
