@@ -322,9 +322,12 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
   assert.strictEqual(part(tile(stoppedEnv, 'ect'), 'sub'), 'not sampling'); assert.strictEqual(stoppedEnv.el('o_note').textContent, 'Not sampling');
   assert.deepStrictEqual(rowsOf(stoppedEnv), []);
   const chipsEnv = await ovEnv(base, st => Object.assign(st, { codes: { read: true, note: null, mil: true, stored: [{ code: 'P0300' }], pending: [], permanent: [] } }));
-  assert.strictEqual(chipsEnv.el('chipLamp').textContent, 'lamp on'); assert.strictEqual(chipsEnv.el('chipCodes').textContent, '1 stored');
+  assert.strictEqual(chipsEnv.el('chipLamp').textContent, 'check engine: ON'); assert.strictEqual(chipsEnv.el('chipCodes').textContent, '1 stored');
   const chipsNone = await ovEnv(base, st => Object.assign(st, { codes: { read: false, note: null } }));
-  assert.strictEqual(chipsNone.el('chipLamp').textContent, 'lamp ?'); assert.strictEqual(chipsNone.el('chipCodes').textContent, 'codes not read');
+  assert.strictEqual(chipsNone.el('chipLamp').textContent, 'check engine: ?'); assert.strictEqual(chipsNone.el('chipCodes').textContent, 'codes not read');
+  const chipsOff = await ovEnv(base, st => Object.assign(st, { codes: { read: true, note: null, mil: false, stored: [], pending: [], permanent: [] } }));
+  assert.strictEqual(chipsOff.el('chipLamp').textContent, 'check engine: off');
+  assert.ok(/<span class="chip" id="chipLamp" title="Malfunction indicator lamp \(check-engine light\) as reported by the engine computer">check engine: \?<\/span>/.test(html), 'the check-engine chip explains itself in a tooltip');
   const qTrim = findQ(wEnv.el('o_attn'), '06'); assert(qTrim, 'attention rows have a ? button');
   wEnv.docHandlers.click({ target: qTrim }); assert(/Short-term trim, bank 1/.test(flat(wEnv.el('helpPanel'))) && /now 13/.test(flat(wEnv.el('helpPanel'))), 'row help shows the catalog and the live value');
 

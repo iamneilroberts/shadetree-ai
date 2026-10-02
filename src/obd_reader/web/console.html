@@ -358,7 +358,7 @@
 <div class="status" id="menuStatus">
   <span class="chip" id="chipConn"><b>no adapter</b></span>
   <span class="chip" id="chipCar">car ?</span>
-  <span class="chip" id="chipLamp">lamp ?</span>
+  <span class="chip" id="chipLamp" title="Malfunction indicator lamp (check-engine light) as reported by the engine computer">check engine: ?</span>
   <span class="chip" id="chipCodes">codes not read</span>
   <span class="chip idle" id="chipLive"><b>NOT SAMPLING</b></span>
   <span class="chip">rate <b id="rate">&mdash;</b></span>
@@ -734,7 +734,7 @@
     var v = st.vehicle;
     $('chipCar').textContent = !v ? 'car ?' : v.key ? 'car ' + v.key + ' · ' + (st.replay ? 'replay' : v.known ? 'seen ' + v.runs + (v.runs === 1 ? ' time' : ' times') : 'new') : (v.note || 'car ?');
     var cd = st.codes || {};
-    $('chipLamp').textContent = 'lamp ' + (cd.read ? (cd.mil ? 'on' : 'off') : '?');
+    $('chipLamp').textContent = 'check engine: ' + (cd.read ? (cd.mil ? 'ON' : 'off') : '?');
     $('chipCodes').textContent = !cd.read ? 'codes not read'
       : (cd.stored && cd.stored.length ? cd.stored.length + ' stored' : 'none stored') + (cd.pending && cd.pending.length ? ' \u00b7 ' + cd.pending.length + ' pending' : '');
     $('rate').textContent = st.hz_measured ? st.hz_measured.toFixed(1) + ' Hz' : '—';
