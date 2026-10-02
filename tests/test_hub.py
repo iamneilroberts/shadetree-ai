@@ -440,7 +440,7 @@ def test_replay_state_and_stepping_publish_sweeps(tmp_path):
     hub = _replay_hub(tmp_path)
     st = hub.state()
     assert st["status"] == "running" and st["demo"] is False and st["seq"] == 0
-    assert st["replay"] == {"name": "drive.json", "duration": 4.0, "pos": 0.0, "speed": 1.0, "playing": False, "ended": False}
+    assert st["replay"] == {"name": "drive.json", "duration": 4.0, "pos": 0.0, "speed": 1.0, "playing": False, "ended": False, "demo": False}
     assert st["adapter"] == {"chip": None, "ati": "replay", "protocol": "ISO 15765-4 (CAN 29/500)"}
     assert st["codes"] == {"read": False, "note": "not stored in this run"} and st["mode06"]["read"] is False
     hub._replay_advance(1.0)
@@ -790,4 +790,68 @@ def test_an_old_rectangular_run_file_still_loads_and_replays_every_sweep(tmp_pat
     hub.start_replay(run, "old.json", playing=False)
     hub.replay_control("seek", pos=run.duration)
     assert hub.state()["seq"] == 10 and hub.state()["stats"]["0C"]["n"] == 10
+    hub.exit_replay()
+
+
+# ---- trust fixes: an unanswered request is never "no codes", "lamp off" or a passed Mode 06 ---------
+class _SilentSim(SimPort):
+    """A simulated car that answers NO DATA to the commands in `silent` (everything else as usual)."""
+    def __init__(self, scenario, silent):
+        super().__init__(scenario)
+        self.silent = set(silent)
+
+    def write(self, data: bytes) -> None:
+        super().write(data)
+        if data.decode("ascii").rstrip("\r") in self.silent:
+            self._pending = "NO DATA\r"
+
+
+def _state_when(tmp_path, sim, cond):
+    hub, _, _ = make(tmp_path, sim=sim)
+    hub.start(DEFAULT_PIDS, hz=10, seconds=30)
+    assert wait_for(lambda: cond(hub.state()))
+    st = hub.state()
+    hub.stop()
+    return st
+
+
+def test_no_answer_to_any_code_request_is_not_read_and_the_lamp_is_unknown(tmp_path):
+    st = _state_when(tmp_path, _SilentSim("rich", ["03", "07", "0A", "0101"]), lambda s: s["codes"]["note"])
+    c = st["codes"]
+    assert c["read"] is False and "did not answer" in c["note"] and c["mil"] is None
+
+
+def test_one_unanswered_list_is_named_and_the_answered_ones_are_kept(tmp_path):
+    st = _state_when(tmp_path, _SilentSim("rich", ["07"]), lambda s: s["codes"]["read"])
+    c = st["codes"]
+    assert c["unanswered"] == ["pending"] and c["pending"] == [] and [x["code"] for x in c["stored"]] == ["P0117", "P0172"]
+    assert c["mil"] is True
+
+
+def test_an_unanswered_lamp_bit_is_null_not_off(tmp_path):
+    st = _state_when(tmp_path, _SilentSim("healthy", ["0101"]), lambda s: s["codes"]["read"])
+    assert st["codes"]["mil"] is None and st["codes"]["unanswered"] == ["mil"] and st["codes"]["stored"] == []
+
+
+def test_an_empty_answer_is_an_empty_list_with_nothing_unanswered(tmp_path):
+    c = _codes_after_start(tmp_path, "healthy")
+    assert c["unanswered"] == [] and c["mil"] is False
+
+
+def test_mode06_with_no_answer_is_not_read_and_says_so(tmp_path):
+    st = _state_when(tmp_path, _SilentSim("rich", ["0600"]), lambda s: s["mode06"]["note"])
+    assert st["mode06"]["read"] is False and "did not answer" in st["mode06"]["note"] and st["mode06"]["results"] == []
+
+
+def test_mode06_monitors_without_results_are_read_with_no_results(tmp_path):
+    st = _state_when(tmp_path, _SilentSim("rich", ["0601", "0621"]), lambda s: s["mode06"]["read"])
+    assert st["mode06"]["mids"] == ["01", "21"] and st["mode06"]["results"] == []
+
+
+def test_a_replayed_simulation_says_so(tmp_path):
+    obj = _run_obj()
+    obj["demo"] = True
+    hub, _, _ = make(tmp_path)
+    hub.start_replay(load_run(obj), "sim.json", playing=False)
+    assert hub.state()["replay"]["demo"] is True and hub.state()["demo"] is False
     hub.exit_replay()

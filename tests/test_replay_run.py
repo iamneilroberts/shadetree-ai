@@ -247,3 +247,14 @@ def test_label_run_cli(tmp_path, capsys):
     assert json.loads(p.read_text())["meta"] == META
     assert main(["label-run", str(p), "--make", "Honda", "--model", "Ridgeline", "--year", "1990", "--title", "t"]) == 1
     assert "error" in capsys.readouterr().err
+
+
+def test_demo_provenance_and_unanswered_codes_survive_loading():
+    o = run_obj()
+    assert rr.load_run(o).demo is False
+    o["demo"] = True
+    o["codes"] = {"read": True, "note": None, "mil": None, "unanswered": ["pending", "mil", "bogus"], "stored": [], "pending": [], "permanent": []}
+    r = rr.load_run(o)
+    assert r.demo is True and r.codes["mil"] is None and r.codes["unanswered"] == ["pending", "mil"]
+    o["codes"] = {"read": False, "note": "the car did not answer", "mil": False}
+    assert rr.load_run(o).codes == {"read": False, "note": "the car did not answer", "mil": False}

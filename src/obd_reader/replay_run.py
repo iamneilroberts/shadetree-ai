@@ -34,6 +34,7 @@ class Run:
     mode06: dict | None = None
     vehicle: dict | None = None
     times: list = field(default_factory=list)
+    demo: bool = False  # recorded from the simulator, not a car
 
     def index_after(self, pos: float) -> int:
         return bisect.bisect_right(self.times, pos)
@@ -66,9 +67,13 @@ def _short(x) -> str:
 def _codes(c) -> dict | None:
     if not isinstance(c, dict):
         return None
+    mil = c.get("mil") if isinstance(c.get("mil"), bool) else None  # null: the lamp bit was not answered
     if c.get("read") is not True:
         n = c.get("note")
-        return {"read": False, "note": n if isinstance(n, str) and len(n) <= 200 else None}
+        out = {"read": False, "note": n if isinstance(n, str) and len(n) <= 200 else None}
+        if mil is not None:
+            out["mil"] = mil
+        return out
     out = {"read": True, "note": None}
     for k in ("stored", "pending", "permanent"):
         items = c.get(k)
@@ -80,7 +85,10 @@ def _codes(c) -> dict | None:
                 return None
             clean.append({"code": it["code"], "desc": _short(it.get("desc")), "hint": _short(it.get("hint")), "known": it.get("known") is True})
         out[k] = clean
-    out["mil"] = c.get("mil") is True
+    out["mil"] = mil
+    miss = c.get("unanswered")
+    if isinstance(miss, list) and miss:
+        out["unanswered"] = [k for k in ("stored", "pending", "permanent", "mil") if k in miss]
     return out
 
 
@@ -149,7 +157,7 @@ def load_run(obj) -> Run:
                rate_hz=rate,
                protocol=proto if isinstance(proto, str) and len(proto) <= MAX_TEXT else None,
                names=names, sweeps=sweeps, codes=_codes(obj.get("codes")), mode06=_mode06(obj.get("mode06")),
-               vehicle=_vehicle(obj.get("vehicle")), times=[t for t, _ in sweeps])
+               vehicle=_vehicle(obj.get("vehicle")), times=[t for t, _ in sweeps], demo=obj.get("demo") is True)
 
 
 def clean_meta(m) -> dict:

@@ -54,8 +54,9 @@ HELP = {
              ["It should climb and then hold steady once the engine is warm.",
               "Stuck cold after ten minutes of driving suggests a stuck-open thermostat or a bad sensor.",
               "A sensor that reads colder than the engine really is makes the computer run rich."],
-             "85-100 °C (185-212 °F) once warm. Worry above 105 °C (221 °F); above 112 °C (234 °F) is out of range here.",
-             {"ok": [None, 105], "out": [None, 112]}),
+             "85-100 °C (185-212 °F) once warm. Below 60 °C (140 °F) is watch here: not warm yet, or a sensor reading cold. "
+             "Worry above 105 °C (221 °F); above 112 °C (234 °F) is out of range here.",
+             {"ok": [60, 105], "out": [None, 112]}),
     "06": _short(1), "07": _long(1), "08": _short(2), "09": _long(2),
     "0B": _e("Manifold pressure (MAP)",
              "Air pressure inside the intake manifold. Low means strong vacuum; near outside pressure means the throttle is wide open or the engine is off.",

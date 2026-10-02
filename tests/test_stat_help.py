@@ -62,3 +62,8 @@ def test_metric_numbers_in_the_help_text_come_with_us_equivalents():
             assert "°F" in text, pid
         if "kPa" in text:
             assert "inHg" in text, pid
+
+
+def test_coolant_below_warm_is_watch_so_the_lamp_and_the_gauge_share_one_range():
+    assert HELP["05"]["watch"] == {"ok": [60, 105], "out": [None, 112]}
+    assert "60 °C (140 °F)" in HELP["05"]["typical"]

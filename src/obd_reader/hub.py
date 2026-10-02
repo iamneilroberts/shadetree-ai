@@ -14,13 +14,12 @@ from typing import Callable
 
 from obd_reader.adapter import identify
 from obd_reader.dtc_text import describe
-from obd_reader.elm import decode_supported, parse_all
+from obd_reader.elm import decode_dtc_list, decode_supported, parse_all
 from obd_reader.live import MAX_HZ, MAX_PIDS, MIN_HZ, LiveLimitError, read_pid_value, summarize, validate_pids
 from obd_reader.mode06 import read_all as read_mode06
 from obd_reader.pids import PIDS
 from obd_reader.profiles import ProfileStore
 from obd_reader.replay_run import Run
-from obd_reader.scanner import _dtcs
 from obd_reader.session import Session
 from obd_reader.simulator import SimPort
 from obd_reader.snapshot import VIN_RE, LiveSample, Series
@@ -419,7 +418,8 @@ class LiveHub:
             return
         mids, res = read_mode06(t, stop=self._stop.is_set)
         with self._data_lock:
-            self._m06 = {"read": True, "note": None, "mids": mids, "results": [r.model_dump() for r in res]}
+            self._m06 = ({"read": True, "note": None, "mids": mids, "results": [r.model_dump() for r in res]} if mids else
+                         {"read": False, "note": "the car did not answer Mode 06 (no supported monitors reported)", "mids": [], "results": []})
 
     def _read_codes(self, t) -> None:
         """Modes 03/07/0A and the lamp bit, once per run (CAN only: other layouts would decode wrongly)."""
@@ -428,14 +428,27 @@ class LiveHub:
             with self._data_lock:
                 self._codes = {"read": False, "note": f"trouble codes not supported yet on {proto or 'this'} protocol"}
             return
-        out = {}
+        # An answer with no codes is an empty list; no answer (NO DATA, a negative or garbled reply) is named in
+        # `unanswered`, so the page never turns silence into "no codes" or "lamp off".
+        out, missed = {}, []
         for k, cmd, sid in (("stored", "03", 0x43), ("pending", "07", 0x47), ("permanent", "0A", 0x4A)):
             if self._stop.is_set():  # Stop pressed: do not finish reading the lists
                 return
-            out[k] = [{"code": d.code, **describe(d.code)} for d in _dtcs(t, cmd, sid)]
+            payloads = parse_all(t.send(cmd), sid)
+            if not payloads:
+                missed.append(k)
+            codes: list[str] = []
+            for p in payloads:
+                codes += [c for c in decode_dtc_list(p) if c not in codes]
+            out[k] = [{"code": c, **describe(c)} for c in codes]
         status = [p for p in parse_all(t.send("0101"), 0x41) if len(p) >= 3 and p[1] == 0x01]
+        mil = any(p[2] & 0x80 for p in status) if status else None
+        if mil is None:
+            missed.append("mil")
+        read = len([k for k in missed if k != "mil"]) < 3
         with self._data_lock:
-            self._codes = {"read": True, "note": None, **out, "mil": any(p[2] & 0x80 for p in status)}
+            self._codes = ({"read": True, "note": None, **out, "mil": mil, "unanswered": missed} if read else
+                           {"read": False, "note": "the car did not answer the trouble-code requests", "mil": mil})
 
     def _sweep(self, t, pids: list[str], now: float) -> bool:
         """Read every PID once, then publish the whole sweep at once (a viewer never sees half of one)."""
@@ -496,7 +509,7 @@ class LiveHub:
             ptimes = self._ptimes
             rp = self._replay
             replay = None if rp is None else {"name": rp["name"], "duration": rp["run"].duration, "pos": round(rp["pos"], 3),
-                                              "speed": rp["speed"], "playing": rp["playing"], "ended": rp["ended"]}
+                                              "speed": rp["speed"], "playing": rp["playing"], "ended": rp["ended"], "demo": rp["run"].demo}
         now = replay["pos"] if replay else (self._clock() - t0) if t0 is not None else 0.0
         for p, sp in stats.items():  # last-seen age: a replay looks up the newest sample at or before the replay clock
             last = sp["age"]
