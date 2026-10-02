@@ -439,7 +439,9 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
   const opts = (id) => pp.el(id).children.map(c => c.textContent);
   const vals = (id) => pp.el(id).children.map(c => c.value);
   const pick = (id, v) => { pp.el(id).value = v; pp.handlers[id + ':change'](); };
-  assert.strictEqual(pp.el('rp_src').value, 'examples', 'examples exist: the picker opens on them');
+  assert.strictEqual(pp.el('rp_src').value, 'mine', 'a saved run exists: the picker opens on My runs');
+  assert.deepStrictEqual(pp.el('rp_src').children.map(c => c.value), ['mine', 'examples'], 'My runs is listed first');
+  pick('rp_src', 'examples');
   assert.deepStrictEqual(opts('rp_make'), ['Honda', 'Toyota', '(unlabelled)'], 'makes sorted, unlabelled last');
   assert.strictEqual(pp.el('rp_make').value, 'Honda');
   assert.deepStrictEqual(opts('rp_model'), ['Pilot', 'Ridgeline'], 'models narrowed to the make');
@@ -465,6 +467,12 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
   assert.deepStrictEqual(opts('rp_make'), ['Ford']); assert.deepStrictEqual(vals('rp_runs'), ['mine-1.json']);
   pp.handlers['rp_load:click'](); await new Promise(r => setImmediate(r));
   assert.deepStrictEqual(pp.posts[pp.posts.length - 1].body, { source: 'mine', name: 'mine-1.json' });
+  const exOnly = makeEnv(statesFor(3, idle), 'v0', null, { runs: [], examples: EX.examples });
+  for (let k = 0; k < 3; k++) await exOnly.tick();
+  exOnly.el('replayPanel').hidden = true;
+  exOnly.handlers['replayBtn:click'](); await new Promise(r => setImmediate(r)); await new Promise(r => setImmediate(r));
+  assert.strictEqual(exOnly.el('rp_src').value, 'examples', 'no saved runs: the picker opens on Examples');
+  assert.deepStrictEqual(exOnly.el('rp_src').children.map(c => c.value), ['examples', 'mine'], 'Examples is listed first');
   const none = makeEnv(statesFor(3, idle), 'v0', null, { runs: [], examples: [] });
   for (let k = 0; k < 3; k++) await none.tick();
   none.el('replayPanel').hidden = true;
