@@ -82,6 +82,15 @@ def test_phone_width_hides_the_status_and_controls_but_keeps_the_topbar_menu_for
     assert re.search(r"--topbar-h: \d+px", _css())
 
 
+def test_phone_handheld_has_one_scroller_and_keeps_the_footer_caveat_inside_the_frame():
+    media = HTML[HTML.index("@media (max-width: 430px)"):]
+    hide = re.search(r"([^{}]*)\{ display: none; \}", media).group(1)
+    assert "body:has(#v5.is-active) .foot" in hide, "the page footer under the full-height frame made the page scroll as well as the frame"
+    assert re.search(r"\.retro \.hh-foot \{ display: none; \}", HTML) and re.search(r"\.retro \.hh-foot \{ display: block; \}", media)
+    pane = HTML[HTML.index('id="h_livepane"'):HTML.index('id="h_codes"')]
+    assert "rules of thumb, not limits for your car [general knowledge, unverified]" in pane
+
+
 def test_phone_menu_collapse_lives_in_the_600px_query_and_uses_no_colour_literals():
     css = _css()
     assert re.search(r"\.menubtn \{[^}]*display: none", css), "no Menu button outside the phone query"

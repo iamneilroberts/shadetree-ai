@@ -211,16 +211,17 @@
   .retro .hh-alert { display: none; flex: none; margin: 8px 10px 0; padding: 6px 10px; background: var(--msg-bg); border: 1px solid var(--amber); border-radius: 4px; color: var(--amber); font-size: 12.5px; white-space: pre-line; overflow-wrap: anywhere; }   /* the page's notices, shown in the frame only where the phone hides the page's own */
   .retro .hh-nav { padding-bottom: calc(8px + env(safe-area-inset-bottom)); }
   .retro .hh-size { font: 12px var(--sil); color: var(--mut); }
+  .retro .hh-foot { display: none; }   /* the page footer's caveat, inside the frame where a phone hides the footer */
   .retro .hhwrap { padding-top: 0; }
   @media (max-width: 900px) { #v0 .cwrap { grid-template-columns: 1fr; } }
   @media (max-width: 430px) {
-    body:has(#v5.is-active) .topbar:not(.menu-open) + .status, body:has(#v5.is-active) .banner, body:has(#v5.is-active) .msgbar { display: none; }
+    body:has(#v5.is-active) .topbar:not(.menu-open) + .status, body:has(#v5.is-active) .banner, body:has(#v5.is-active) .msgbar, body:has(#v5.is-active) .foot { display: none; }   /* the frame fills the screen and is the only scroller */
     body:has(#v5.is-active) .stage { padding: 0; }
     #v5 .stage-pad { padding: 0; }
     .retro .hh { width: 100%; height: calc(100dvh - var(--topbar-h)); padding: 0; border-radius: 0; background: none; box-shadow: none; }
     .retro .hh-in { border: 0; border-radius: 0; }
     .retro .hh-top { height: 60px; } .retro .hh-body { padding: 8px; } .retro .hh-size { display: none; }
-    .retro .hh-alert { display: block; }
+    .retro .hh-alert, .retro .hh-foot { display: block; }
     body:has(.rbar:not([hidden])) .hh { height: calc(100dvh - var(--topbar-h) - var(--rbar-h)); }   /* the frame ends above the pinned replay bar */
   }
   :root { --topbar-h: 49px; }
@@ -483,6 +484,7 @@
         <div class="gauges" id="h_gauges"></div>
         <button type="button" class="hh-tbl" id="h_tblbtn" aria-controls="h_table">All readings &#9662;</button>
         <div id="h_table"></div>
+        <p class="note hh-foot">Normal, watch and out of range are general rules of thumb, not limits for your car [general knowledge, unverified].</p>
       </div>
       <div class="hh-pane" data-mode="codes" id="h_codes" hidden></div>
     </div>
