@@ -27,10 +27,15 @@ function makeEnv(states, viewId = 'v0', help = null, runs = [], store = {}, page
   let parts = null;   // the page hands its shared parts to window.__shadetreeParts
   function el(id) { return els[id] || (els[id] = makeNode(id, handlers)); }
   (page.views || []).forEach(v => { els[v.id] = v; });   // page.views: real view sections, so show() toggling is observable
+  // the Handheld panes and nav buttons, built from the page's own markup so they start as the page starts them
+  const hhPanes = [...html.matchAll(/<div class="hh-pane" data-mode="(\w+)" id="(\w+)"( hidden)?>/g)].map(m => { const n = el(m[2]); n.dataset.mode = m[1]; n.hidden = !!m[3]; return n; });
+  const hhNav = html.match(/<nav class="hh-nav">([\s\S]*?)<\/nav>/);
+  const hhBtns = hhNav ? [...hhNav[1].matchAll(/<button data-mode="(\w+)"( class="on")?>/g)].map(m => { const b = makeNode('hh_' + m[1], handlers); b.dataset.mode = m[1]; b.className = m[2] ? 'on' : ''; return b; }) : [];
   let timer = null, i = 0, now = 0;
   const sandbox = {
     console, URLSearchParams, Promise, Math, Object, Array, Number, String, JSON, Date, parseInt, isFinite,
-    document: { documentElement: el('html'), getElementById: (id) => ((page.absent || []).includes(id) ? null : el(id)), querySelectorAll: (sel) => (sel === '.vbtn' ? (page.vbtns || []) : sel === '.view' ? (page.views || []) : []),
+    document: { documentElement: el('html'), getElementById: (id) => ((page.absent || []).includes(id) ? null : el(id)),
+                querySelectorAll: (sel) => (sel === '.vbtn' ? (page.vbtns || []) : sel === '.view' ? (page.views || []) : sel === '.hh-pane' ? hhPanes : sel === '.hh-nav button' ? hhBtns : []),
                 querySelector: (sel) => (page.views && sel === '.view.is-active' ? page.views.find(v => v.className.split(' ').includes('is-active')) || null : { id: viewId }),
                 createElement: () => makeNode('new', handlers), addEventListener(t, fn) { docHandlers[t] = fn; } },
     window: { addEventListener() {}, devicePixelRatio: 1, innerWidth: 500, innerHeight: 800, __shadetreeParts: page.noHook ? undefined : (p) => { parts = p; } },
@@ -57,7 +62,7 @@ function makeEnv(states, viewId = 'v0', help = null, runs = [], store = {}, page
     sandbox.window.matchMedia = (q) => ({ matches: /max-width/.test(q) ? !!page.narrow : /light/.test(q) === !!page.prefersLight });
   vm.runInNewContext(js, sandbox);
   return {
-    el, handlers, docHandlers, posts, sandbox, store, parts: () => parts,
+    el, handlers, docHandlers, posts, sandbox, store, hhBtns, parts: () => parts,
     timer() { timer(); }, setHelp(h) { help = h; }, advance(ms) { now += ms; },
     async tick() { timer(); await new Promise(r => setImmediate(r)); await new Promise(r => setImmediate(r)); }
   };
@@ -218,11 +223,12 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
   for (let k = 0; k < 3; k++) await hh.tick();
   assert.strictEqual(hh.el('h_n').textContent, '3 CODES');
   assert(/P0117/.test(hh.el('h_codes').innerHTML) && /Reads colder than real/.test(hh.el('h_codes').innerHTML) && !/<img/.test(hh.el('h_codes').innerHTML), 'handheld cards');
-  assert.strictEqual(hh.el('h_live').textContent, 'LIVE');
-  assert(/Check engine \(MIL\)/.test(hh.el('h_status').innerHTML) && /Sampling/.test(hh.el('h_status').innerHTML), 'status pane');
+  assert.strictEqual(hh.el('h_live').textContent, 'LIVE'); assert.strictEqual(hh.el('h_miltxt').textContent, 'Check engine ON');
+  assert(/Check engine \(MIL\)/.test(hh.el('h_lamps').innerHTML) && /Sampling/.test(hh.el('h_lamps').innerHTML), 'the Lamps strip in Live');
   const hhWait = makeEnv(withCodes(3, { read: false, note: null }, 'idle'), 'v5');
   for (let k = 0; k < 3; k++) await hhWait.tick();
   assert.strictEqual(hhWait.el('h_n').textContent, '-- CODES'); assert.strictEqual(hhWait.el('h_live').textContent, 'IDLE');
+  assert.strictEqual(hhWait.el('h_miltxt').textContent, 'Check engine ?'); assert(/START SAMPLING TO READ CODES/.test(hhWait.el('h_codes').innerHTML));
 
   // 4) car chip: partial-VIN key, seen-before count, honest notes, never markup
   const withCar = (vehicle) => makeEnv(statesFor(3, idle).map(st => Object.assign(st, { vehicle })));
@@ -561,8 +567,8 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
   await toggle(an);
   assert(/106/.test(flat(an.el('d_table'))) && /°F/.test(flat(an.el('d_table'))) && /inHg/.test(flat(an.el('d_table'))), 'Dashboard rows convert to °F and inHg: ' + flat(an.el('d_table')).slice(0, 300));
   const hh2 = await uEnv({ '05': 41 }, 'v5', { 'shadetree.units': 'us' });
-  assert(/aria-label="106"/.test(hh2.el('h_ect').innerHTML) && /aria-label="10.6"/.test(hh2.el('h_map').innerHTML), 'handheld digits convert');
-  assert.strictEqual(hh2.el('h_ect_u').textContent, '°F'); assert.strictEqual(hh2.el('h_map_u').textContent, 'INHG');
+  assert(/106 °F/.test(flat(hh2.el('h_gauges'))), 'handheld gauges convert: ' + flat(hh2.el('h_gauges')).slice(0, 300));
+  assert(/106/.test(flat(hh2.el('h_table'))) && /°F/.test(flat(hh2.el('h_table'))) && /inHg/.test(flat(hh2.el('h_table'))), 'handheld table converts: ' + flat(hh2.el('h_table')).slice(0, 300));
   const gt = await uEnv({ '05': 41 }, 'v3', { 'shadetree.units': 'us' });
   assert.strictEqual(gt.el('v3ect').textContent, '106'); assert.strictEqual(gt.el('v3ect_u').textContent, '°F'); assert.strictEqual(gt.el('v3map_u').textContent, 'inHg');
 
@@ -1016,6 +1022,38 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
     let l6 = null; walk(e6.el('d_codes_mount'), n => { if (n.id === 'd_codes') l6 = n; });
     assert.strictEqual((l6.innerHTML.match(/class="crow"/g) || []).length, 6, 'six codes, six rows');
     assert.strictEqual((l6.innerHTML.match(/class="chint"/g) || []).length, 6, 'each with its hint');
+  }
+
+  {   // 15) Handheld: Live (lamps, the scenario's gauges, the full PID table) and Codes, opening on Live; its scenario dropdown and the Dashboard's follow each other
+    const hhE = async (store = {}, states = statesFor(6, base)) => { const e = makeEnv(states, 'v5', OVF, [], store); for (let k = 0; k < states.length; k++) await e.tick(); return e; };
+    const btn = (e, m) => e.hhBtns.find(b => b.dataset.mode === m), on = (b) => b.className.split(' ').includes('on');
+    const hRows = (e) => e.el('h_table').children[0].children[0].children[1].children;   // .rwrap > table > tbody > rows
+    const hKeys = (e) => e.el('h_gauges').children.map(g => g.getAttribute('data-key'));
+    const hStore = {}, e = await hhE(hStore);
+    assert.deepStrictEqual(e.hhBtns.map(b => b.dataset.mode), ['live', 'codes'], 'two modes: Live, Codes');
+    assert.strictEqual(e.el('h_livepane').hidden, false, 'opens on Live'); assert.strictEqual(e.el('h_codes').hidden, true, 'Codes starts hidden');
+    assert.ok(on(btn(e, 'live')) && !on(btn(e, 'codes')), 'the Live button is lit');
+    btn(e, 'codes').on.click();
+    assert.ok(e.el('h_livepane').hidden && !e.el('h_codes').hidden, 'Codes shows the codes and hides Live'); assert.ok(on(btn(e, 'codes')) && !on(btn(e, 'live')));
+    btn(e, 'live').on.click(); assert.ok(!e.el('h_livepane').hidden && e.el('h_codes').hidden, 'and Live comes back');
+    assert.deepStrictEqual(e.el('h_sel').children.map(o => o.value), ['general', 'fuel', 'cooling', 'idle', 'charging'], 'the dropdown lists the five scenarios');
+    assert.strictEqual(e.el('h_sel').value, 'general');
+    assert.strictEqual(e.el('h_gauges').children.length, 8, 'General: 8 gauges');
+    assert.deepStrictEqual(hRows(e).map(r => r.getAttribute('data-key')), Object.keys(base()).sort(), 'the table lists every PID in the run');
+    const dim = e.el('h_gauges').children.filter(g => g.getAttribute('data-key') === '0D:dial')[0];   // base() has no 0D
+    assert.ok(dim && dim.className.split(' ').includes('dim') && dim.children.some(c => c.className === 'gnote' && c.textContent === 'not in this run'), 'a PID not in the run is a dim gauge that says so');
+    assert.ok(/Check engine \(MIL\)/.test(e.el('h_lamps').innerHTML), 'the Lamps strip is drawn');
+    e.el('h_sel').value = 'fuel'; e.handlers['h_sel:change'](); await e.tick();
+    assert.strictEqual(hStore['shadetree.scenario'], 'fuel', 'the choice is remembered'); assert.strictEqual(e.el('d_sel').value, 'fuel', "the Dashboard's dropdown follows");
+    assert.strictEqual(hKeys(e)[0], '06:bar', "Fuel trims' gauges"); assert.strictEqual(hKeys(e).length, 8);
+    e.el('d_sel').value = 'charging'; e.handlers['d_sel:change'](); await e.tick();
+    assert.strictEqual(e.el('h_sel').value, 'charging', "and the Handheld's follows the Dashboard's"); assert.strictEqual(hKeys(e).length, 4);
+    assert.ok(!/aria-pressed|d_edit/.test(html.slice(html.indexOf('id="v5"'), html.indexOf('id="v6"'))), 'no gauge editing in the Handheld');
+    const emp = await hhE({ 'shadetree.scen.general': '[]' });
+    assert.strictEqual(emp.el('h_gauges').children.length, 0, 'an emptied scenario draws no gauges'); assert.strictEqual(hRows(emp).length, Object.keys(base()).length, 'and the table still lists the run');
+    const none = makeEnv([{ status: 'idle', channels: {}, stats: {}, extras: {}, seq: 1 }], 'v5', OVF); await none.tick();
+    assert.strictEqual(hRows(none).length, 0, 'no channels: the table body is empty');
+    assert.ok(none.el('h_gauges').children.every(g => g.children.some(c => c.className === 'gnote' && c.textContent === 'not sampling')), 'and the gauges say not sampling');
   }
 
   console.log('page logic OK');

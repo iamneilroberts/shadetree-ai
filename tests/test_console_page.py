@@ -61,7 +61,10 @@ def test_handheld_frame_has_a_fixed_size_so_switching_modes_never_resizes_it():
     assert "width: 390px" in frame and "height: 780px" in frame
     body = re.search(r"\.retro \.hh-body \{([^}]*)\}", HTML).group(1)
     assert "flex: 1" in body and "overflow-y: auto" in body  # long content scrolls inside the frame
-    assert re.findall(r'<div class="hh-pane" data-mode="(\w+)"', HTML) == ["codes", "live", "trims", "status"]
+    assert re.findall(r'<div class="hh-pane" data-mode="(\w+)"', HTML) == ["live", "codes"]
+    for gone in ("h_rpm", "h_l_stft1", "h_status"):
+        assert f'id="{gone}"' not in HTML and f"'{gone}'" not in HTML, f"{gone} is gone with the old panes"
+    assert re.search(r"\.hh \.gauges \{ grid-template-columns: repeat\(2, 1fr\); \}", HTML), "gauges two across in the Handheld"
 
 
 def test_phone_width_hides_the_status_and_controls_but_keeps_the_topbar_menu_for_the_handheld_view():

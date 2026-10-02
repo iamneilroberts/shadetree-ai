@@ -108,8 +108,8 @@
   :root {
     --sil: "Helvetica Neue", Helvetica, Arial, "Liberation Sans", sans-serif; --ghost: .16; --glow: 3px; --ink2: #4a4a4c; --mut: #a39b88; --retro-ink: #ece6d6;
     --rail: linear-gradient(90deg, #3a0f0e, #7d2724 22%, #a5423b 34%, #74221f 62%, #3f100f); --rail-rivet: radial-gradient(circle at 50% 28px, #e4e4e2 0 2.5px, #2b2b2c 3px 5px, transparent 5.5px) 0 0 / 100% 84px repeat-y; --rail-tex: repeating-linear-gradient(90deg, rgba(255,255,255,.05) 0 1px, rgba(0,0,0,.08) 1px 2px); --rail-edge: rgba(230,230,228,.35);
-    --face: linear-gradient(#e9e9e6, #d6d6d3); --face-bd: #2b2b2c; --face-ink: #161617; --pan: #b9babc; --pan-bd: #7a7b7e; --plate-bg: #141415; --plate-ink: #f4f4f1; --plate-ink2: #a9aaad; --bench: #a6a7aa; --scale: #232324; --win-bd: #2b2b2c;
-    --win-bg: #0d0a09; --led-off: rgba(255,255,255,.07); --led-g: #3fe06a; --led-y: #ffc233; --led-r: #ff4a3a; --led-zero: #d9d2bd; --seg-red: #ff3b2b; --code-amber: #ffb62e;
+    --face: linear-gradient(#e9e9e6, #d6d6d3); --face-bd: #2b2b2c; --face-ink: #161617; --pan: #b9babc; --pan-bd: #7a7b7e; --plate-bg: #141415; --plate-ink: #f4f4f1; --plate-ink2: #a9aaad; --bench: #a6a7aa; --win-bd: #2b2b2c;
+    --win-bg: #0d0a09; --led-off: rgba(255,255,255,.07); --led-g: #3fe06a; --led-y: #ffc233; --led-r: #ff4a3a; --seg-red: #ff3b2b; --code-amber: #ffb62e;
     --lamp-lit: #fff1cf; --lens-bd: #6c6555; --lens-red: radial-gradient(circle at 35% 30%, #5a4a4a, #2a1c1c 70%); --lens-grn: radial-gradient(circle at 35% 30%, #4a5a4a, #1c2a1c 70%); --lens-amb: radial-gradient(circle at 35% 30%, #5a5040, #2a2216 70%);
     --lens-red-lit: radial-gradient(circle at 35% 30%, #ffd0c8, #ff4a3a 55%, #b3170b); --lens-amb-lit: radial-gradient(circle at 35% 30%, #fff0c0, #ffc233 55%, #b37c05); --lens-grn-lit: radial-gradient(circle at 35% 30%, #d6ffe0, #3fe06a 55%, #0e8a30);
     --screw: radial-gradient(circle at 35% 30%, #f1f1ee, #7d8288); --screw-slot: #454a4f; --rocker: linear-gradient(#5a5c60, #2b2c2f); --rocker-bd: #1b1c1e; --rocker-ink: #f1ead4; --rocker-sh: #101112;
@@ -119,19 +119,10 @@
   .retro { font: 14px/1.45 var(--sil); color: var(--retro-ink);
            --g-face: var(--meter-face); --g-rim: var(--meter-rim); --g-ink: var(--meter-ink); --g-ink2: var(--meter-ink2); --g-needle: var(--meter-needle); --g-z-out: var(--meter-zone); }
   .retro.max { --ghost: .05; --glow: 1px; }
-  .retro .lab, .retro .lampbox { margin-top: 0; }
-  .retro .lab { font: 700 11.5px var(--sil); letter-spacing: .16em; text-transform: uppercase; color: var(--face-ink); margin: 0 0 6px; display: flex; justify-content: space-between; }
-  .retro .lab span { color: var(--ink2); letter-spacing: .08em; }
-  .retro .win, #v0 .win { background: var(--win-bg); border: 3px solid var(--win-bd); border-radius: 4px; padding: 8px 10px; box-shadow: inset 0 0 12px #000; }
+  .retro .lampbox { margin-top: 0; }
+  #v0 .win { background: var(--win-bg); border: 3px solid var(--win-bd); border-radius: 4px; padding: 8px 10px; box-shadow: inset 0 0 12px #000; }
   .retro .led svg, #v0 .led svg { filter: drop-shadow(0 0 var(--glow) var(--c)); }
   .retro svg.seg, #v0 svg.seg { display: block; }
-  .retro .leds { display: grid; grid-template-columns: repeat(21, 1fr); gap: 3px; background: var(--win-bg); border: 3px solid var(--win-bd); border-radius: 4px; padding: 7px 8px; }
-  .retro .leds i { display: block; height: 20px; border-radius: 2px; background: var(--led-off); }
-  .retro .leds i.g { background: var(--led-g); box-shadow: 0 0 6px var(--led-g); }
-  .retro .leds i.y { background: var(--led-y); box-shadow: 0 0 6px var(--led-y); }
-  .retro .leds i.r { background: var(--led-r); box-shadow: 0 0 6px var(--led-r); }
-  .retro .leds i.z { border-bottom: 3px solid var(--led-zero); }
-  .retro .scale { display: flex; justify-content: space-between; font: 700 11px var(--sil); color: var(--scale); padding: 3px 2px 0; }
   svg.dial .df { fill: var(--g-face); stroke: var(--g-rim); }
   svg.dial .da, svg.dial .dt { stroke: var(--g-ink); }
   svg.dial text, svg.dial .dh { fill: var(--g-ink); }
@@ -201,7 +192,7 @@
   .retro .hh-top .n.zero { color: var(--led-g); }
   .retro .hh-body { flex: 1; min-height: 0; padding: 10px; overflow-y: auto; }
   .retro .hh-pane[hidden] { display: none; }
-  .retro .hh-nav { flex: none; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; padding: 8px; background: var(--pan); border-top: 1px solid var(--pan-bd); }
+  .retro .hh-nav { flex: none; display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; padding: 8px; background: var(--pan); border-top: 1px solid var(--pan-bd); }
   .retro .hh-nav button { appearance: none; border: 2px solid var(--rocker-bd); background: var(--rocker); color: var(--rocker-ink); border-radius: 6px; padding: 12px 0; font: 700 12px var(--sil); letter-spacing: .1em; text-transform: uppercase; cursor: pointer; min-height: 48px; }
   .retro .hh-nav button.on { background: var(--nav-on); color: var(--on-amber); border-color: var(--nav-on-bd); }
   .retro .hcode { background: var(--win-bg); border: 2px solid var(--win-bd); border-radius: 6px; padding: 8px 12px 10px; margin-bottom: 8px; }
@@ -209,19 +200,12 @@
   .retro .hcode .ccode { font-size: 32px; }
   .retro .hcode .cdesc { font-size: 17px; margin-top: 2px; }
   .retro .hcode .chint { margin-top: 3px; }
-  .retro .hh .win { margin-bottom: 6px; }
-  /* the three data panes spread their contents over the whole frame, so nothing is left empty and the frame never resizes */
-  .retro .hh-pane[data-mode="live"], .retro .hh-pane[data-mode="trims"], .retro .hh-pane[data-mode="status"] { height: 100%; display: flex; flex-direction: column; }
-  .retro .hh-pane[hidden] { display: none; }
-  .retro .hh-pane[data-mode="live"] .win { flex: 1; min-height: 0; margin-bottom: 4px; display: flex; align-items: center; justify-content: center; padding: 4px 8px; }
-  .retro .hh-pane[data-mode="live"] .win svg.seg { max-height: none !important; height: 100%; width: 100%; }
-  .retro .hh-pane[data-mode="trims"] .leds { flex: 1; min-height: 0; margin-bottom: 4px; }
-  .retro .hh-pane[data-mode="trims"] .leds i { height: auto; }
-  .retro .hh-pane[data-mode="status"] .lampbox { flex: 1; min-height: 0; margin-bottom: 8px; }
-  .retro .hh-pane[data-mode="status"] .lampbox b { font-size: 14px; } .retro .hh-pane[data-mode="status"] .lampbox em { font-size: 13px; }
+  /* Live: lamps, the scenario's gauges two across, then the PID table (it scrolls sideways inside its .rwrap); the pane scrolls inside .hh-body */
+  .retro .hh-scen { flex: none; padding: 8px 10px 0; } .retro .hh-scen select { width: 100%; }
+  .retro .hh .lamps { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; margin-bottom: 10px; }
+  .retro #h_table { margin-top: 10px; }
+  .retro .hh table.rd th, .retro .hh table.rd td .at { color: var(--ink2); }   /* the table sits on the light face */
   .retro .hh-nav { padding-bottom: calc(8px + env(safe-area-inset-bottom)); }
-  .retro .hh .lab { margin-top: 8px; }
-  .retro .hh .lampbox { margin-bottom: 8px; }
   .retro .hh-size { font: 12px var(--sil); color: var(--mut); }
   .retro .hhwrap { padding-top: 0; }
   @media (max-width: 900px) { #v0 .cwrap { grid-template-columns: 1fr; } }
@@ -319,6 +303,7 @@
   .panel > .pbody { padding: 12px 14px; min-width: 0; }
   .gauges { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
   @media (min-width: 601px) { .gauges { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); } }   /* wider cards where there is room, so long names fit; a phone keeps two side by side */
+  .hh .gauges { grid-template-columns: repeat(2, 1fr); }   /* the Handheld frame is phone width on any screen: always two across */
   /* Dashboard: scenario tabs (a dropdown on a phone), and the scenario's PIDs marked in the table */
   .scenbar { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
   .stabs { display: flex; gap: 6px; flex-wrap: wrap; flex: 1; }
@@ -345,6 +330,7 @@
   .gauge .gval { font: 700 20px var(--cond); font-variant-numeric: tabular-nums; margin-top: 4px; } .gauge .gval:empty { display: none; }
   .gauge .gnote { color: var(--muted); font-size: 12px; min-height: 18px; }
   .gauge.watch .gnote { color: var(--amber); } .gauge.out .gnote { color: var(--bad); }
+  .retro .hh .gauge { color: var(--ink); }   /* Handheld gauge cards are page-coloured on the light face: page ink, not the face ink */
 </style>
 </head>
 <body>
@@ -472,24 +458,16 @@
   <section class="view" id="v5" role="tabpanel"><div class="retro stage-pad">
 <div class="hhwrap"><div class="hh" id="hh"><div class="hh-in">
     <div class="hh-top"><span class="mil"><i class="lens red" id="h_mil" style="width:18px;height:18px"></i><span id="h_miltxt">Check engine</span></span><span class="hlive" id="h_live">&mdash;</span><span class="n mono" id="h_n">0 CODES</span></div>
+    <div class="hh-scen"><select class="b" id="h_sel" aria-label="Scenario"></select></div>
     <div class="hh-body">
-      <div class="hh-pane" data-mode="codes" id="h_codes"></div>
-      <div class="hh-pane" data-mode="live" hidden>
-        <p class="lab">Engine speed <span>RPM</span></p><div class="win led" id="h_rpm" style="--c:var(--seg-red)"></div>
-        <p class="lab">Coolant <span id="h_ect_u">&deg;C</span></p><div class="win led" id="h_ect" style="--c:var(--code-amber)"></div>
-        <p class="lab">Control module <span>VOLTS</span></p><div class="win led" id="h_volts" style="--c:var(--led-g)"></div>
-        <p class="lab">Manifold <span id="h_map_u">KPA</span></p><div class="win led" id="h_map" style="--c:var(--code-amber)"></div>
+      <div class="hh-pane" data-mode="live" id="h_livepane">
+        <div class="lamps" id="h_lamps"></div>
+        <div class="gauges" id="h_gauges"></div>
+        <div id="h_table"></div>
       </div>
-      <div class="hh-pane" data-mode="trims" hidden>
-        <p class="lab">Short term &middot; bank 1 <span id="h_v_stft1"></span></p><div class="leds" id="h_l_stft1"></div>
-        <p class="lab">Long term &middot; bank 1 <span id="h_v_ltft1"></span></p><div class="leds" id="h_l_ltft1"></div>
-        <p class="lab">Short term &middot; bank 2 <span id="h_v_stft2"></span></p><div class="leds" id="h_l_stft2"></div>
-        <p class="lab">Long term &middot; bank 2 <span id="h_v_ltft2"></span></p><div class="leds" id="h_l_ltft2"></div>
-        <div class="scale"><span>&minus;25</span><span>&minus;10</span><span>0</span><span>+10</span><span>+25</span></div>
-      </div>
-      <div class="hh-pane" data-mode="status" hidden id="h_status"></div>
+      <div class="hh-pane" data-mode="codes" id="h_codes" hidden></div>
     </div>
-    <nav class="hh-nav"><button data-mode="codes" class="on">Codes</button><button data-mode="live">Live</button><button data-mode="trims">Trims</button><button data-mode="status">Status</button></nav>
+    <nav class="hh-nav"><button data-mode="live" class="on">Live</button><button data-mode="codes">Codes</button></nav>
   </div></div><div class="hh-size" id="h_size"></div></div>
   </div></section>
   <!-- F: READINGS (extra PIDs the car supports + Mode 06 test results) -->
@@ -1096,7 +1074,7 @@
     return specs.map(function (g, j) { return j !== i || !GAUGE[g.pid] ? g : { pid: g.pid, form: FORMS[(FORMS.indexOf(g.form) + 1) % FORMS.length] }; });
   }
   /* ---------- Dashboard: the chosen scenario's gauges, every PID in the run below, the health strip in General ---------- */
-  var SC = { list: scenarioList([]), id: 'general', want: null }, DB = null, ED = { on: false, draft: [], sig: '', box: null };   // want: a stored id that may name a server scenario not loaded yet
+  var SC = { list: scenarioList([]), id: 'general', want: null }, DB = null, HB = null, ED = { on: false, draft: [], sig: '', box: null };   // want: a stored id that may name a server scenario not loaded yet
   function hasScen(id) { return SC.list.some(function (s) { return s.id === id; }); }
   try { SC.want = localStorage.getItem('shadetree.scenario'); if (SC.want && hasScen(SC.want)) SC.id = SC.want; } catch (x) {}
   function curScenario() { return SC.list.filter(function (s) { return s.id === SC.id; })[0] || SC.list[0]; }
@@ -1105,19 +1083,19 @@
     try { localStorage.setItem('shadetree.scenario', id); } catch (x) {}
     drawTabs(); render();
   }
-  function drawTabs() {   // scenario names come from a file or the page: textContent only
-    var tabs = $('d_tabs'), sel = $('d_sel');
-    tabs.textContent = ''; sel.textContent = '';
+  function drawTabs() {   // scenario names come from a file or the page: textContent only; the Dashboard's and the Handheld's dropdowns list the same
+    var tabs = $('d_tabs'), sels = [$('d_sel'), $('h_sel')];
+    tabs.textContent = ''; sels.forEach(function (sel) { sel.textContent = ''; });
     SC.list.forEach(function (s) {
-      var b = el('button', 'stab' + (s.id === SC.id ? ' is-active' : ''), s.name), o = el('option', '', s.name);
+      var b = el('button', 'stab' + (s.id === SC.id ? ' is-active' : ''), s.name);
       b.setAttribute('type', 'button'); b.setAttribute('data-scen', s.id); b.setAttribute('role', 'tab'); b.setAttribute('aria-selected', String(s.id === SC.id));
       b.addEventListener('click', function () { setScenario(s.id); });
-      o.value = s.id; if (s.id === SC.id) o.selected = true;
-      tabs.appendChild(b); sel.appendChild(o);
+      tabs.appendChild(b);
+      sels.forEach(function (sel) { var o = el('option', '', s.name); o.value = s.id; if (s.id === SC.id) o.selected = true; sel.appendChild(o); });
     });
-    sel.value = SC.id;
+    sels.forEach(function (sel) { sel.value = SC.id; });
   }
-  $('d_sel').addEventListener('change', function () { setScenario($('d_sel').value); });
+  ['d_sel', 'h_sel'].forEach(function (id) { $(id).addEventListener('change', function () { setScenario($(id).value); }); });
   /* edit mode: every action saves the draft in the browser and redraws, so there is nothing unsaved to lose */
   function edit(next) { var sc = curScenario(); ED.draft = next; saveSaved(sc.id, next, sc.gauges); drawEditor(); render(); }
   function drawEditor() {
@@ -1258,7 +1236,6 @@
   function renderUnits() {
     $('unitsBtn').textContent = 'Units: ' + (US ? 'US' : 'Metric');
     $('v3ect_u').textContent = unitOf('05'); $('v3map_u').textContent = unitOf('0B');
-    $('h_ect_u').textContent = unitOf('05').toUpperCase(); $('h_map_u').textContent = unitOf('0B').toUpperCase();
   }
   /* ---------- theme: a stored choice, else the system preference, else dark ---------- */
   function pickTheme(stored, prefersLight) { return stored === 'light' || stored === 'dark' ? stored : prefersLight ? 'light' : 'dark'; }
@@ -1346,14 +1323,6 @@
     }
     el.innerHTML = out + '</g></svg>';
   }
-  function ledBar(v, n) {
-    var zero = (n - 1) / 2, step = 25 / zero, off = Math.max(-zero, Math.min(zero, Math.round(v / step))), h = '';
-    for (var i = 0; i < n; i++) {
-      var d = Math.abs(i - zero), lit = off >= 0 ? (i >= zero && i <= zero + off) : (i <= zero && i >= zero + off), col = d <= 2 ? 'g' : d <= 4 ? 'y' : 'r';
-      h += '<i class="' + (lit ? col : '') + (i === zero ? ' z' : '') + '"></i>';
-    }
-    return h;
-  }
   function dialSvg(v, lo, hi, majors, zones, label, div) {   // the dial face (Dashboard and Guided gauges); zones [{from, to, s: 'ok'|'watch'|'out'}] are coloured arcs; v null draws no needle
     div = div || 1;
     var cx = 110, cy = 118, r = 92, a0 = -50, a1 = 50, s = '<svg class="dial" viewBox="0 0 220 128" role="img" aria-label="' + esc(label) + '">';
@@ -1398,21 +1367,16 @@
   }
   function ledLamp(id, on, cls, b, e) { return '<div class="lampbox' + (on ? ' lit' : '') + '"><i class="lens ' + cls + '"></i><div><b>' + b + '</b><em>' + e + '</em></div></div>'; }
   function trimText(v) { return v > 10 ? 'LEAN: outside \u00b110 %' : 'RICH: outside \u00b110 %'; }
-  function renderHandheld() {
-    var r = retroCommon(), l1 = last.ltft1 !== null && Math.abs(last.ltft1) > 10, l2 = last.ltft2 !== null && Math.abs(last.ltft2) > 10, st = state || {};
+  function renderHandheld() {   // the top strip, Codes (unchanged), and Live: lamps, the scenario's gauges (no editing here), every PID in the run
+    var r = retroCommon(), st = state || {};
+    if (!HB) { var t = pidTableEl(); $('h_table').appendChild(t.root); HB = { g: $('h_gauges'), rows: t.body }; drawTabs(); }
     var mil = $('h_mil'); mil.className = 'lens red';
     mil.style.cssText = 'width:18px;height:18px' + (r.mil ? ';background:var(--lens-red-lit);box-shadow:0 0 12px var(--led-r)' : '');
     $('h_miltxt').textContent = r.mil ? 'Check engine ON' : (r.c.read ? 'Check engine off' : 'Check engine ?');
     $('h_n').textContent = r.c.read ? r.list.length + (r.list.length === 1 ? ' CODE' : ' CODES') : '-- CODES'; $('h_n').className = 'n mono' + (r.c.read && !r.list.length ? ' zero' : '');
     var lv = $('h_live'); lv.textContent = { running: 'LIVE', stopped: 'STOPPED', error: 'ERROR', idle: 'IDLE', disconnected: 'NO LINK' }[st.status] || '--'; lv.className = 'hlive ' + (st.status === 'running' ? 'on' : 'off');
     $('h_codes').innerHTML = r.list.length ? codeRows(r.list, 'hh') + '<p class="cfoot">Meanings are plain-words drafts, unreviewed. Hints: general knowledge, unverified.</p>' : '<div class="cnone' + (r.c.read ? '' : ' wait') + '" style="padding:150px 0">' + codeEmpty(r.c, r.live) + '</div>';
-    seven($('h_rpm'), last.rpm, 4, 0, 'var(--seg-red)', 84); seven($('h_ect'), cv('05', last.ect), 3, dpFor('05', 0), 'var(--code-amber)', 64);
-    seven($('h_volts'), last.volts, 4, 2, 'var(--led-g)', 64); seven($('h_map'), cv('0B', last.map), 4, dpFor('0B', 0), 'var(--code-amber)', 64);
-    ['stft1', 'ltft1', 'stft2', 'ltft2'].forEach(function (k) { $('h_l_' + k).innerHTML = ledBar(last[k], 21); $('h_v_' + k).textContent = last[k] === null ? '' : (last[k] > 0 ? '+' : '') + last[k].toFixed(1); });
-    $('h_status').innerHTML = ledLamp('', r.mil, 'red', 'Check engine (MIL)', r.mil ? 'ON' : (r.c.read ? 'off' : 'unknown')) +
-      ledLamp('', l1, 'red', 'LTFT bank 1', l1 ? trimText(last.ltft1) : 'within range') + ledLamp('', l2, 'red', 'LTFT bank 2', l2 ? trimText(last.ltft2) : 'within range') +
-      ledLamp('', last.ect !== null && last.ect < 60, 'amb', 'Coolant', last.ect !== null && last.ect < 60 ? 'reads cold' : 'warm') +
-      ledLamp('', st.status === 'running', 'grn', 'Sampling', st.status === 'running' ? (st.hz_measured ? st.hz_measured.toFixed(1) + ' Hz' : 'starting') : 'not sampling');
+    renderLamps($('h_lamps')); gauges(HB.g, specsFor(curScenario())); pidRows(HB.rows, Object.keys(st.channels || {}).sort());
   }
   function setMode(m) {
     Array.prototype.forEach.call(document.querySelectorAll('.hh-pane'), function (e) { e.hidden = e.dataset.mode !== m; });
@@ -1500,7 +1464,7 @@
       SC.list = scenarioList(j && j.scenarios);
       if (SC.want && hasScen(SC.want)) SC.id = SC.want;
       if (!hasScen(SC.id)) SC.id = 'general';
-      if (DB) drawTabs();
+      if (DB || HB) drawTabs();
       render();
     })
     .catch(function () {});
