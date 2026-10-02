@@ -2,7 +2,7 @@
 
 A **read-only** OBD-II diagnostic assistant for DIY mechanics. Plug in an adapter, scan the car into a snapshot, and troubleshoot with Claude using that snapshot plus cited reference material.
 
-> **Status (2026-09-30):** working and tested (701 tests), still early. It can scan a car read-only, replay recorded scans without a car, serve 17 read-only MCP tools to Claude, and show live data in a local web console. The reference store and guided playbooks are not built yet. See [What works today](#what-works-today) and [docs/design.md](docs/design.md).
+> **Status (2026-09-30):** working and tested (712 tests), still early. It can scan a car read-only, replay recorded scans without a car, serve 17 read-only MCP tools to Claude, and show live data in a local web console. The reference store and guided playbooks are not built yet. See [What works today](#what-works-today) and [docs/design.md](docs/design.md).
 
 ## Quick start
 
@@ -98,9 +98,9 @@ shadetree-ai console --port /dev/serial/by-id/<your-adapter>
 
 The console is read-only: it can only start and stop sampling and save a run to `runs/`. It binds to `127.0.0.1`, needs the token in the link, and refuses other `Host` and `Origin` values; the page's one script is pinned by hash in the Content-Security-Policy, and text from the adapter is only ever shown as text.
 
-**Help popups:** every reading, tile and Mode 06 line has a "?" that says what it measures, how to use it and typical values. The wording is ours and unreviewed (the popup says so); the colors on the Overview use general rules of thumb, not limits for your particular car.
+**Help popups:** every reading, tile and Mode 06 line has a "?" that says what it measures, how to use it and typical values. The wording is ours and unreviewed (the popup says so); the colors on the Dashboard use general rules of thumb, not limits for your particular car.
 
-**Units:** the **Units** button switches the page between metric and US units (°C/°F, km/h/mph, kPa/psi, g/s to lb/min; manifold and barometric pressure show in inHg). It only changes what is displayed: saved runs, replays and the Overview colors stay metric underneath, and the choice is remembered in the browser.
+**Units:** the **Units** button switches the page between metric and US units (°C/°F, km/h/mph, kPa/psi, g/s to lb/min; manifold and barometric pressure show in inHg). It only changes what is displayed: saved runs, replays and the Dashboard colors stay metric underneath, and the choice is remembered in the browser.
 
 **Remote access:** start the console with `--allow-host <name>` to accept a public host name served by a tunnel (the console stays on loopback); `scripts/remote_access.py` sets up a Cloudflare Tunnel with a Cloudflare Access email gate and adds or removes friends. See [docs/remote-access.md](docs/remote-access.md).
 

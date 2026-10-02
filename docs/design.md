@@ -1,6 +1,6 @@
 # OBD Diagnostic Assistant — Design (draft 1)
 
-_Status: design of record, updated 2026-09-30. Project name `shadetree-ai` (provisional; import package `obd_reader`, repo dir `obd-reader`). Built so far: Phases 1 and 2, the tool layer and MCP server (Phase 3a), and the live console with its Dashboard, help popups and per-car profiles (§7b). Not built: the reference store and grounding checker (Phase 3b), legacy-protocol decode (Phase 4), playbooks and evals (Phase 5). See the README "What works today" table for hardware-verification status._
+_Status: design of record, updated 2026-10-02. Project name `shadetree-ai` (provisional; import package `obd_reader`, repo dir `obd-reader`). Built so far: Phases 1 and 2, the tool layer and MCP server (Phase 3a), and the live console with its Dashboard, scenarios, Retro and Handheld views, replay, help popups and per-car profiles (§7b). **NOT BUILT:** the reference store and grounding checker (Phase 3b), legacy-protocol decode (Phase 4), playbooks and evals (Phase 5), UDS 0x19, Mode 22, and a Mode 05 tool (the allowlist permits Mode 05; no tool or scan step uses it). See the README "What works today" table for hardware-verification status._
 
 ## 1. Purpose
 
@@ -130,24 +130,38 @@ Two artifacts per scan:
 
 Rules: unsupported ≠ error (`NO DATA` and negative responses map to `unsupported`); every decoded value keeps its `raw` hex; snapshots contain a VIN, so they stay local and are gitignored except synthetic fixtures.
 
-## 7. MCP tools (defined once, in `tools/`)
+## 7. MCP tools (defined once, in `tools.py`)
 
-All carry `readOnlyHint: true`. No tool accepts a command string.
+All carry `readOnlyHint: true`. No tool accepts a command string. The 17 tools below are the registered set (`tools.TOOL_NAMES`, asserted by `mcp_server.py`); the last table lists planned tools that do **not** exist.
 
 | Tool | Args | Returns |
 |---|---|---|
-| `scan` | `protocol?`, `sample_seconds?` (default 0), `symptoms?` | new `snapshot_id` + summary |
-| `get_snapshot` / `list_snapshots` | `snapshot_id` | snapshot JSON / index |
-| `read_dtcs` | `kind: stored\|pending\|permanent` | DTCs with `ref` record IDs |
-| `freeze_frame` | — | freeze-frame block |
-| `live_data` | `pids[≤8]`, `seconds≤120`, `conditions?` | series + summary stats (min/max/mean/trend) |
-| `decode_vin` | `vin` | vPIC decode + recalls/complaints refs |
-| `lookup_reference` | `id` or `query`, `kind?` | records with source/confidence/license |
-| `get_playbook` | `id` | structured playbook steps with cites |
-| `check_citations` | `answer_text` | valid/invalid `[ref:ID]` tags, uncited-claim report |
-| `import_snapshot` | `path` | validates + registers a recorded/imported snapshot |
+| `list_snapshots` | — | index of saved snapshots |
+| `get_snapshot` | `snapshot_id?` (newest if omitted) | snapshot JSON |
+| `import_snapshot` | `path` (a file inside the data directory) | validates and registers it; `snapshot_id` |
+| `read_dtcs` | `snapshot_id?`, `kind: stored\|pending\|permanent\|all` | DTCs from a snapshot, plus MIL |
+| `freeze_frame` | `snapshot_id?` | freeze-frame block |
+| `readiness` | `snapshot_id?` | readiness monitors from a snapshot |
+| `vehicle_info` | `snapshot_id?` | VIN, protocol, adapter, ECUs, supported Mode 09 items (decoded locally from the snapshot; no vPIC lookup) |
+| `list_supported_pids` | `snapshot_id?` | supported Mode 01 PIDs with names |
+| `compare_snapshots` | `a`, `b` | differences: DTCs, MIL, protocol, supported PIDs, readiness |
+| `adapter_info` | — | adapter chip, firmware, device id, supply voltage (live) |
+| `scan` | `label?`, `protocol?` (0 = auto, or 1-9), `symptoms?` | new `snapshot_id` + summary (live) |
+| `read_pid` | `pid` (hex, must be in the decoder table) | one Mode 01 reading (live) |
+| `live_data` | `pids[≤8]`, `seconds≤120`, `hz?`, `conditions?` | series + summary stats (live) |
+| `trim_summary` | `seconds?`, `hz?` | short- and long-term fuel-trim statistics, both banks (live) |
+| `mode06_tests` | `mid?` (2 hex digits, or all supported) | raw Mode 06 results, no unit scaling (live) |
 | `open_console` | `demo?`, `start?` | starts the live console web page (§7b) and returns its local URL |
-| `console_data` | `seconds?` | latest values and exact stats from the console's sampler (what the page shows) |
+| `console_data` | `seconds?` (0-600) | latest values and exact stats from the console's sampler (what the page shows); `source` says live or replay |
+
+**NOT BUILT** (planned in earlier drafts of this table; none is registered):
+
+| Tool | Planned purpose | Needs |
+|---|---|---|
+| `decode_vin` | vPIC decode + recalls/complaints refs (and the NHTSA vPIC/recalls/complaints/TSB tools) | NHTSA client, Phase 3b |
+| `lookup_reference` | records by `id` or `query` with source/confidence/license | reference store (§8), Phase 3b |
+| `get_playbook` | structured playbook steps with cites | playbooks, Phase 5 |
+| `check_citations` | valid/invalid `[ref:ID]` tags, uncited-claim report | reference store, Phase 3b (no `evals/` directory exists either) |
 
 Live mode = same snapshot format with a time series; the tool layer is the same for replay and live.
 
@@ -247,9 +261,9 @@ Playbooks are YAML (steps, conditions, tool calls, expected readings, branches, 
 | 0 | Research + hygiene: design doc, README, CLAUDE.md, **data-source landscape deep-dive** (subagent report with sources) | ~1 day | `docs/design.md`; `docs/research/data-sources.md` |
 | 1 | Replay core: snapshot schema, allowlist gate, fake ELM transport, fuzz tests | ~2 evenings | `pytest` — forbidden bytes rejected; synthetic snapshot replays |
 | 2 | Real scan: EX on Ridgeline + Highlander; transcript recorder | ~1 evening after adapter arrives | real `snapshot.json` + transcript |
-| 3 | MCP tools + generic DTC store with provenance + grounding checker | ~1 week of evenings | Claude Code explains a real code, citing record IDs |
-| 4 | Austin's old car: legacy protocols, pinned protocol, VIN fallback chain | ~1 evening on-site + fixes | old-car transcript replays in CI |
-| 5 | Playbooks + eval harness; `live_data` guided tests; first playbook (P0171) | 2–3 weeks | guided P0171 diagnosis on a recorded case, eval green |
+| 3 | MCP tools (3a, built) + generic DTC store with provenance + grounding checker (3b, NOT BUILT) | ~1 week of evenings | Claude Code explains a real code, citing record IDs |
+| 4 | NOT BUILT: Austin's old car: legacy protocols, pinned protocol, VIN fallback chain | ~1 evening on-site + fixes | old-car transcript replays in CI |
+| 5 | NOT BUILT: Playbooks + eval harness; `live_data` guided tests; first playbook (P0171) | 2–3 weeks | guided P0171 diagnosis on a recorded case, eval green |
 | Later | phone capture/import, credentialed connectors, Mode 22/OBDb, Mode 06, UDS 19, wireless adapter, web UI, C-level playbooks | — | — |
 
 ## 11. Top risks (ranked) and cheap experiments
