@@ -16,7 +16,7 @@ def test_page_is_self_contained_with_no_external_urls():
 
 def test_every_view_button_has_a_matching_section():
     views = set(re.findall(r'data-view="([a-z0-9]+)"', HTML))
-    assert {"v0", "v3", "v5", "v6"} <= views
+    assert {"v0", "v3", "v5", "v6", "v7"} <= views
     assert "v4" not in views and 'id="v4"' not in HTML, "the Analyzer view is gone: it is the Retro skin of the Dashboard"
     assert "v1" not in views and "v2" not in views
     for view in views:
@@ -729,3 +729,34 @@ def test_the_retro_dashboard_bar_keeps_44px_touch_targets():
     small = css.index(R + " .topbar button.b:not(.tg), " + R + " .topbar select.b { min-height: 28px;")
     touch = css.index("@media (max-width: 600px), (pointer: coarse) { " + R + " .topbar button.b:not(.tg), " + R + " .topbar button.tg, " + R + " .topbar select.b { min-height: 44px; } }")
     assert touch > small, "the touch rule comes after the bar's sizes"
+
+
+# ---- Terminal view (#v7): a fixed CRT screen, its own tokens ------------------------------------------
+TM_TEXT = ("--tm-text", "--tm-key", "--tm-num", "--tm-ok", "--tm-cmd", "--tm-prompt", "--tm-warn", "--tm-head", "--tm-fg", "--tm-dim")
+
+
+def test_terminal_screen_has_a_fixed_height_and_scrolls_inside():
+    css = _css()
+    assert re.search(r"#v7 \.tscr \{[^}]*height: calc\(38 \* var\(--tm-lh\) \* var\(--tm-size\)\); overflow: auto;", css), "about 38 lines, fixed, scrolls inside"
+    assert not re.search(r"#v7 \.tscr \{[^}]*(?:min-height|max-height)", css), "no content-driven height"
+    phone = css[css.rindex("@media (max-width: 600px) {", 0, css.index("#v7 { --tm-size: 12.5px; }")):]
+    phone = phone[:phone.index("\n  }")]
+    assert "#v7 .tscr { height: max(240px, calc(100dvh - var(--topbar-h) - 160px)); }" in phone
+    assert "body:has(.rbar:not([hidden])) #v7 .tscr { height: max(240px, calc(100dvh - var(--topbar-h) - var(--rbar-h) - 160px)); }" in phone, "ends above the pinned replay bar"
+    assert re.search(r"#v7 \.tbar, #v7 \.tcrt \{ max-width: calc\(100ch \+ 40px\);", css), "fills the width up to about 100 characters"
+
+
+@pytest.mark.parametrize("theme", ["dark", "light"])
+def test_terminal_text_reads_on_its_screen(theme):
+    p = _block_all(":root")
+    if theme == "light":
+        p.update(_block_all(':root[data-theme="light"]'))
+    low = [(k, round(_contrast(p[k], p["--tm-scr"]), 2)) for k in TM_TEXT if _contrast(p[k], p["--tm-scr"]) < 4.5]
+    assert low == [], f"{theme}: terminal text below 4.5:1 on the screen: {low}"
+
+
+def test_terminal_is_green_phosphor_in_dark_and_amber_without_scanlines_in_light():
+    dark, light = _block_all(":root"), _block_all(':root[data-theme="light"]')
+    assert {dark[k] for k in TM_TEXT if k != "--tm-warn"} <= {"#4cf28a", "#2fb565", "#b9ffd0"}, "dark: one phosphor colour in three intensities"
+    assert light["--tm-fg"] == "#ffb000" and light["--tm-scan"] == "rgba(0,0,0,0)" and dark["--tm-scan"] != "rgba(0,0,0,0)"
+    assert len({light[k] for k in ("--tm-key", "--tm-num", "--tm-ok", "--tm-warn", "--tm-text")}) == 5, "light: the colourful CLI palette"

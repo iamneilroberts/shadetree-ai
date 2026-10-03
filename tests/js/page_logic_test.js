@@ -713,7 +713,7 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
   const sk3 = await thEnv({ 'shadetree.theme': 'light', 'shadetree.skin': 'retro' }, { narrow: false });
   assert.strictEqual(skin(sk3) + '/' + sk3.el('html').getAttribute('data-theme'), 'retro/light', 'skin and theme are independent');
   sk3.handlers['themeBtn:click'](); assert.strictEqual(skin(sk3), 'retro', 'the theme leaves the skin alone');
-  for (const v of ['v0', 'v3', 'v5', 'v6']) {   // a render error would surface as DISCONNECTED (poll's catch)
+  for (const v of ['v0', 'v3', 'v5', 'v6', 'v7']) {   // a render error would surface as DISCONNECTED (poll's catch)
     const e = makeEnv(statesFor(3, idle), v, OVF, [], { 'shadetree.skin': 'retro', 'shadetree.theme': 'light' });
     for (let k = 0; k < 3; k++) await e.tick();
     assert(/SIMULATED/.test(e.el('chipLive').innerHTML), 'Retro light renders ' + v);
@@ -1105,7 +1105,7 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
 
   // Phone Menu: a real button toggles a menu-open class on the topbar (CSS collapses the tabs, chips and controls behind it at phone width); a view pick closes it
   {
-    const mkBtns = () => ['v0', 'v3', 'v5', 'v6'].map(v => { const b = makeNode('vb_' + v, {}); b.dataset.view = v; return b; });
+    const mkBtns = () => ['v0', 'v3', 'v5', 'v6', 'v7'].map(v => { const b = makeNode('vb_' + v, {}); b.dataset.view = v; return b; });
     const vb = mkBtns(), m = makeEnv(statesFor(2, idle), 'v0', OVF, [], {}, { narrow: true, vbtns: vb }); await m.tick();
     const top = m.el('topbar'), btn = m.el('menuBtn'), open = () => top.className.split(' ').includes('menu-open');
     assert.ok(/<button type="button"[^>]*id="menuBtn"[^>]*aria-expanded="false"[^>]*aria-controls="[^"]+"[^>]*>Menu<\/button>/.test(html), 'a real Menu button, collapsed, with aria-controls');
@@ -1151,12 +1151,12 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
   }
 
   {   // a stale #v4 (the removed Analyzer): the page has no such id, so the fragment is ignored and the Dashboard stays the only active view
-    const views = ['v0', 'v3', 'v5', 'v6'].map(id => { const v = makeNode(id, {}); v.className = id === 'v0' ? 'view is-active' : 'view'; return v; });
+    const views = ['v0', 'v3', 'v5', 'v6', 'v7'].map(id => { const v = makeNode(id, {}); v.className = id === 'v0' ? 'view is-active' : 'view'; return v; });
     const st = makeEnv(statesFor(4, base), 'v0', OVF, [], {}, { hash: '#v4', absent: ['v4'], views });
     for (let k = 0; k < 4; k++) await st.tick();
     assert.deepStrictEqual(views.filter(v => v.className.split(' ').includes('is-active')).map(v => v.id), ['v0'], 'the Dashboard is still the one active view');
     assert.ok(/SIMULATED/.test(st.el('chipLive').innerHTML) && st.el('d_lamps').innerHTML.includes('Check engine'), 'and it renders');
-    const good = ['v0', 'v3', 'v5', 'v6'].map(id => { const v = makeNode(id, {}); v.className = id === 'v0' ? 'view is-active' : 'view'; return v; });
+    const good = ['v0', 'v3', 'v5', 'v6', 'v7'].map(id => { const v = makeNode(id, {}); v.className = id === 'v0' ? 'view is-active' : 'view'; return v; });
     makeEnv(statesFor(1, base), 'v0', OVF, [], {}, { hash: '#v5', views: good });
     assert.deepStrictEqual(good.filter(v => v.className.split(' ').includes('is-active')).map(v => v.id), ['v5'], 'a real #v5 still opens Handheld (the harness can see a switch)');
   }
@@ -1517,7 +1517,7 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
   }
 
   {   // Retro Dashboard: the controls move into the Options drawer and Start/Stop into the bar; another view or skin puts the same nodes back in the toolbar
-    const views = ['v0', 'v3', 'v5', 'v6'].map(id => { const v = makeNode(id, {}); v.className = 'view'; return v; });
+    const views = ['v0', 'v3', 'v5', 'v6', 'v7'].map(id => { const v = makeNode(id, {}); v.className = 'view'; return v; });
     const vbtns = ['v0', 'v3', 'v5', 'v6'].map(id => { const b = makeNode('vb_' + id, {}); b.dataset.view = id; return b; }), sess = {};
     const e = makeEnv(statesFor(3, idle), 'v0', OVF, [], { 'shadetree.skin': 'retro' }, { views, vbtns, session: sess });
     await e.tick();
@@ -1604,6 +1604,71 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
     await e.tick();
     assert.deepStrictEqual([e.el('d_lamps').innerHTML, e.el('d_sum').innerHTML], before, 'the lamps and the summary are what the car says');
     assert.ok(/lampbox lit/.test(e.el('d_lamps').innerHTML) && e.posts.length === n, 'MIL still lit from the data; nothing posted');
+  }
+
+  {   // 30) Terminal (#v7): the run as CLI text from the same state, judgement and words as the other views; honest states, no VIN, copy = the screen's text
+    const plain = (h) => h.replace(/<[^>]*>/g, '').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&');
+    const txt = (e) => e.parts().termText(e.parts().termLines());
+    assert.ok(/<button class="vbtn" data-view="v7" role="tab">Terminal<\/button>/.test(html) && /<section class="view" id="v7" role="tabpanel">/.test(html), 'a view button and its section');
+    assert.ok(/<pre class="tscr" id="t_scr" role="log" aria-live="off" aria-label="[^"]+" tabindex="0">/.test(html), 'a log that is not announced, named, focusable to scroll');
+    const P = makeEnv(statesFor(1, base), 'v0', OVF).parts();
+    assert.ok(P.pickView('#v7', false) === 'v7' && P.pickView('#v7', true) === 'v7', 'routable by hash at any width');
+    const tv = ['v0', 'v3', 'v5', 'v6', 'v7'].map(id => { const v = makeNode(id, {}); v.className = id === 'v0' ? 'view is-active' : 'view'; return v; });
+    makeEnv(statesFor(1, base), 'v0', OVF, [], {}, { hash: '#v7', views: tv });
+    assert.deepStrictEqual(tv.filter(v => v.className.split(' ').includes('is-active')).map(v => v.id), ['v7'], '#v7 opens the Terminal');
+    // live car: prompt, adapter, codes (one list unanswered), table rows, warnings
+    const real = (st) => Object.assign(st, { demo: false, adapter: { chip: 'STN2120', ati: 'ELM327 v1.4b', protocol: 'ISO 15765-4 (CAN 11/500)' }, vehicle: { key: 'ABCDE123-4', known: true, runs: 2, note: null },
+      codes: { read: true, note: null, mil: false, stored: [{ code: 'P0171', desc: 'x' }], pending: [], permanent: [], unanswered: ['permanent'] },
+      mode06: { read: false, note: null }, readiness: { read: false, note: 'the car did not answer' }, stats: { '0C': { n: 6, min: 650, max: 720 }, '05': { n: 6, min: 88, max: 90 } } });
+    const lv = makeEnv(statesFor(6, base).map(real), 'v7', OVF); for (let k = 0; k < 6; k++) await lv.tick();
+    let t = txt(lv);
+    assert.ok(t.split('\n')[0] === '$ shadetree-ai console --live' && !/^# (SIMULATED|REPLAY)/m.test(t), 'a live run: no banner, the --live prompt\n' + t);
+    for (const re of [/^status: {5}LIVE$/m, /^source: {5}Live car · sampling$/m, /^vehicle: {4}ABCDE123-4 \(seen 2 times\)$/m, /^protocol: {3}ISO 15765-4 \(CAN 11\/500\)$/m,
+                      /^adapter: {4}ELM327 v1\.4b \/ STN2120$/m, /^battery: {4}14\.20 V \(control module, PID 42\)$/m, /^ecu names: {2}not read$/m, /^cal ids: {4}not read$/m,
+                      /^stored: {5}P0171$/m, /^pending: {4}none$/m, /^permanent: {2}no answer$/m, /^mil: {8}off$/m, /^readiness: {2}no answer$/m, /^mode 06: {4}reading…$/m,
+                      /^rate: {7}2\.5 Hz$/m, /^units: {6}metric$/m, /^Engine speed +700 rpm +650 +720$/m, /^Coolant temp +90 °C +88 +90$/m,
+                      /^warning: {4}no answer for permanent codes$/m, /^warning: {4}no answer for the readiness monitors$/m])
+      assert.ok(re.test(t), 'live line ' + re + '\n' + t);
+    assert.ok(!/^stored:.*none/m.test(t) && !/^permanent:.*none/m.test(t), 'an unanswered list never reads as none');
+    const scr = lv.el('t_scr'), shown = plain(scr.innerHTML);
+    assert.strictEqual(shown, t, 'the screen shows exactly these lines'); assert.strictEqual(scr._text, shown, 'the copy text is the screen text');
+    assert.ok(/<span class="t-k">permanent:<\/span>  <span class="t-w">no answer<\/span>/.test(scr.innerHTML) && /<span class="t-o">none<\/span>/.test(scr.innerHTML), 'keys, warnings and ok values are coloured');
+    assert.ok(/<span class="t-r">/.test(scr.innerHTML) && /<span class="t-caret" aria-hidden="true"><\/span>$/.test(scr.innerHTML), 'table rows do not wrap; the caret is not text');
+    let copied = null; lv.sandbox.navigator = { clipboard: { writeText: (s) => { copied = s; return Promise.resolve(); } } };
+    lv.handlers['t_copy:click'](); await new Promise(r => setImmediate(r));
+    assert.strictEqual(copied, shown, 'Copy text puts the screen text on the clipboard'); assert.ok(/^Copied \d+ lines$/.test(lv.el('t_note').textContent), lv.el('t_note').textContent);
+    let picked = null; lv.sandbox.navigator = {}; lv.sandbox.window.getSelection = () => ({ removeAllRanges() {}, addRange(r) { picked = r.node; } });
+    lv.sandbox.document.createRange = () => ({ selectNodeContents(n) { this.node = n; } });
+    lv.handlers['t_copy:click'](); assert.ok(picked === scr && /Ctrl\+C/.test(lv.el('t_note').textContent), 'no clipboard: the screen text is selected instead');
+    assert.deepStrictEqual(lv.posts.filter(p => !/\/api\/focus/.test(p.url)), [], 'the Terminal posts nothing (the page-wide focus request aside)');
+    // stopped: not read is not "reading", and the readings are not current
+    const sp = makeEnv(statesFor(6, base).map(real).map((st, i) => (i > 3 ? Object.assign(st, { status: 'stopped' }) : st)), 'v7', OVF); for (let k = 0; k < 6; k++) await sp.tick();
+    t = txt(sp); assert.ok(/^mode 06: {4}not read$/m.test(t) && /^status: {5}STOPPED$/m.test(t) && /^warning: {4}readings not current: STOPPED$/m.test(t), 'stopped\n' + t);
+    // lost link
+    lv.sandbox.fetch = () => Promise.reject(new Error('down')); await lv.tick();
+    t = txt(lv); assert.ok(/^status: {5}NO LINK$/m.test(t) && /^warning: {4}NO LINK: lost contact/m.test(t) && /^Engine speed +700 /m.test(t), 'lost: the last readings, said so\n' + t);
+    // simulated, stale, US units
+    const sm = makeEnv(statesFor(3, base).concat(statesFor(3, () => ({ '0C': 710 }), 3, 20).map(st => { st.channels['05'] = { name: '05', unit: '', samples: [] }; return st; }))
+      .map(st => { st.channels['0D'] = { name: 'vehicle_speed', unit: 'km/h', samples: [] }; return st; }), 'v7', OVF, [], { 'shadetree.units': 'us' }); for (let k = 0; k < 6; k++) await sm.tick();
+    t = txt(sm);
+    assert.ok(t.split('\n')[0] === '# SIMULATED: no car connected' && /^\$ shadetree-ai console --demo$/m.test(t) && /^status: {5}SIMULATED$/m.test(t), 'simulated\n' + t);
+    assert.ok(/^Coolant temp +194 °F +— +— +stale$/m.test(t) && /^units: {6}US$/m.test(t) && /^warning: {4}stale, no sample in 10 s: 1: Coolant temp$/m.test(t), 'stale, in US units\n' + t);
+    assert.ok(/^stored: {5}reading…$/m.test(t) && /^vehicle: {4}not read$/m.test(t), 'codes not read yet, no car key');
+    assert.ok(/^Vehicle speed +— mph +— +— +no data$/m.test(t) && /^warning: {4}no data yet: 1: Vehicle speed$/m.test(t), 'a reading never sampled says no data, never blank');
+    // replay: banner, the file name only, paused words, not in recording distinct from not read
+    const rp = statesFor(3, base).map(st => Object.assign(st, { demo: false, adapter: { chip: null, ati: 'replay', protocol: 'ISO 15765-4 (CAN 29/500)' }, codes: { read: false, note: 'not stored in this run' },
+      replay: { name: 'runs/sub/2026-09-30T21-32-56Z-drive-rebuilt.json', duration: 360, pos: 83, speed: 2, playing: false, ended: false, demo: false } }));
+    const re = makeEnv(rp, 'v7', OVF); for (let k = 0; k < 3; k++) await re.tick();
+    t = txt(re);
+    assert.ok(t.split('\n')[0] === '# REPLAY: recorded car, not live' && /^\$ shadetree-ai console --replay 2026-09-30T21-32-56Z-drive-rebuilt\.json$/m.test(t) && !/runs\/sub/.test(t), 'replay prompt: the file name only\n' + t);
+    assert.ok(/^status: {5}REPLAY · PAUSED$/m.test(t) && /^adapter: {4}not in recording$/m.test(t) && /^vehicle: {4}not in recording$/m.test(t) && /^stored: {5}not stored in this run$/m.test(t), 'replay states\n' + t);
+    assert.ok(/^replay: {5}1:23 \/ 6:00 · paused · 2×$/m.test(t) && /^mode 06: {4}not in recording$/m.test(t), 'replay position, Mode 06 not in the recording\n' + t);
+    // a VIN-shaped run from any field is never shown; untrusted text stays text
+    const vin = '1ABCD23EFGH' + '456789';
+    const vv = makeEnv(statesFor(3, base).map(st => Object.assign(st, { message: 'car ' + vin, adapter: { chip: null, ati: '<b>' + vin + '</b>', protocol: null } })), 'v7', OVF); for (let k = 0; k < 3; k++) await vv.tick();
+    t = txt(vv);
+    assert.ok(!/(?<![A-Z0-9])[A-HJ-NPR-Z0-9]{17}(?![A-Z0-9])/.test(t) && !vv.el('t_scr').innerHTML.includes(vin) && /\(VIN hidden\)/.test(t), 'no VIN-shaped text\n' + t);
+    assert.ok(/&lt;b&gt;/.test(vv.el('t_scr').innerHTML) && !/<b>/.test(vv.el('t_scr').innerHTML), 'adapter text escaped');
   }
 
   console.log('page logic OK');

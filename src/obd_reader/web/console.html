@@ -127,6 +127,33 @@
   #v3 .cite { color: var(--cyan); }
   #v3 .band { display: inline-block; padding: 1px 8px; border: 1px solid var(--line); border-radius: 3px; font-size: 12px; }
   @media (max-width: 860px) { #v3 .wrap { grid-template-columns: 1fr; } #v3 .readouts { grid-template-columns: 1fr 1fr; } }
+  /* G: Terminal: the run as command-line text on a CRT screen, its own look in every skin. Dark theme: single-colour green phosphor;
+     light theme: amber on near-black with the CLI colours. Only the --tm- tokens colour it */
+  :root { --tm-scr: #04100a; --tm-edge: #020805; --tm-fg: #4cf28a; --tm-dim: #2fb565; --tm-line: #166f3a; --tm-bezel: #010503; --tm-glow: rgba(76,242,138,.3); --tm-vig: rgba(76,242,138,.12);
+          --tm-scan: rgba(0,0,0,.28); --tm-text: #4cf28a; --tm-key: #2fb565; --tm-num: #b9ffd0; --tm-ok: #4cf28a; --tm-cmd: #b9ffd0; --tm-prompt: #2fb565; --tm-warn: #ffd24a; --tm-head: #b9ffd0; }
+  :root[data-theme="light"] { --tm-scr: #020100; --tm-edge: #0d0800; --tm-fg: #ffb000; --tm-dim: #c58a12; --tm-line: #6e4a00; --tm-bezel: #050300; --tm-glow: rgba(255,176,0,.16); --tm-vig: rgba(255,176,0,.045);
+          --tm-scan: rgba(0,0,0,0); --tm-text: #eadfc4; --tm-key: #55c8ff; --tm-num: #ffb000; --tm-ok: #7fd962; --tm-cmd: #ffd780; --tm-prompt: #7fd962; --tm-warn: #ff6b3d; --tm-head: #ffd780; }
+  #v7 { --tm-size: 15px; --tm-lh: 1.45; font: var(--tm-size)/var(--tm-lh) ui-monospace, "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", "Liberation Mono", monospace; }
+  #v7 .tbar, #v7 .tcrt { max-width: calc(100ch + 40px); margin: 0 auto; }
+  #v7 .tbar { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; margin-bottom: 14px; font-size: 13px; color: var(--muted); }
+  #v7 .tbar > span:first-child { flex: 1 1 auto; }
+  #v7 .tbar .b { font: inherit; color: var(--tm-fg); background: var(--tm-scr); border: 1px solid var(--tm-line); border-radius: 3px; padding: 4px 12px; }
+  #v7 .tbar .b:focus-visible, #v7 .tscr:focus-visible { outline: 2px solid var(--tm-fg); outline-offset: 3px; }
+  #v7 .tcrt { position: relative; color: var(--tm-text); background: radial-gradient(ellipse at center, var(--tm-scr) 62%, var(--tm-edge) 100%); border: 2px solid var(--tm-line);
+    border-radius: 18px / 14px; padding: 14px 16px 12px; box-shadow: inset 0 0 90px var(--tm-vig), 0 0 0 6px var(--tm-bezel), 0 0 0 7px var(--tm-line); overflow: hidden; }
+  #v7 .tcrt::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: repeating-linear-gradient(to bottom, transparent 0 2px, var(--tm-scan) 2px 3px); }
+  #v7 .tscr { margin: 0; height: calc(38 * var(--tm-lh) * var(--tm-size)); overflow: auto; font: inherit; white-space: pre-wrap; overflow-wrap: anywhere;   /* a fixed screen: updates never resize it, it scrolls inside */
+    text-shadow: 0 0 5px var(--tm-glow); font-variant-numeric: tabular-nums; scrollbar-color: var(--tm-line) transparent; }
+  #v7 .t-r { white-space: pre; } #v7 .t-p { color: var(--tm-prompt); } #v7 .t-c { color: var(--tm-cmd); } #v7 .t-k { color: var(--tm-key); } #v7 .t-n { color: var(--tm-num); }
+  #v7 .t-o { color: var(--tm-ok); } #v7 .t-w { color: var(--tm-warn); } #v7 .t-h { color: var(--tm-head); font-weight: 600; }
+  #v7 .t-caret { display: inline-block; width: .6em; height: 1em; background: var(--tm-text); vertical-align: text-bottom; animation: tblink 1.1s steps(1) infinite; }
+  @keyframes tblink { 50% { opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) { #v7 .t-caret { animation: none; } }
+  @media (max-width: 600px) {   /* a phone: the screen takes the height under the bar and a banner (and above a pinned replay bar) */
+    #v7 { --tm-size: 12.5px; } #v7 .tcrt { padding: 10px 10px 8px; border-radius: 12px / 10px; } #v7 .tbar { margin-bottom: 10px; } #v7 .tbar > span:first-child { display: none; }
+    #v7 .tscr { height: max(240px, calc(100dvh - var(--topbar-h) - 160px)); }
+    body:has(.rbar:not([hidden])) #v7 .tscr { height: max(240px, calc(100dvh - var(--topbar-h) - var(--rbar-h) - 160px)); }
+  }
   /* ---- retro layouts: the Dashboard cabinet and E (handheld / phone): oxblood finish ---- */
   /* retro device palette: the Handheld face reads these in every skin and theme, the Dashboard cabinet face (Retro skin, desktop only) reads them too; the Retro skin also uses them for any view */
   :root {
@@ -649,6 +676,7 @@
     <button class="vbtn" data-view="v3" role="tab">Guided test</button>
     <button class="vbtn" data-view="v5" role="tab">Handheld</button>
     <button class="vbtn" data-view="v6" role="tab">All readings</button>
+    <button class="vbtn" data-view="v7" role="tab">Terminal</button>
   </nav>
   <button type="button" class="b optbtn" id="optBtn" aria-expanded="false" aria-controls="optDrawer">Options</button>
   <div class="optd" id="optDrawer" role="group" aria-label="Options" hidden>
@@ -797,6 +825,11 @@
     <div class="card"><h3>Mode 06 &middot; on-board test results <span class="tag" id="m6_count"></span></h3>
       <p class="note" id="m6_note">Read once per run. Values are raw integers: the unit scaling table is not applied, so compare a value to its own limits, not to other tests. Monitor names are general knowledge, unverified.</p>
       <div id="m6"></div></div>
+  </section>
+  <!-- G: TERMINAL (the current run as command-line text, read-only) -->
+  <section class="view" id="v7" role="tabpanel">
+    <div class="tbar"><span>The current run as command-line text: read-only, updated with every reading.</span><span id="t_note" role="status"></span><button type="button" class="b" id="t_copy">Copy text</button></div>
+    <div class="tcrt"><pre class="tscr" id="t_scr" role="log" aria-live="off" aria-label="Terminal: the current run as command-line text" tabindex="0"></pre></div>
   </section>
 </main>
 <p class="foot">Values come from one shared sampler, so Claude and this page see the same numbers. Normal, watch and out of range are general rules of thumb, not limits for your car [general knowledge, unverified]. The guided test is a draft, unreviewed playbook.</p>
@@ -1861,6 +1894,87 @@
   $('d_ltest').addEventListener('pointerdown', ltDown);
   $('d_ltest').addEventListener('keydown', function (e) { if (e.key === ' ' || e.key === 'Enter') ltDown(e); });
   ['pointerup', 'pointerleave', 'pointercancel', 'blur', 'keyup'].forEach(function (t) { $('d_ltest').addEventListener(t, ltUp); });
+  /* Terminal: the run in the format of the scan / probe summaries, from the same state, judgement and words as the other views.
+     A line is { s: [[class, text], ...], row: a table row (never wrapped) }; what a file or an adapter sends is text, and a VIN-shaped run is hidden */
+  var VINISH = /(?<![A-Z0-9])[A-HJ-NPR-Z0-9]{17}(?![A-Z0-9])/g;
+  function tcol(s, w, right) { s = String(s); if (s.length > w) s = s.slice(0, w - 1) + '…'; var p = new Array(w - s.length + 1).join(' '); return right ? p + s : s + p; }
+  function termLines() {
+    var st = state || {}, src = source(), rp = st.replay, ad = st.adapter || {}, cd = st.codes || { read: false }, miss = codeMiss(cd), m6 = st.mode06 || { read: false },
+        nr = rp ? 'not in recording' : 'not read', L = [], W = [];
+    function out(segs, row) { L.push({ row: !!row, s: segs.map(function (x) { return [x[0], String(x[1]).replace(VINISH, '(VIN hidden)')]; }) }); }
+    function kv(k, v, cls) { out([['t-k', k + ':'], ['', new Array(Math.max(2, 12 - k.length)).join(' ')], [cls === undefined ? (/^-?\d/.test(v) ? 't-n' : '') : cls, v]]); }
+    function why(b) { return b && b.note ? String(b.note) : src.sampling ? 'reading…' : nr; }
+    function names(a) { return a.length + ': ' + a.slice(0, 6).join(', ') + (a.length > 6 ? ' and ' + (a.length - 6) + ' more' : ''); }
+    if (rp) out([['t-w', '# REPLAY: ' + (rp.demo ? 'recorded simulation, not a car' : 'recorded car, not live')]]);
+    else if (st.demo) out([['t-w', '# SIMULATED: no car connected']]);
+    out([['t-p', '$ '], ['t-c', 'shadetree-ai console ' + (rp ? '--replay ' + String(rp.name || '').split(/[\\/]/).pop() : st.demo ? '--demo' : '--live')]]);
+    kv('status', src.word, src.sampling || src.phase === 'playing' ? 't-o' : 't-w'); kv('source', summary().parts[0], '');
+    var v = st.vehicle;
+    kv('vehicle', !v ? nr : v.key ? v.key + (rp ? ' (replay)' : v.known ? ' (seen ' + v.runs + (v.runs === 1 ? ' time)' : ' times)') : ' (new)') : v.note || nr, v && v.key ? '' : 't-w');
+    kv('protocol', ad.protocol || nr, ad.protocol ? '' : 't-w');
+    kv('adapter', rp ? nr : ad.ati ? ad.ati + ' / ' + (ad.chip || 'not STN') : nr, rp || !ad.ati ? 't-w' : '');
+    var bv = latest('42');
+    kv('battery', bv === null || bv === undefined ? nr : fmtStat('42', bv) + ' V (control module, PID 42)', bv === null || bv === undefined ? 't-w' : 't-n');
+    kv('ecu names', nr, 't-w'); kv('cal ids', nr, 't-w');
+    ['stored', 'pending', 'permanent'].forEach(function (k) {
+      var l = cd[k] || [], t = !cd.read ? why(cd) : miss.indexOf(k) >= 0 ? 'no answer' : l.length ? l.map(function (d) { return d.code; }).join(', ') : 'none';
+      kv(k, t, t === 'none' ? 't-o' : 't-w');
+    });
+    var rd = st.readiness || { read: false }, mil = cd.mil === true ? 'ON' : cd.mil === false ? 'off' : (cd.unanswered || []).indexOf('mil') >= 0 ? 'no answer' : cd.read ? 'unknown' : nr;
+    kv('mil', mil + (rd.read && typeof rd.dtc_count === 'number' ? ' (' + rd.dtc_count + ' code' + (rd.dtc_count === 1 ? '' : 's') + ' counted by the car)' : ''), mil === 'off' ? 't-o' : 't-w');
+    var rs = readySum(); kv('readiness', rs.t, rs.warn ? 't-w' : 't-o');
+    var res = m6.results || [], bad = res.filter(function (x) { return x.within_limits === false; }).length;
+    kv('mode 06', m6.read ? (m6.mids || []).length + ' MIDs, ' + res.length + ' tests, ' + bad + ' outside limits' : why(m6), m6.read && !bad && res.length ? 't-n' : 't-w');
+    if (rp) kv('replay', mmss(rp.pos) + ' / ' + mmss(rp.duration) + ' · ' + (rp.playing ? 'playing' : rp.ended ? 'ended' : 'paused') + ' · ' + rp.speed + '×', '');
+    else kv('rate', st.hz_measured ? st.hz_measured.toFixed(1) + ' Hz' : src.sampling ? 'starting' : 'not sampling', st.hz_measured ? 't-n' : 't-w');
+    kv('units', US ? 'US' : 'metric', '');
+    var chs = st.channels || {}, stats = st.stats || {}, ids = Object.keys(chs).sort(), stale = [], none = [];
+    out([['', '']]);
+    out([['t-h', '# readings: ' + ids.length + (ids.length ? ' · min and max over ' + (st.status === 'running' && !rp ? 'this run so far' : 'the whole run') : '')]]);
+    if (ids.length) out([['t-k', tcol('reading', 28) + ' ' + tcol('now', 9, true) + ' ' + tcol('unit', 6) + ' ' + tcol('min', 9, true) + ' ' + tcol('max', 9, true)]], true);
+    ids.forEach(function (p) {
+      var a = assess(p), s = stats[p], lab = chs[p].labels, now = latest(p), nm = pidName(p), has = now !== null && now !== undefined,
+          lb = lab && has ? lab[String(Math.round(now))] : null, f = { stale: 'stale', watch: 'watch', out: 'out', na: 'no data' }[a.s] || '';
+      nm = nm.charAt(0).toUpperCase() + nm.slice(1); if (a.s === 'stale') stale.push(nm); if (a.s === 'na') none.push(nm);
+      out([['', tcol(nm, 28) + ' '], [has ? 't-n' : 't-w', tcol(lb || (has ? fmtStat(p, now) : '—'), 9, true)],
+           ['', ' ' + tcol(unitOf(p), 6) + ' '], ['t-n', tcol(s && !lab ? fmtStat(p, s.min) : '—', 9, true) + ' ' + tcol(s && !lab ? fmtStat(p, s.max) : '—', 9, true)],
+           ['t-w', f ? '  ' + f : '']], true);
+    });
+    if (src.phase === 'lost') W.push('NO LINK: lost contact with the console server; the readings are the last ones heard, not current');
+    else if (ids.length && !src.fresh && !rp) W.push('readings not current: ' + src.word);
+    else if (src.fresh && stale.length) W.push('stale, no sample in ' + FRESH_S + ' s: ' + names(stale));
+    if (src.fresh && none.length) W.push((rp ? 'no sample yet at this point of the recording: ' : 'no data yet: ') + names(none));
+    if (miss.length) W.push('no answer for ' + miss.join(', ') + ' codes');
+    if ((cd.unanswered || []).indexOf('mil') >= 0) W.push('no answer for the check-engine lamp');
+    if (rs.t === 'no answer') W.push('no answer for the readiness monitors');
+    if (st.message) W.push(st.message);
+    out([['', '']]);
+    if (!W.length) kv('warnings', 'none', 't-o');
+    W.forEach(function (w) { kv('warning', w, 't-w'); });
+    out([['', '']]); out([['t-p', '$ ']]);
+    return L;
+  }
+  function termText(lines) { return lines.map(function (l) { return l.s.map(function (x) { return x[1]; }).join(''); }).join('\n'); }
+  function renderTerminal() {   // rebuilt on each poll; the scroll position stays, or follows the end when the reader is at the bottom
+    var lines = termLines(), box = $('t_scr'), h = lines.map(function (l) {
+      var x = l.s.map(function (s) { return s[0] ? '<span class="' + s[0] + '">' + esc(s[1]) + '</span>' : esc(s[1]); }).join('');
+      return l.row ? '<span class="t-r">' + x + '</span>' : x;
+    }).join('\n') + '<span class="t-caret" aria-hidden="true"></span>';
+    if (box._sig === h) return;
+    var end = box.scrollHeight - box.scrollTop - box.clientHeight < 4 && box.scrollTop > 0, top = box.scrollTop;
+    box._sig = h; box._text = termText(lines); box.innerHTML = h;
+    box.scrollTop = end ? box.scrollHeight : top;
+  }
+  $('t_copy').addEventListener('click', function () {   // the screen's plain text; without a clipboard, the text is selected for Ctrl+C
+    var box = $('t_scr'), t = box._text || '';
+    function note(s) { $('t_note').textContent = s; setTimeout(function () { $('t_note').textContent = ''; }, 2500); }
+    function pick() {
+      try { var sel = window.getSelection(), r = document.createRange(); r.selectNodeContents(box); sel.removeAllRanges(); sel.addRange(r); note('Text selected: press Ctrl+C to copy'); }
+      catch (e) { note('Copy is not available here: select the text by hand'); }
+    }
+    var cb = typeof navigator !== 'undefined' && navigator.clipboard;
+    if (cb && cb.writeText) cb.writeText(t).then(function () { note('Copied ' + t.split('\n').length + ' lines'); }, pick); else pick();
+  });
   function render() {
     place();
     renderUnits();
@@ -1870,6 +1984,7 @@
     syncFocus();
     var view = active();
     if (view === 'v6') renderReadings();
+    if (view === 'v7') renderTerminal();
     if (view === 'v0') {
       renderDashboard();
     } else if (view === 'v5') {
@@ -2055,7 +2170,7 @@
   }
   Array.prototype.forEach.call(btns, function (b) { b.addEventListener('click', function () { show(b.dataset.view); history.replaceState(null, '', location.search + '#' + b.dataset.view); }); });
   // the opening view (never stored): a known #fragment, else Handheld on a phone-width screen, else the Dashboard; a fixed list, so a stale or unknown hash can never reach show()
-  function pickView(hash, narrow) { var h = String(hash || '').replace('#', ''); return h === 'v0' || h === 'v3' || h === 'v5' || h === 'v6' ? h : narrow ? 'v5' : 'v0'; }
+  function pickView(hash, narrow) { var h = String(hash || '').replace('#', ''); return h === 'v0' || h === 'v3' || h === 'v5' || h === 'v6' || h === 'v7' ? h : narrow ? 'v5' : 'v0'; }
   var narrowNow = false;
   try { narrowNow = !!(window.matchMedia && window.matchMedia('(max-width: 600px)').matches); } catch (e) { narrowNow = false; }
   show(pickView(location.hash, narrowNow));
@@ -2099,7 +2214,7 @@
     .catch(function () {});
   // the page test reaches the shared parts through this hook; a browser never defines it, so nothing is exposed
   if (typeof window.__shadetreeParts === 'function') window.__shadetreeParts({ lampModel: lampModel, assess: assess, pickView: pickView, panel: panel, gaugeZones: gaugeZones, gauges: gauges, pidRows: pidRows, pidTableEl: pidTableEl,
-    gaugeModel: gaugeModel, niceTicks: niceTicks, dialSvg: dialSvg, segDigits: segDigits, BUILTIN: BUILTIN, stripTiles: stripTiles, cleanSpecs: cleanSpecs, scenarioList: scenarioList, loadSaved: loadSaved, saveSaved: saveSaved, specsFor: specsFor, editAdd: editAdd, editRemove: editRemove, editMove: editMove, editForm: editForm });
+    gaugeModel: gaugeModel, niceTicks: niceTicks, dialSvg: dialSvg, segDigits: segDigits, BUILTIN: BUILTIN, stripTiles: stripTiles, cleanSpecs: cleanSpecs, scenarioList: scenarioList, loadSaved: loadSaved, saveSaved: saveSaved, specsFor: specsFor, editAdd: editAdd, editRemove: editRemove, editMove: editMove, editForm: editForm, termLines: termLines, termText: termText });
 })();
 </script>
 </body>
