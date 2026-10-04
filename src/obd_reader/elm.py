@@ -102,11 +102,18 @@ def decode_dtc(b1: int, b2: int) -> str:
     return f"{letter}{(b1 >> 4) & 0x3}{b1 & 0xF:X}{b2:02X}"
 
 
-def decode_dtc_list(payload: bytes) -> list[str]:
-    """CAN layout: SID, count, then 2-byte DTCs (zero pairs are padding)."""
+def is_legacy(protocol_name: str | None) -> bool:
+    """True for the pre-CAN buses an ELM/STN adapter names in ATDP: J1850 PWM/VPW, ISO 9141-2, ISO 14230 (KWP2000)."""
+    n = (protocol_name or "").upper()
+    return "J1850" in n or "9141" in n or "14230" in n
+
+
+def decode_dtc_list(payload: bytes, legacy: bool = False) -> list[str]:
+    """CAN layout: SID, count, then 2-byte DTCs (zero pairs are padding).
+    Legacy layout (J1850, ISO 9141, KWP): SID, then three 2-byte DTCs, no count byte; zero pairs are padding."""
     if len(payload) < 2:
         return []
-    pairs = payload[2 : 2 + 2 * payload[1]]
+    pairs = payload[1:7] if legacy else payload[2 : 2 + 2 * payload[1]]
     out = []
     for i in range(0, len(pairs) - 1, 2):
         if pairs[i] == 0 and pairs[i + 1] == 0:
@@ -118,3 +125,39 @@ def decode_dtc_list(payload: bytes) -> list[str]:
 def decode_supported(base_pid: int, data: bytes) -> list[str]:
     mask = int.from_bytes(data[:4].ljust(4, b"\x00"), "big")
     return [f"{base_pid + i + 1:02X}" for i in range(32) if mask & (0x80000000 >> i)]
+
+
+def parse_vin_legacy(lines: list[str]) -> list[str]:
+    """VIN candidates from a legacy-bus (J1850, ISO 9141, KWP) 0902 reply, one per answering ECU.
+
+    Each line is `49 02 <n> <4 data bytes>`; line 1 starts with three zero pad bytes, so five lines carry the
+    17 characters. A line numbered 1 starts a new ECU's message. A message that is not 17 printable ASCII
+    characters is dropped rather than repaired."""
+    msgs: list[dict[int, bytes]] = []
+    for p in parse_all(lines, 0x49):
+        if len(p) < 7 or p[1] != 0x02:
+            continue
+        if p[2] == 1 or not msgs:
+            msgs.append({})
+        msgs[-1][p[2]] = p[3:7]
+    out: list[str] = []
+    for m in msgs:
+        data = b"".join(m[k] for k in sorted(m)).lstrip(b"\x00")
+        if len(data) == 17 and all(32 <= b < 127 for b in data):
+            out.append(data.decode("ascii"))
+    return out
+
+
+def parse_headers_legacy(lines: list[str]) -> list[str]:
+    """ECU source addresses from a headers-on (ATH1) reply to "0100" on a legacy bus, first-seen order.
+
+    A J1850 line looks like "<priority> <target> <source> 41 00 <4 bytes> [<crc>]"; the source byte names the
+    ECU (10 engine, 18 transmission, ...). Anything that does not fit yields no header instead of a guess.
+    Unverified on hardware."""
+    out: list[str] = []
+    for ln in lines:
+        toks = ln.strip().upper().split()
+        if len(toks) >= 9 and toks[3:5] == ["41", "00"] and all(re.fullmatch(r"[0-9A-F]{2}", t) for t in toks[:3]):
+            if toks[2] not in out:
+                out.append(toks[2])
+    return out

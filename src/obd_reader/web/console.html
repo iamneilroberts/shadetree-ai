@@ -1260,6 +1260,7 @@
     var msig = JSON.stringify(m); if (box._msig === msig) return; box._msig = msig;   // results do not change after the read; rebuilding would drop clicks
     box.textContent = '';
     if (!m.read) { box.appendChild(el('p', 'note', m.note || 'Start sampling to read the test results.')); $('m6_count').textContent = ''; return; }
+    if (m.layout === 'legacy') { renderM6Legacy(box, res); return; }
     var bad = res.filter(function (r) { return r.within_limits === false; }).length, good = res.some(function (r) { return r.within_limits === true; });
     $('m6_count').textContent = res.length ? res.length + ' tests \u00b7 ' + bad + ' outside limits' : 'no results';
     $('m6_count').className = 'tag' + (bad ? ' warn' : good ? ' ok' : '');
@@ -1280,6 +1281,21 @@
       });
       box.appendChild(tb);
     });
+  }
+  function renderM6Legacy(box, res) {   // J1850, ISO 9141, KWP: one value against one limit; TIDs are not CAN monitor ids, so no names, no help, no pass/fail
+    $('m6_count').textContent = res.length ? res.length + ' tests \u00b7 not judged' : 'no results';
+    $('m6_count').className = 'tag';
+    box.appendChild(el('p', 'note', 'Older-bus layout: each row is one raw value and one limit. Whether the limit is a minimum or a maximum comes from the component id (SAE J1979; general knowledge, unverified on this car), and what each test means is set by the manufacturer, so no row is judged OK or outside.'));
+    if (!res.length) return;
+    var tb = el('table', 'm6'), hd = el('tr');
+    ['Test (TID)', 'Component', 'Value', 'Limit', 'Limit is'].forEach(function (c) { hd.appendChild(el('th', '', c)); });
+    tb.appendChild(hd);
+    res.forEach(function (r) {
+      var tr = el('tr');
+      [r.tid, r.component, r.value, r.limit, r.limit_type].forEach(function (c) { tr.appendChild(el('td', '', String(c))); });
+      tb.appendChild(tr);
+    });
+    box.appendChild(tb);
   }
   /* ---------- shared parts: Panel, Gauge, PID table ---------- */
   function panel(title) {   // a card with a title plate: { root, plate, name, body }; callers fill body and may add controls to plate

@@ -82,8 +82,8 @@ def test_capture_without_a_headers_pass_warns_that_ecus_are_unattributed():
     assert any("ECU attribution unavailable" in w for w in snap.warnings)
 
 
-def test_non_can_protocol_never_sends_the_headers_pass():
-    records = patch(load_transcript(REAL), "ATDP", ["SAE J1850 PWM"])
+def test_unknown_protocol_never_sends_the_headers_pass():
+    records = [r for r in load_transcript(REAL) if r["tx"] != "ATDP"]
     snap, port = run(records)
     assert "ATH1" not in port.written
 

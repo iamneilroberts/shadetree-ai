@@ -101,6 +101,8 @@ def _mode06(m) -> dict | None:
     mids, res = m.get("mids"), m.get("results")
     if not (isinstance(mids, list) and isinstance(res, list)) or len(mids) > 64 or len(res) > 400:
         return None
+    if m.get("layout") == "legacy":
+        return _mode06_legacy(mids, res)
     out = []
     for r in res:
         if not isinstance(r, dict):
@@ -113,6 +115,20 @@ def _mode06(m) -> dict | None:
         out.append({"mid": ids[0], "tid": ids[1], "uasid": ids[2], "value": nums[0], "minimum": nums[1], "maximum": nums[2],
                     "within_limits": wl if isinstance(wl, bool) else None})
     return {"read": True, "note": None, "mids": [x for x in mids if isinstance(x, str) and _HEX2.fullmatch(x)], "results": out}
+
+
+def _mode06_legacy(tids: list, res: list) -> dict | None:
+    out = []
+    for r in res:
+        if not isinstance(r, dict):
+            return None
+        ids, nums = [r.get("tid"), r.get("component")], [r.get("value"), r.get("limit")]
+        if (not all(isinstance(x, str) and _HEX2.fullmatch(x) for x in ids) or not all(type(x) is int for x in nums)
+                or r.get("limit_type") not in ("min", "max")):
+            return None
+        out.append({"tid": ids[0], "component": ids[1], "value": nums[0], "limit": nums[1], "limit_type": r["limit_type"]})
+    return {"read": True, "note": None, "layout": "legacy",
+            "mids": [x for x in tids if isinstance(x, str) and _HEX2.fullmatch(x)], "results": out}
 
 
 def _not_read(x) -> dict | None:

@@ -273,3 +273,13 @@ def test_readiness_and_freeze_frame_blocks_are_checked_and_a_bad_one_is_dropped(
         assert rr.load_run({**o, "freeze_frame": {**o["freeze_frame"], **bad}}).freeze_frame is None
     o["freeze_frame"] = {"read": False, "note": "the car did not answer the freeze-frame request"}
     assert rr.load_run(o).freeze_frame == o["freeze_frame"]
+
+
+def test_legacy_mode06_block_is_kept_and_bad_rows_drop_it():
+    good = {"read": True, "layout": "legacy", "mids": ["02"],
+            "results": [{"tid": "02", "component": "50", "value": 32771, "limit": 32878, "limit_type": "min"}]}
+    assert rr._mode06(good) == {"read": True, "note": None, "layout": "legacy", "mids": ["02"],
+                                "results": good["results"]}
+    bad = copy.deepcopy(good)
+    bad["results"][0]["limit_type"] = "<b>"
+    assert rr._mode06(bad) is None

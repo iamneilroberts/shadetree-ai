@@ -76,5 +76,5 @@ def test_cli_scan_summary_counts_replies_and_undecoded_pids_and_names_unanswered
     (s,) = (tmp_path / "snapshots").glob("*-scan.json")
     n = len(Snapshot.model_validate_json(s.read_text()).replies)
     assert f"replies:    {n} (no_data 1, ok {n - 1})" in out
-    assert "undecoded:  1 PIDs (13)" in out
+    assert "undecoded:  1 PIDs (2B)" in out
     assert "pending:    no answer" in out and "permanent:  none" in out

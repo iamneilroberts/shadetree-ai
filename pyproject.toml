@@ -22,4 +22,5 @@ where = ["src"]
 testpaths = ["tests"]
 
 [project.scripts]
-shadetree-ai-mcp = "obd_reader.mcp_server:main"
+shadetree-ai = "obd_reader.__main__:main"
+shadetree-ai-mcp ="obd_reader.mcp_server:main"

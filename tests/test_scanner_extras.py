@@ -51,8 +51,8 @@ def _scan_records(records, protocol="6"):
 
 def test_advertised_pids_without_a_decoder_are_read_once_and_kept_raw():
     snap, port = run(SEDAN)
-    assert snap.undecoded == [UndecodedPid(pid="13", reply="ok", raw=["03"])]
-    assert port.written.count("0113") == 1 and port.unmatched == []
+    assert snap.undecoded == [UndecodedPid(pid="2B", reply="ok", raw=["03"])]
+    assert port.written.count("012B") == 1 and port.unmatched == []
 
 
 def test_ridgeline_bitmap_undecoded_pids_are_requested_and_nothing_else():
@@ -60,7 +60,7 @@ def test_ridgeline_bitmap_undecoded_pids_are_requested_and_nothing_else():
     extra = [{"tx": "0166", "rx": ["41 66 03 01 F4 01 E0"]}, {"tx": "0167", "rx": ["7F 01 12"]},
              {"tx": "0141", "rx": ["41 41 00 07 E5 00", "41 41 00 04 00 00"]}]
     snap, port = _scan_records(load_transcript(REAL) + extra, protocol="0")
-    expected = ["13", "41", "66", "67", "68", "6C", "9D", "9E", "9F", "A3"]
+    expected = ["41", "66", "67", "68", "6C", "9D", "9E", "9F", "A3"]
     assert [u.pid for u in snap.undecoded] == expected
     requested = [c for c in port.written if c.startswith("01") and c[2:] in PIDS]
     assert requested == []  # decodable PIDs are not read here; only the undecoded ones are

@@ -35,3 +35,41 @@ def test_incomplete_trailing_group_is_dropped_not_raised():
 
 def test_not_a_mode06_payload_returns_nothing():
     assert parse_results(b"") == [] and parse_results(b"\x41\x01\x00") == [] and parse_results(b"\x46") == []
+
+
+# ---- legacy bus (J1850, ISO 9141, KWP): replies as a J1850 VPW GMC truck answered (2026-10-04) ----
+from obd_reader.mode06 import LegacyTestResult, parse_legacy, read_all_legacy, walk_ids  # noqa: E402
+from obd_reader.replay import ReplayPort  # noqa: E402
+from obd_reader.transport import Transport  # noqa: E402
+
+GMC_06 = {
+    "0600": ["46 00 FF 48 54 00 00"],
+    "0602": ["46 02 84 00 00 00 00", "46 02 66 80 03 80 46", "46 02 D0 80 03 80 6E"],
+    "0605": ["46 05 0A 00 10 05 AA", "46 05 4A 00 1A 05 AA"],
+    "060A": ["46 0A 09 00 00 00 00"],
+    "060C": ["46 0C 60 76 1F 80 29"],
+    "060E": ["46 0E 11 00 00 00 08"],
+}
+
+
+def gmc_port():
+    return ReplayPort([{"tx": k, "rx": v} for k, v in GMC_06.items()])
+
+
+def test_legacy_bitmap_has_a_filler_byte_before_it():
+    # Read at byte 2 this bitmap would list 01-08, 0A, 0D, 12, 14, 16; the truck answered only 02, 05, 0A, 0C, 0E.
+    assert walk_ids(Transport(gmc_port()), 3) == ["02", "05", "0A", "0C", "0E"]
+
+
+def test_legacy_result_is_one_value_against_one_limit_typed_by_cid_bit_7():
+    assert parse_legacy(bytes.fromhex("4602D08003806E")) == LegacyTestResult(
+        tid="02", component="50", value=0x8003, limit=0x806E, limit_type="min")
+    assert parse_legacy(bytes.fromhex("4605 0A 0010 05AA".replace(" ", ""))).limit_type == "max"
+    assert parse_legacy(bytes.fromhex("4602D080")) is None  # truncated
+
+
+def test_legacy_read_all_reads_every_listed_tid_and_nothing_else():
+    port = gmc_port()
+    tids, res = read_all_legacy(Transport(port))
+    assert tids == ["02", "05", "0A", "0C", "0E"] and len(res) == 8
+    assert port.unmatched == []

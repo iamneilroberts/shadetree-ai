@@ -12,11 +12,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
-from obd_reader.adapter import identify
+from obd_reader.adapter import fallback_search, identify
 from obd_reader.dtc_text import describe
-from obd_reader.elm import decode_dtc_list, decode_supported, parse_all
+from obd_reader.elm import decode_dtc_list, decode_supported, is_legacy, parse_all, parse_vin_legacy
 from obd_reader.live import MAX_HZ, MAX_PIDS, MIN_HZ, LiveLimitError, read_pid_value, summarize, validate_pids
-from obd_reader.mode06 import read_all as read_mode06
+from obd_reader.mode06 import read_all as read_mode06, read_all_legacy as read_mode06_legacy
 from obd_reader.pids import PIDS, pid_label
 from obd_reader.profiles import ProfileStore
 from obd_reader.readiness import parse_readiness
@@ -392,7 +392,7 @@ class LiveHub:
             self._full = {p: [] for p in fast + slow}
         return fast, slow, per
 
-    def _discover_supported(self, t) -> set[str]:
+    def _discover_supported(self, t, retry: bool = True) -> set[str]:
         """The Mode 01 PIDs the car says it supports, from the 0100/0120/... bitmaps."""
         supported: set[str] = set()
         base = 0x00
@@ -407,18 +407,30 @@ class LiveHub:
             if f"{base + 0x20:02X}" not in found:
                 break
             base += 0x20
+        if not supported and retry and self._sim is None and self._s.config.protocol == "0" and not self._stop.is_set():
+            # automatic search can miss a bus that answers when pinned (a J1850 VPW truck did)
+            if fallback_search(t):
+                return self._discover_supported(t, retry=False)
         return supported
 
+    @staticmethod
+    def _decodable(proto: str) -> bool:
+        """CAN or a named legacy bus: the protocols whose code and VIN layouts are decoded."""
+        return "15765" in proto or is_legacy(proto)
+
     def _read_identity(self, t) -> dict | None:
-        """Name the class of car from a partial VIN, once per run (CAN only), and load what past runs learned.
-        The VIN itself is never kept."""
+        """Name the class of car from a partial VIN, once per run (CAN or a legacy bus), and load what past runs
+        learned. The VIN itself is never kept."""
         proto = self._adapter["protocol"] or ""
-        if self._sim is None and "15765" not in proto:
+        if self._sim is None and not self._decodable(proto):
             with self._data_lock:
                 self._vehicle = {"key": None, "known": False, "runs": 0,
                                  "note": f"vehicle id not supported yet on {proto or 'this'} protocol"}
             return None
-        cands = [p[3:20].decode("ascii", errors="replace") for p in parse_all(t.send("0902"), 0x49)]
+        if is_legacy(proto):
+            cands = parse_vin_legacy(t.send("0902"))
+        else:
+            cands = [p[3:20].decode("ascii", errors="replace") for p in parse_all(t.send("0902"), 0x49)]
         key = next((vehicle_key(c) for c in cands if VIN_RE.fullmatch(c)), None)
         if key is None:
             with self._data_lock:
@@ -444,8 +456,17 @@ class LiveHub:
             self.message = self.message or f"could not save the car profile: {e}"
 
     def _read_mode06(self, t) -> None:
-        """On-board test results, once per run (CAN only: the layout was verified on CAN)."""
+        """On-board test results, once per run: the CAN layout, or the one-limit legacy layout (`layout: "legacy"`,
+        rows never judged pass or fail) on J1850, ISO 9141 and KWP."""
         proto = self._adapter["protocol"] or ""
+        if self._sim is None and is_legacy(proto):
+            tids, lres = read_mode06_legacy(t, stop=self._stop.is_set)
+            with self._data_lock:
+                self._m06 = ({"read": True, "note": None, "layout": "legacy", "mids": tids,
+                              "results": [r.model_dump() for r in lres]} if tids else
+                             {"read": False, "note": "the car did not answer Mode 06 (no supported tests reported)",
+                              "mids": [], "results": []})
+            return
         if self._sim is None and "15765" not in proto:
             with self._data_lock:
                 self._m06 = {"read": False, "note": f"Mode 06 not supported yet on {proto or 'this'} protocol",
@@ -457,9 +478,11 @@ class LiveHub:
                          {"read": False, "note": "the car did not answer Mode 06 (no supported monitors reported)", "mids": [], "results": []})
 
     def _read_codes(self, t) -> None:
-        """Modes 03/07/0A and the lamp bit, once per run (CAN only: other layouts would decode wrongly)."""
+        """Modes 03/07/0A and the lamp bit, once per run (CAN or a legacy bus; an unknown protocol's layout would
+        decode wrongly). A legacy bus has no Mode 0A, so permanent codes are listed as unanswered, never asked."""
         proto = self._adapter["protocol"] or ""
-        if self._sim is None and "15765" not in proto:
+        legacy = is_legacy(proto)
+        if self._sim is None and not self._decodable(proto):
             with self._data_lock:
                 self._codes = {"read": False, "note": f"trouble codes not supported yet on {proto or 'this'} protocol"}
                 self._ready = {"read": False, "note": f"readiness not supported yet on {proto or 'this'} protocol"}
@@ -468,7 +491,10 @@ class LiveHub:
         # An answer with no codes is an empty list; no answer (NO DATA, a negative or garbled reply) is named in
         # `unanswered`, so the page never turns silence into "no codes" or "lamp off".
         out, missed = {}, []
-        for k, cmd, sid in (("stored", "03", 0x43), ("pending", "07", 0x47), ("permanent", "0A", 0x4A)):
+        asked = (("stored", "03", 0x43), ("pending", "07", 0x47)) + (() if legacy else (("permanent", "0A", 0x4A),))
+        if legacy:
+            out["permanent"], missed = [], ["permanent"]
+        for k, cmd, sid in asked:
             if self._stop.is_set():  # Stop pressed: do not finish reading the lists
                 return
             payloads = parse_all(t.send(cmd), sid)
@@ -476,7 +502,7 @@ class LiveHub:
                 missed.append(k)
             codes: list[str] = []
             for p in payloads:
-                codes += [c for c in decode_dtc_list(p) if c not in codes]
+                codes += [c for c in decode_dtc_list(p, legacy) if c not in codes]
             out[k] = [{"code": c, **describe(c, make_of(self._key))} for c in codes]
         status = [p for p in parse_all(t.send("0101"), 0x41) if len(p) >= 3 and p[1] == 0x01]
         mil = any(p[2] & 0x80 for p in status) if status else None
@@ -493,9 +519,9 @@ class LiveHub:
                            {"read": False, "note": "the car did not answer the trouble-code requests", "mil": mil})
 
     def _read_freeze_frame(self, t) -> None:
-        """Mode 02 frame 0, once per run, only when a stored code was read (as scan() does). CAN only, as the codes."""
-        if self._sim is None and "15765" not in (self._adapter["protocol"] or ""):
-            return  # non-CAN: _read_codes already said why
+        """Mode 02 frame 0, once per run, only when a stored code was read (as scan() does). CAN or legacy, as the codes."""
+        if self._sim is None and not self._decodable(self._adapter["protocol"] or ""):
+            return  # unknown protocol: _read_codes already said why
         with self._data_lock:
             codes = dict(self._codes)
         if not codes.get("read"):

@@ -72,7 +72,9 @@ _DEFS = [
         PidDef(f"{0x14 + i:02X}", f"o2_b{i // 4 + 1}s{i % 4 + 1}_voltage", "V", 2, lambda d: d[0] / 200)
         for i in range(8)
     ],
+    PidDef("13", "o2_sensors_present", None, 1, lambda d: d[0]),   # bit mask: sensors present (2 banks x 4)
     PidDef("1C", "obd_standard", None, 1, lambda d: d[0], _OBD_STD),
+    PidDef("1E", "pto_active", None, 1, lambda d: d[0] & 1),
     PidDef("1F", "run_time", "s", 2, _u16),
     PidDef("21", "distance_with_mil", "km", 2, _u16),
     PidDef("23", "fuel_rail_gauge_pressure", "kPa", 2, lambda d: _u16(d) * 10),

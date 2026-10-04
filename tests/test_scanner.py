@@ -118,22 +118,21 @@ def test_an_unanswered_dtc_request_is_recorded_not_shown_as_no_codes():
     assert snap.dtcs.stored == [] and snap.freeze_frame is None
 
 
-def test_non_can_protocol_skips_dtc_and_vin_decoding_with_a_warning():
-    # Non-CAN Mode 03 has no count byte and the VIN reply is 5 lines; decoding
-    # them with the CAN layout would yield wrong codes (P0133 -> P3300).
+def test_legacy_protocol_decodes_codes_with_the_legacy_layout():
+    # Legacy Mode 03 has no count byte: decoding it with the CAN layout would give P3300 for P0133.
     records = _patch(load_transcript(FIXTURE), "ATDP", ["SAE J1850 PWM"])
     records = _patch(records, "03", ["43 01 33 00 00 00 00"])
     snap, port = run_scan(records)
-    assert snap.dtcs.stored == [] and snap.vehicle.vin is None
-    assert any("non-CAN" in w for w in snap.warnings)
-    assert not {"03", "07", "0A", "0902"} & set(port.written)
+    assert [d.code for d in snap.dtcs.stored] == ["P0133"]
+    assert "0A" not in port.written and "permanent" in snap.dtcs.unanswered
 
 
-def test_unknown_protocol_is_treated_as_non_can():
+def test_unknown_protocol_skips_dtc_and_vin_decoding_with_a_warning():
     records = [r for r in load_transcript(FIXTURE) if r["tx"] != "ATDP"]
     snap, port = run_scan(records)
-    assert snap.dtcs.stored == []
-    assert any("non-CAN" in w for w in snap.warnings)
+    assert snap.dtcs.stored == [] and snap.vehicle.vin is None
+    assert any("unknown protocol" in w for w in snap.warnings)
+    assert not {"03", "07", "0A", "0902"} & set(port.written)
 
 
 def test_auto_protocol_is_not_reported_as_pinned():

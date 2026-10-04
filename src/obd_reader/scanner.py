@@ -3,10 +3,12 @@ import time
 from datetime import datetime, timezone
 
 from obd_reader import __version__
-from obd_reader.adapter import identify, init_adapter
+from obd_reader.adapter import fallback_search, identify, init_adapter
 from obd_reader.elm import (
-    ERROR_MARKERS, classify, decode_dtc, decode_dtc_list, decode_supported, parse_all, parse_headers,
+    ERROR_MARKERS, classify, decode_dtc, decode_dtc_list, decode_supported, is_legacy, parse_all, parse_headers,
+    parse_headers_legacy, parse_vin_legacy,
 )
+from obd_reader.mode06 import walk_ids
 from obd_reader.pids import PIDS, decode_pid
 from obd_reader.readiness import parse_readiness
 from obd_reader.snapshot import (
@@ -78,31 +80,32 @@ def _mode09_ids(transport: Transport, advertised: set[str], warnings: list[str])
     return Mode09Ids(cal_ids=text("04"), cvns=[c.hex().upper() for c in got.get("06", [])], ecu_names=text("0A"))
 
 
-def _dtcs(transport: Transport, cmd: str, sid: int) -> list[Dtc] | None:
+def _dtcs(transport: Transport, cmd: str, sid: int, legacy: bool = False) -> list[Dtc] | None:
     """Union of the codes every responding ECU reports, first-seen order; None if no ECU answered."""
     payloads = parse_all(transport.send(cmd), sid)
     codes: list[str] = []
     for payload in payloads:
-        codes += [c for c in decode_dtc_list(payload) if c not in codes]
+        codes += [c for c in decode_dtc_list(payload, legacy) if c not in codes]
     return [Dtc(code=c) for c in codes] if payloads else None
 
 
-def _discover_ecus(transport: Transport) -> list[Ecu]:
-    """One headers-on Mode 01 request to learn which CAN ids answer, then headers off again."""
+def _discover_ecus(transport: Transport, legacy: bool = False) -> list[Ecu]:
+    """One headers-on Mode 01 request to learn which CAN ids (or legacy source addresses) answer, then headers off."""
     transport.send("ATH1")
     try:
         lines = transport.send("0100")
     finally:
         transport.send("ATH0")  # every later parse assumes headers off
-    return [Ecu(header=h, modes_seen=["01"]) for h in parse_headers(lines)]
+    return [Ecu(header=h, modes_seen=["01"]) for h in (parse_headers_legacy if legacy else parse_headers)(lines)]
 
 
-def _supported(payloads: list[bytes], base: int) -> set[str]:
-    """PIDs advertised by any ECU whose reply is for this bitmap page."""
+def _supported(payloads: list[bytes], base: int, off: int = 2) -> set[str]:
+    """PIDs advertised by any ECU whose reply is for this bitmap page. `off` is where the 4 bitmap bytes start:
+    2 on CAN; 3 for Mode 09 on a legacy bus, which puts a message number first (`49 00 01 FC 00 00 00`, J1850 VPW)."""
     out: set[str] = set()
     for p in payloads:
-        if len(p) >= 6 and p[1] == base:
-            out.update(decode_supported(base, p[2:6]))
+        if len(p) >= off + 4 and p[1] == base:
+            out.update(decode_supported(base, p[off:off + 4]))
     return out
 
 
@@ -195,6 +198,12 @@ def scan(
         adapter.device = _reply(transport, "STDI")
     supported: dict[str, list[str]] = {}
     pids01 = _walk_pages(transport, 0x01)
+    found_by = None
+    if not pids01 and protocol == "0":  # automatic search can miss a bus that answers when pinned
+        found_by = fallback_search(transport)
+        if found_by:
+            pids01 = _walk_pages(transport, 0x01)
+            warnings.append(f"automatic protocol search found nothing; protocol {found_by} answered when tried directly")
     if pids01:
         supported["01"] = sorted(pids01)
     else:
@@ -205,28 +214,31 @@ def scan(
     dp = _first(transport.send("ATDP"))
     proto = Protocol(
         name=dp.removeprefix("AUTO, ") if dp else None,
-        atsp=protocol,
-        pinned=protocol not in (None, "0"),  # ATSP0 = automatic search, not a pin
+        atsp=found_by or protocol,
+        pinned=protocol not in (None, "0"),  # ATSP0 = automatic search, not a pin (nor is a fallback find)
     )
 
-    # DTC and VIN replies use a different layout on non-CAN buses (no count byte;
-    # multi-line VIN). Decoding them as CAN would give wrong codes, so skip until
-    # Phase 4 adds the non-CAN layouts.
+    # CAN and the pre-CAN buses (J1850, ISO 9141, KWP) lay out DTC and VIN replies differently; an unknown
+    # protocol gets neither decoder, since decoding a layout we cannot name would give wrong codes.
     is_can = "15765" in (proto.name or "")
+    legacy = is_legacy(proto.name)
     ecus: list[Ecu] = []
-    if is_can:
-        ecus = _discover_ecus(raw)  # headers on: not a layout classify() reads
+    if is_can or legacy:
+        ecus = _discover_ecus(raw, legacy)  # headers on: not a layout classify() reads
         if not ecus:
-            warnings.append("ECU attribution unavailable (no CAN ids in the headers-on reply)")
+            warnings.append("ECU attribution unavailable (no ECU ids in the headers-on reply)")
     vin, vin_source = None, "none"
     mode09 = Mode09Ids()
     dtcs = Dtcs()
-    if is_can:
-        pids09 = _supported(parse_all(transport.send("0900"), 0x49), 0x00)
+    if is_can or legacy:
+        pids09 = _supported(parse_all(transport.send("0900"), 0x49), 0x00, 3 if legacy else 2)
         if pids09:
             supported["09"] = sorted(pids09)
         if "02" in pids09:
-            candidates = [p[3:20].decode("ascii", errors="replace") for p in parse_all(transport.send("0902"), 0x49)]
+            if legacy:
+                candidates = parse_vin_legacy(transport.send("0902"))
+            else:
+                candidates = [p[3:20].decode("ascii", errors="replace") for p in parse_all(transport.send("0902"), 0x49)]
             valid = [c for c in dict.fromkeys(candidates) if VIN_RE.fullmatch(c)]
             if valid:
                 vin, vin_source = valid[0], "obd"
@@ -236,19 +248,25 @@ def scan(
                 warnings.append(f"Mode 09 returned an invalid VIN: {candidates[0] if candidates else ''!r}")
         else:
             warnings.append("VIN unsupported via Mode 09")
-        mode09 = _mode09_ids(transport, pids09, warnings)
+        if legacy:
+            if pids09 & {"04", "06", "0A"}:
+                warnings.append("Mode 09 CAL ID, CVN and ECU name not read: their legacy-bus layout is not supported yet")
+        else:
+            mode09 = _mode09_ids(transport, pids09, warnings)
 
         # As in the console (hub._read_codes): no answer is recorded as unanswered, never as an empty list.
-        got = {k: _dtcs(transport, cmd, sid) for k, cmd, sid in
-               (("stored", "03", 0x43), ("pending", "07", 0x47), ("permanent", "0A", 0x4A))}
-        dtcs = Dtcs(**{k: v or [] for k, v in got.items()}, unanswered=[k for k, v in got.items() if v is None])
-        if mode06:
-            mids = _walk_pages(transport, 0x06)
+        # Mode 0A (permanent codes) does not exist before CAN, so a legacy bus is never asked for it.
+        asked = (("stored", "03", 0x43), ("pending", "07", 0x47)) + (() if legacy else (("permanent", "0A", 0x4A),))
+        got = {k: _dtcs(transport, cmd, sid, legacy) for k, cmd, sid in asked}
+        dtcs = Dtcs(**{k: v or [] for k, v in got.items()}, unanswered=[k for k, v in got.items() if v is None]
+                     + (["permanent"] if legacy else []))  # not asked: never report "no permanent codes"
+        if mode06:  # a legacy bus puts a filler byte before the bitmap (mode06.py)
+            mids = walk_ids(transport, 3) if legacy else _walk_pages(transport, 0x06)
             if mids:
                 supported["06"] = sorted(mids)
     else:
         warnings.append(
-            f"non-CAN or unknown protocol ({proto.name!r}): DTC and VIN decoding skipped (not supported yet)"
+            f"unknown protocol ({proto.name!r}): DTC and VIN decoding skipped (layout cannot be named)"
         )
 
     mil = Mil()

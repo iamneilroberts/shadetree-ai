@@ -27,6 +27,28 @@ With an adapter (OBDLink EX tested; the car parked, ignition on, engine off):
 
 `scan` prints VIN, protocol, codes and warnings, and saves `snapshots/<time>-<label>.json` plus the raw `transcripts/<time>-<label>.jsonl`. Both hold the VIN, so they are gitignored.
 
+## Install the console on Windows (no Claude needed)
+
+The live console is a local web page; it needs Python, not Claude. With an OBDLink EX plugged in:
+
+1. Install Python 3.11 or newer from python.org (tick "Add python.exe to PATH").
+2. In a new PowerShell window:
+   ```
+   py -m pip install --user pipx
+   py -m pipx ensurepath
+   ```
+   Close and reopen PowerShell, then:
+   ```
+   pipx install https://github.com/iamneilroberts/shadetree-ai/archive/refs/heads/main.zip
+   ```
+3. Find the adapter's port: Device Manager, Ports (COM & LPT), e.g. `COM3`.
+4. Ignition on, then `shadetree-ai console --port COM3` and open the link it prints. If the car is not found, pin the
+   protocol: `--protocol 2` (J1850 VPW, GM), `1` (J1850 PWM, Ford), `3` (ISO 9141), `5` or `4` (KWP).
+5. No car: `shadetree-ai console --demo`. Update later: `pipx upgrade shadetree-ai` (or reinstall the zip with `--force`).
+
+Runs and transcripts are written to the folder you start it from; transcripts contain the VIN, so keep them private.
+Not yet tried on a Windows machine.
+
 ## What works today
 
 | Area | State | Verified on real hardware |
@@ -45,14 +67,14 @@ With an adapter (OBDLink EX tested; the car parked, ignition on, engine off):
 | Link straight to a replay: add `&example=<file>` to the console URL (examples only; a bad name says "Example not found"), or `&run=<file>` (My runs first, then Examples; a bad name says "Run not found") | done, tested (page logic and server); not yet opened in a browser | n/a |
 | Extra readings on the console (car's supported PIDs, up to 16 per run, rotated) and unsupported PIDs dropped | done | 2024 Ridgeline: PID discovery (`0100` to `01A0`, two ECUs) and rotating extra readings sampled (`0104`, `0111`, `010D`, `010E`, `0143`, `0144`); MAF (`0110`) unanswered, MAP (`010B`) used |
 | Capture level on the console (a min / std / max control: in the Options drawer on the Retro Dashboard, in the toolbar elsewhere; default std; `capture: "min" | "std" | "max"` on `/api/start`, absent = std, `"all"` accepted as `max`, anything else is a 400). min reads only the page's core PIDs plus the current scenario's PIDs the car supports, every sweep, with no rotating extras; std is the normal run (core PIDs plus rotating extras, scenario PIDs first); max, "Capture all supported": every decodable Mode 01 PID the car reports, in two tiers: engine speed, vehicle speed, load and throttle every sweep (2.5 Hz), the rest rotated a few a sweep (about 0.25 Hz each, at most 4 a sweep). The default is std: the normal run is unchanged. Stats on irregularly sampled channels are over the samples actually taken (an average is a mean of those samples, not a time-weighted mean) | done, tested in the simulator (30 supported PIDs; tier counts, save and replay of mixed rates, old run files) | **not verified** on a real adapter: how many PIDs an OBDLink EX (STN2232) sustains at this cadence has to be checked on a car |
-| Car identification and learned profile (partial VIN key, per-car list of PIDs that never answer), CAN cars only | done | 2024 Ridgeline: the VIN request (`0902`, one ECU, multi-frame) parsed, the partial key was derived and a profile file was written. A second run that loads the profile (car seen before) has **not** been checked |
-| Trouble codes on the console (Modes 03/07/0A + lamp), CAN cars only | done | 2024 Ridgeline (CAN 29/500, two ECUs): Modes 03, 07, 0A and the lamp bit read; the car had no codes and the lamp was off. A car that has codes has **not** been seen yet |
-| Mode 06 test results (MCP tool and console Readings tab) | done; reply layout is 9-byte groups `MID TID UASID value min max` | 2024 Ridgeline: 20 MIDs, 53 results, all within limits; values are raw (unit scaling not applied) |
+| Car identification and learned profile (partial VIN key, per-car list of PIDs that never answer), CAN and legacy buses | done | 2024 Ridgeline: the VIN request (`0902`, one ECU, multi-frame) parsed, the partial key was derived and a profile file was written. A second run that loads the profile (car seen before) has **not** been checked |
+| Trouble codes on the console (Modes 03/07/0A + lamp; 03/07 on a legacy bus) | done | 2024 Ridgeline (CAN 29/500, two ECUs): Modes 03, 07, 0A and the lamp bit read; the car had no codes and the lamp was off. A car that has codes has **not** been seen yet |
+| Mode 06 test results (MCP tool and console Readings tab; legacy layout in the row below) | done; reply layout is 9-byte groups `MID TID UASID value min max` | 2024 Ridgeline: 20 MIDs, 53 results, all within limits; values are raw (unit scaling not applied) |
 | `probe` command: a scan plus one Mode 06 MID-bitmap pass, reply classes and latencies, undecoded Mode 01 PIDs, Mode 09 CAL ID/CVN/ECU name, ATRV/STDI; writes `probes/<id>.json` and `.md` with no VIN, VIN serial or transcript (a test and a write-time check guard this) | done, tested on replay fixtures and a local fake adapter | **not verified** on a real adapter (does the Ridgeline answer `0600`, `0904` multi-frame, how it answers unsupported PIDs) |
 | Console: readiness monitors and freeze frame panels (Dashboard and Handheld), scenario PID requests (`POST /api/focus`, only PIDs the car's bitmap lists), unsupported PIDs named | done, tested (Python and page logic) and viewed in a headless browser on the simulator | **not verified** on a real car |
 | Honda/Acura DTC meanings (P1456, P1457, P2646, P2647, P3400, P3497) picked by make from the VIN, and a VCM note in the fuel-trim help | done; model-drafted, unreviewed, uncertain wording flagged in the hints | Austin or a service manual must review; only manufacturer code `5FP` is confirmed |
 | 29-bit ECU header attribution | written | **not verified** on a real car |
-| Legacy protocols (J1850, ISO 9141, KWP) | scanner skips DTC/VIN decode on non-CAN | **not built yet** (needs Austin's older cars) |
+| Legacy protocols (J1850, ISO 9141, KWP): Modes 03/07 without the count byte (no Mode 0A before CAN; permanent codes listed as not read), VIN from the five numbered `0902` lines, ECU source addresses from a headers-on `0100`, freeze frame and readiness as on CAN, on the scanner and the console; `--protocol` on the console; when automatic search finds nothing, each protocol is pinned and tried in turn. Mode 06 in the one-limit legacy layout (`46 TID CID value limit`, bitmap after a filler byte; shown raw, never judged pass/fail, limit type from CID bit 7 per J1979 [general knowledge, unverified]) on the console, probe and MCP tool. Mode 09 CAL ID/CVN/ECU name stay CAN only | done, tested | a 2003-ish GMC SUV on J1850 VPW (one ECU, address 10): automatic search returned UNABLE TO CONNECT and the fallback found protocol 2 (probe and console); stored and pending P0455 decoded, lamp on, freeze frame read, VIN read from the five `0902` lines (Mode 09 `0900` carries a message number before the bitmap), readiness read; Mode 06: TIDs 02, 05, 0A, 0C, 0E, 20 rows read on the console. ISO 9141, KWP and J1850 PWM **not verified** |
 | Reference store, DTC lookup, playbooks, `check_citations` | not built | n/a |
 
 ## Roadmap

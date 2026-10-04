@@ -9,9 +9,9 @@ from typing import Callable
 from obd_reader.adapter import identify
 from obd_reader.capture import capture
 from obd_reader.console import ConsoleService
-from obd_reader.elm import parse_all
+from obd_reader.elm import is_legacy, parse_all
 from obd_reader.live import downsample, sample, summarize, validate_pids
-from obd_reader.mode06 import read_all
+from obd_reader.mode06 import read_all, read_all_legacy
 from obd_reader.pids import PIDS, decode_pid, pid_name
 from obd_reader.session import Session
 from obd_reader.snapshot import Snapshot
@@ -207,6 +207,14 @@ def build_tools(session: Session) -> dict[str, Callable]:
         if mid is not None and not _MID_RE.fullmatch(mid):
             raise ValueError("mid must be 2 hex digits")
         with session.connection("mode06") as t:
+            t.send("0100")  # the adapter names the bus only after a request has found it
+            if is_legacy((t.send("ATDP") or [""])[0]):
+                tids, lres = read_all_legacy(t, None if mid is None else [mid.upper()])
+                return {"layout": "legacy", "supported_tids": list(tids), "results": [r.model_dump() for r in lres],
+                        "note": "legacy-bus layout (J1850, ISO 9141, KWP): one value against one limit per row; "
+                                "limit_type comes from bit 7 of the component id per J1979 [general knowledge, unverified]; "
+                                "what each TID and component means is manufacturer-specific; rows are not judged pass/fail. "
+                                "Layout seen on one J1850 VPW GMC truck only."}
             mids, res = read_all(t, None if mid is None else [mid.upper()])
             results = [r.model_dump() for r in res]
         return {"supported_mids": list(mids), "results": results,

@@ -82,7 +82,7 @@ def console_main(args, block: bool = True):
             scen = load_scenarios(args.scenarios)
         except (OSError, ValueError) as exc:
             raise ValueError(f"--scenarios {args.scenarios}: {exc}") from None
-    session = Session(Config(port=args.port, home=args.out_dir))
+    session = Session(Config(port=args.port, protocol=args.protocol, home=args.out_dir))
     svc = ConsoleService(session, demo=args.demo, host=args.host, http_port=args.http_port,
                          allow_lan=args.allow_lan, scenario=args.scenario, allow_hosts=args.allow_host,
                          examples_dir=args.examples_dir, scenarios=scen)
@@ -166,6 +166,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     co = sub.add_parser("console", help="open the live console web page (read-only)")
     co.add_argument("--port", default=None, help="adapter serial device (not needed with --demo)")
+    co.add_argument("--protocol", default="0", help="ATSP value; 0 = automatic search (default), 2 = J1850 VPW")
     co.add_argument("--demo", action="store_true", help="use the built-in simulated car instead of an adapter; the page comes up idle and its Demo button starts the simulated run")
     co.add_argument("--scenario", default="rich", choices=["healthy", "rich", "lean"], help="demo scenario")
     co.add_argument("--http-port", type=int, default=8765, help="local web port (0 = any free port)")

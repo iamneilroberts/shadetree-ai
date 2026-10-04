@@ -81,7 +81,7 @@ def test_vehicle_info_shows_mode09_identity_and_battery_voltage(tools):
 def test_vehicle_info_counts_reply_classes_and_undecoded_pids(tools):
     v = tools["vehicle_info"]("sedan-1")
     assert v["reply_counts"] == {"ok": sum(v["reply_counts"].values())} and v["reply_counts"]["ok"] > 0
-    assert v["undecoded_count"] == 1  # 0113 in the synthetic sedan
+    assert v["undecoded_count"] == 1  # 012B in the synthetic sedan
 
 
 def test_read_dtcs_names_kinds_the_car_did_not_answer(session):

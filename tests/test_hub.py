@@ -208,22 +208,45 @@ def test_codes_are_not_read_before_the_first_sample(tmp_path):
     assert hub.state()["codes"] == {"read": False, "note": None}
 
 
-def test_non_can_protocol_skips_code_decoding_and_says_why(tmp_path):
+def _sim_with(replies: dict[str, str]):
+    """A simulated car whose ATDP (and any listed command) answers as given."""
     sim = SimPort("rich")
+    sim.sent = []
     orig = sim.write
 
     def write(data):
         orig(data)
-        if data.decode().strip() == "ATDP":
-            sim._pending = "AUTO, SAE J1850 PWM\r"
+        cmd = data.decode().strip()
+        sim.sent.append(cmd)
+        if cmd in replies:
+            sim._pending = replies[cmd]
     sim.write = write
+    return sim
+
+
+def test_unknown_protocol_skips_code_decoding_and_says_why(tmp_path):
+    sim = _sim_with({"ATDP": "AUTO\r"})
     hub, _, _ = make(tmp_path, sim=None, port_factory=lambda: sim)
-    hub._sim = None  # behave like a real adapter: only a CAN protocol name enables code decoding
+    hub._sim = None  # behave like a real adapter: only a named protocol enables code decoding
     hub.start(DEFAULT_PIDS, hz=10, seconds=30)
     assert wait_for(lambda: hub.state()["codes"]["note"])
     st = hub.state()["codes"]
     hub.stop()
     assert st["read"] is False and "not supported" in st["note"]
+
+
+def test_legacy_protocol_reads_codes_with_the_legacy_layout(tmp_path):
+    sim = _sim_with({"ATDP": "SAE J1850 VPW\r", "03": "43 01 33 00 00 00 00\r", "07": "47 00 00 00 00 00 00\r"})
+    hub, _, _ = make(tmp_path, sim=None, port_factory=lambda: sim)
+    hub._sim = None
+    hub.start(DEFAULT_PIDS, hz=10, seconds=30)
+    assert wait_for(lambda: hub.state()["codes"]["read"])
+    st = hub.state()
+    hub.stop()
+    codes = st["codes"]
+    assert [c["code"] for c in codes["stored"]] == ["P0133"] and codes["pending"] == []
+    assert codes["permanent"] == [] and "permanent" in codes["unanswered"]  # Mode 0A is never asked on VPW
+    assert "03" in sim.sent and "0A" not in sim.sent
 
 
 class _NoMapSim(SimPort):
@@ -972,3 +995,41 @@ def test_saved_run_replays_readiness_and_freeze_frame_and_an_old_file_says_not_i
     st = hub2.state()
     assert st["readiness"] == st["freeze_frame"] == {"read": False, "note": "not in this recording"}
     hub2.exit_replay()
+
+
+def test_console_falls_back_to_a_pinned_protocol_when_automatic_search_finds_nothing(tmp_path):
+    sim = SimPort("rich")
+    sim.sent, pinned = [], []
+    orig = sim.write
+
+    def write(data):
+        orig(data)
+        cmd = data.decode().strip()
+        sim.sent.append(cmd)
+        if cmd.startswith("ATSP"):
+            pinned[:] = [cmd[4:]]
+        elif cmd == "ATDP":
+            sim._pending = "SAE J1850 VPW\r"
+        elif cmd.startswith("01") and pinned != ["2"]:
+            sim._pending = "SEARCHING...\rUNABLE TO CONNECT\r"
+    sim.write = write
+    hub, _, _ = make(tmp_path, sim=None, port_factory=lambda: sim)
+    hub._sim = None
+    hub.start(DEFAULT_PIDS, hz=10, seconds=30)
+    assert wait_for(lambda: hub.state()["seq"] >= 2)
+    hub.stop()
+    assert [c for c in sim.sent if c.startswith("ATSP")][:6] == ["ATSP0", "ATSP6", "ATSP8", "ATSP7", "ATSP9", "ATSP2"]
+
+
+def test_legacy_protocol_reads_mode06_with_the_one_limit_layout(tmp_path):
+    sim = _sim_with({"ATDP": "SAE J1850 VPW\r", "0600": "46 00 FF 40 00 00 00\r",
+                     "0602": "46 02 D0 80 03 80 6E\r46 02 0A 00 10 05 AA\r"})
+    hub, _, _ = make(tmp_path, sim=None, port_factory=lambda: sim)
+    hub._sim = None
+    hub.start(DEFAULT_PIDS, hz=10, seconds=30)
+    assert wait_for(lambda: hub.state()["mode06"]["read"])
+    m = hub.state()["mode06"]
+    hub.stop()
+    assert m["layout"] == "legacy" and m["mids"] == ["02"]
+    assert m["results"] == [{"tid": "02", "component": "50", "value": 0x8003, "limit": 0x806E, "limit_type": "min"},
+                            {"tid": "02", "component": "0A", "value": 0x10, "limit": 0x5AA, "limit_type": "max"}]

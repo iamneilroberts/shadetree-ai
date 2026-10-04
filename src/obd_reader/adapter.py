@@ -4,6 +4,11 @@ from obd_reader.transport import Transport
 
 INIT = ("ATZ", "ATE0", "ATL0", "ATH0")
 
+# Tried one by one when automatic search (ATSP0) finds nothing: CAN first (most cars after 2008), then
+# J1850 VPW, J1850 PWM, ISO 9141-2 and KWP. A real J1850 VPW truck answered when pinned to 2 right after
+# ATSP0 had returned UNABLE TO CONNECT.
+FALLBACK_PROTOCOLS = ("6", "8", "7", "9", "2", "1", "3", "5", "4")
+
 
 def init_adapter(transport: Transport, protocol: str | None) -> None:
     for cmd in INIT:
@@ -22,3 +27,16 @@ def identify(transport: Transport) -> Adapter:
         chip=sti.split()[0] if genuine else None,
         genuine_stn=genuine,
     )
+
+
+def fallback_search(transport) -> str | None:
+    """After automatic search found nothing: pin each protocol in turn and ask `0100`. Returns the ATSP value
+    that answered (left pinned), or None with the adapter back on automatic search."""
+    from obd_reader.elm import parse_all  # local: elm has no adapter dependency, keep it that way
+
+    for p in FALLBACK_PROTOCOLS:
+        transport.send(f"ATSP{p}")
+        if parse_all(transport.send("0100"), 0x41):
+            return p
+    transport.send("ATSP0")
+    return None

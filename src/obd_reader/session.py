@@ -23,11 +23,15 @@ class AdapterBusy(RuntimeError):
     """Another tool call is using the adapter."""
 
 
+_CONFIG_PROTOCOL = "\0config"   # sentinel: use Config.protocol
+
+
 @dataclass
 class Config:
     port: str | None
     baud: int = 115200
     timeout: float = 10.0
+    protocol: str = "0"   # ATSP value; 0 = automatic search, 2 = J1850 VPW, ...
     home: Path = field(default_factory=lambda: Path("."))
 
     @classmethod
@@ -81,7 +85,7 @@ class Session:
             self._lock.release()
 
     @contextmanager
-    def connection(self, label: str, protocol: str | None = "0") -> Iterator[Transport]:
+    def connection(self, label: str, protocol: str | None = _CONFIG_PROTOCOL) -> Iterator[Transport]:
         self._acquire()
         transport = None
         try:
@@ -90,7 +94,7 @@ class Session:
             stamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%S-%fZ")
             recorder = TranscriptRecorder(tdir / f"{stamp}-{label}.jsonl")
             transport = Transport(self._factory(), recorder=recorder, default_timeout=self.config.timeout)
-            init_adapter(transport, protocol)
+            init_adapter(transport, self.config.protocol if protocol is _CONFIG_PROTOCOL else protocol)
             yield transport
         finally:
             if transport is not None:
