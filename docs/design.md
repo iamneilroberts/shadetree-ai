@@ -1,6 +1,6 @@
 # OBD Diagnostic Assistant — Design (draft 1)
 
-_Status: design of record, updated 2026-10-02. Project name `shadetree-ai` (provisional; import package `obd_reader`, repo dir `obd-reader`). Built so far: Phases 1 and 2, the tool layer and MCP server (Phase 3a), the live console with its Dashboard, scenarios, Retro and Handheld views, replay, help popups, per-car profiles, readiness and freeze-frame panels and scenario PID requests (§7b), and the `probe` command with its VIN-free report (§6). **Next:** the quirks file (probe step 4) and the Terminal skin (GitHub issue #1). **NOT BUILT:** the reference store and grounding checker (Phase 3b), legacy-protocol decode (Phase 4), playbooks and evals (Phase 5), UDS 0x19, Mode 22, and a Mode 05 tool (the allowlist permits Mode 05; no tool or scan step uses it). See the README "What works today" table for hardware-verification status._
+_Status: design of record, updated 2026-10-02. Project name `shadetree-ai` (provisional; import package `obd_reader`, repo dir `obd-reader`). Built so far: Phases 1 and 2, the tool layer and MCP server (Phase 3a), the live console with its Dashboard, scenarios, Retro and Handheld views, replay, help popups, per-car profiles, readiness and freeze-frame panels and scenario PID requests (§7b), and the `probe` command with its VIN-free report (§6). Also built: the 1970s cabinet skin, the Options drawer, Capture level, the Terminal view (§7b) and legacy-bus decoding (J1850, ISO 9141, KWP; first hardware check on a J1850 VPW truck, 2026-10-04). **Next:** the quirks file (probe step 4). **NOT BUILT:** the reference store and grounding checker (Phase 3b), legacy CAL ID/CVN/ECU name reads, playbooks and evals (Phase 5), UDS 0x19, Mode 22, and a Mode 05 tool (the allowlist permits Mode 05; no tool or scan step uses it). See the README "What works today" table for hardware-verification status._
 
 ## 1. Purpose
 
@@ -271,7 +271,7 @@ Playbooks are YAML (steps, conditions, tool calls, expected readings, branches, 
 | 1 | Replay core: snapshot schema, allowlist gate, fake ELM transport, fuzz tests | ~2 evenings | `pytest` — forbidden bytes rejected; synthetic snapshot replays |
 | 2 | Real scan: EX on Ridgeline + Highlander; transcript recorder | ~1 evening after adapter arrives | real `snapshot.json` + transcript |
 | 3 | MCP tools (3a, built) + generic DTC store with provenance + grounding checker (3b, NOT BUILT) | ~1 week of evenings | Claude Code explains a real code, citing record IDs |
-| 4 | NOT BUILT: Austin's old car: legacy protocols, pinned protocol, VIN fallback chain | ~1 evening on-site + fixes | old-car transcript replays in CI |
+| 4 | Built 2026-10-04 (one J1850 VPW truck checked; ISO 9141 and KWP not yet on a car): Austin's old car: legacy protocols, pinned protocol, VIN fallback chain | ~1 evening on-site + fixes | old-car transcript replays in CI |
 | 5 | NOT BUILT: Playbooks + eval harness; `live_data` guided tests; first playbook (P0171) | 2–3 weeks | guided P0171 diagnosis on a recorded case, eval green |
 | Later | phone capture/import, credentialed connectors, Mode 22/OBDb, Mode 06, UDS 19, wireless adapter, web UI, C-level playbooks | — | — |
 

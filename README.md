@@ -2,7 +2,7 @@
 
 A **read-only** OBD-II diagnostic assistant for DIY mechanics. Plug in an adapter, scan the car into a snapshot, and troubleshoot with Claude using that snapshot plus cited reference material.
 
-> **Status (2026-10-02):** working and tested (792 tests), still early. It can scan a car read-only, probe it and write a VIN-free report you can share, replay recorded scans without a car, serve 17 read-only MCP tools to Claude, and show live data in a local web console. The reference store and guided playbooks are not built yet. See [What works today](#what-works-today) and [docs/design.md](docs/design.md).
+> **Status (2026-10-04):** working and tested (843 tests), still early. It can scan a car read-only, probe it and write a VIN-free report you can share, replay recorded scans without a car, serve 17 read-only MCP tools to Claude, and show live data in a local web console. The reference store and guided playbooks are not built yet. See [What works today](#what-works-today) and [docs/design.md](docs/design.md).
 
 ## Quick start
 
@@ -81,8 +81,8 @@ Not yet tried on a Windows machine.
 ## Roadmap
 
 1. Run `shadetree-ai probe` and the console against the Ridgeline: confirm Mode 09 reads, reply classes, Mode 06, Mode 02/readiness and the 29-bit header parse.
-   Then: quirks file keyed by vehicle key (probe step 4); the Terminal skin (issue #1).
-2. Legacy-protocol scans (non-CAN DTC and VIN layouts) on Austin's older cars.
+   Then: the quirks file keyed by vehicle key (probe step 4).
+2. More legacy-bus cars (Austin's older ones): ISO 9141 and KWP are decoded but only a J1850 VPW truck has been tried; legacy CAL ID/CVN/ECU name reads.
 3. Reference store with provenance-tagged records, NHTSA lookups, and the grounding check.
 4. Author and review the first playbooks (P0171/P0174, misfire, P0420, charging, parasitic draw).
 5. Later: UDS 0x19 read-DTC, phone capture, an in-chat MCP Apps widget for the console.
