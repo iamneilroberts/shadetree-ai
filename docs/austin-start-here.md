@@ -96,7 +96,7 @@ Everything goes in `Documents\Shadetree`: saved runs in `runs`, the adapter's ra
 
 ## Updating
 
-Download a fresh ZIP (step 1 of Install) and run the installer again. It replaces the program, keeps your files, the Desktop icons and the saved adapter port.
+Close the Shadetree black window, then double-click **Update Shadetree** on the Desktop. It downloads the latest version and installs it over the old one. Run it as often as you like: it keeps your files, the saved adapter port and any number you added to an icon's Target. If the Update icon is missing, run the installer again the way you did the first time.
 
 ## Troubleshooting
 

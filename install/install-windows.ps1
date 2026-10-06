@@ -143,25 +143,25 @@ function Install-Python {
     return Find-Python
 }
 
-function Get-LauncherText([string]$pkg) {
-    # The launcher from the package being installed (newest), else the copy next to this script.
+function Get-InstallFile([string]$pkg, [string]$name) {
+    # install\<name> from the package being installed (newest), else the copy next to this script; $null if neither.
     if (Test-Path -LiteralPath $pkg -PathType Container) {
-        $f = Join-Path $pkg 'install\shadetree-start.bat'
+        $f = Join-Path $pkg "install\$name"
         if (Test-Path -LiteralPath $f) { return [IO.File]::ReadAllText($f) }
     } elseif ($pkg -like '*.zip') {
         Add-Type -AssemblyName System.IO.Compression.FileSystem
         $zip = [IO.Compression.ZipFile]::OpenRead($pkg)
         try {
-            $entry = $zip.Entries | Where-Object { $_.FullName -like '*install/shadetree-start.bat' } | Select-Object -First 1
+            $entry = $zip.Entries | Where-Object { $_.FullName -like "*install/$name" } | Select-Object -First 1
             if ($entry) {
                 $reader = New-Object IO.StreamReader($entry.Open())
                 try { return $reader.ReadToEnd() } finally { $reader.Dispose() }
             }
         } finally { $zip.Dispose() }
     }
-    $f = Join-Path $PSScriptRoot 'shadetree-start.bat'
+    $f = Join-Path $PSScriptRoot $name
     if (Test-Path -LiteralPath $f) { return [IO.File]::ReadAllText($f) }
-    throw 'cannot find shadetree-start.bat: keep it in the same folder as install-windows.ps1'
+    return $null
 }
 
 try {
@@ -180,6 +180,11 @@ try {
     }
 
     Step 'Step 2 of 5: the Shadetree program'
+    while (Get-Process -Name 'shadetree-ai' -ErrorAction SilentlyContinue) {
+        # Windows locks a running program's files, so the update would fail
+        Say '  Shadetree is still running. Close its black window, then press Enter here.'
+        $null = Read-Host
+    }
     $null = New-Item -ItemType Directory -Force -Path $AppDir
     $venv = Join-Path $AppDir 'venv'
     $vpy = Join-Path $venv 'Scripts\python.exe'
@@ -194,7 +199,8 @@ try {
     }
     if ($Source -match '^https?://') {
         $pkg = Join-Path $env:TEMP 'shadetree-ai-download.zip'
-        Say "  Downloading $Source"
+        Say "  Downloading the latest version from $Source"
+        Remove-Item -LiteralPath $pkg -Force -ErrorAction SilentlyContinue   # never install an old download
         Invoke-WebRequest -Uri $Source -OutFile $pkg -UseBasicParsing -ErrorAction Stop
     } elseif (Test-Path -LiteralPath $Source) {
         $pkg = (Resolve-Path -LiteralPath $Source).Path
@@ -208,10 +214,14 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'pip could not update shadetree-ai (see the messages above)' }
     if (-not (Test-Path -LiteralPath (Join-Path $venv 'Scripts\shadetree-ai.exe'))) { throw 'shadetree-ai.exe is missing after the install' }
     $bat = Join-Path $AppDir 'shadetree-start.bat'
-    $text = (Get-LauncherText $pkg) -replace "`r?`n", "`r`n"   # a batch file needs Windows line endings
-    [IO.File]::WriteAllText($bat, $text, [Text.Encoding]::ASCII)
+    $text = Get-InstallFile $pkg 'shadetree-start.bat'
+    if (-not $text) { throw 'cannot find shadetree-start.bat: keep it in the same folder as install-windows.ps1' }
+    [IO.File]::WriteAllText($bat, ($text -replace "`r?`n", "`r`n"), [Text.Encoding]::ASCII)   # a batch file needs Windows line endings
+    # the installer itself, newest first, so the Update shortcut and the launcher's port search run the latest copy
     $self = Join-Path $AppDir 'install-windows.ps1'
-    if ($PSCommandPath -and ($PSCommandPath -ne $self)) { Copy-Item -LiteralPath $PSCommandPath -Destination $self -Force }
+    $mine = Get-InstallFile $pkg 'install-windows.ps1'
+    if ($mine) { [IO.File]::WriteAllText($self, $mine, [Text.Encoding]::ASCII) }
+    elseif ($PSCommandPath -and ($PSCommandPath -ne $self)) { Copy-Item -LiteralPath $PSCommandPath -Destination $self -Force }
     if (Test-Path -LiteralPath $self) { Unblock-File -LiteralPath $self }
     Say "  Installed in $AppDir"
 
@@ -240,14 +250,23 @@ try {
         @('Shadetree with phone', 'phone', 'Start the Shadetree console and let a phone on the same Wi-Fi open it')
     )
     foreach ($l in $links) {
-        $s = $shell.CreateShortcut((Join-Path $desk ($l[0] + '.lnk')))
+        $lnk = Join-Path $desk ($l[0] + '.lnk')
+        $keep = Test-Path -LiteralPath $lnk   # keep words added to an existing shortcut's Target, such as a protocol number
+        $s = $shell.CreateShortcut($lnk)
         $s.TargetPath = $bat
-        $s.Arguments = $l[1]
+        if (-not $keep) { $s.Arguments = $l[1] }
         $s.WorkingDirectory = $AppDir
         $s.Description = $l[2]
         $s.Save()
         Say "  $($l[0])"
     }
+    $s = $shell.CreateShortcut((Join-Path $desk 'Update Shadetree.lnk'))
+    $s.TargetPath = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+    $s.Arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$self`""
+    $s.WorkingDirectory = $AppDir
+    $s.Description = 'Download and install the latest Shadetree (safe to run any time)'
+    $s.Save()
+    Say '  Update Shadetree'
 
     Write-Host ''
     Write-Host 'All done. Turn the ignition on, then double-click "Shadetree" on your Desktop.' -ForegroundColor Green

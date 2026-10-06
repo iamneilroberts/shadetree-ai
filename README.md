@@ -33,7 +33,9 @@ The live console is a local web page; it needs Python, not Claude. The easy way:
 `install/install-windows.ps1` and choose **Run with PowerShell**. It installs Python 3.12 for the current user if needed,
 installs shadetree-ai into `%LOCALAPPDATA%\Shadetree`, saves runs to `Documents\Shadetree`, finds the adapter's COM port,
 and puts **Shadetree**, **Shadetree demo (no car)** and **Shadetree with phone** icons on the Desktop (they run
-`install/shadetree-start.bat`; the phone icon adds `--host 0.0.0.0 --allow-lan`). Re-run it to update. Step by step,
+`install/shadetree-start.bat`; the phone icon adds `--host 0.0.0.0 --allow-lan`), plus **Update Shadetree**, which
+re-runs the installer: every run downloads the latest `main` and reinstalls it, keeping data, the saved port and
+shortcut Targets. Step by step,
 with the Handheld view and troubleshooting: [docs/austin-start-here.md](docs/austin-start-here.md).
 
 The manual route, with an OBDLink EX plugged in:
