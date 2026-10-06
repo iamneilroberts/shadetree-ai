@@ -29,7 +29,14 @@ With an adapter (OBDLink EX tested; the car parked, ignition on, engine off):
 
 ## Install the console on Windows (no Claude needed)
 
-The live console is a local web page; it needs Python, not Claude. With an OBDLink EX plugged in:
+The live console is a local web page; it needs Python, not Claude. The easy way: download the repository ZIP, right-click
+`install/install-windows.ps1` and choose **Run with PowerShell**. It installs Python 3.12 for the current user if needed,
+installs shadetree-ai into `%LOCALAPPDATA%\Shadetree`, saves runs to `Documents\Shadetree`, finds the adapter's COM port,
+and puts **Shadetree**, **Shadetree demo (no car)** and **Shadetree with phone** icons on the Desktop (they run
+`install/shadetree-start.bat`; the phone icon adds `--host 0.0.0.0 --allow-lan`). Re-run it to update. Step by step,
+with the Handheld view and troubleshooting: [docs/austin-start-here.md](docs/austin-start-here.md).
+
+The manual route, with an OBDLink EX plugged in:
 
 1. Install Python 3.11 or newer from python.org (tick "Add python.exe to PATH").
 2. In a new PowerShell window:
