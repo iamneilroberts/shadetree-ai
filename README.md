@@ -76,12 +76,13 @@ Not yet tried on a Windows machine.
 | Honda/Acura DTC meanings (P1456, P1457, P2646, P2647, P3400, P3497) picked by make from the VIN, and a VCM note in the fuel-trim help | done; model-drafted, unreviewed, uncertain wording flagged in the hints | Austin or a service manual must review; only manufacturer code `5FP` is confirmed |
 | 29-bit ECU header attribution | written | **not verified** on a real car |
 | Legacy protocols (J1850, ISO 9141, KWP): Modes 03/07 without the count byte (no Mode 0A before CAN; permanent codes listed as not read), VIN from the five numbered `0902` lines, ECU source addresses from a headers-on `0100`, freeze frame and readiness as on CAN, on the scanner and the console; `--protocol` on the console; when automatic search finds nothing, each protocol is pinned and tried in turn. Mode 06 in the one-limit legacy layout (`46 TID CID value limit`, bitmap after a filler byte; shown raw, never judged pass/fail, limit type from CID bit 7 per J1979 [general knowledge, unverified]) on the console, probe and MCP tool. Mode 09 CAL ID/CVN/ECU name stay CAN only | done, tested | a 2003-ish GMC SUV on J1850 VPW (one ECU, address 10): automatic search returned UNABLE TO CONNECT and the fallback found protocol 2 (probe and console); stored and pending P0455 decoded, lamp on, freeze frame read, VIN read from the five `0902` lines (Mode 09 `0900` carries a message number before the bitmap), readiness read; Mode 06: TIDs 02, 05, 0A, 0C, 0E, 20 rows read on the console. ISO 9141, KWP and J1850 PWM **not verified** |
+| Quirks file (`quirks/<vehicle key>.json`, falling back to `quirks/<WMI>.json`; private `quirks-local/` first): hints only (`protocol` pin over automatic search, `pids_lie`, `max_hz`, `ecus`, `notes` with source/confidence/verified); malformed means no quirks. The probe report proposes entries (`--propose-quirks` prints them); only `shadetree-ai quirks accept probes/<id>.json` writes, to `quirks-local/`. The console shows the file applied in `/api/state` (`quirks`), not on the page | done, tested on replay fixtures and the simulator | **not verified** on a real car; `quirks/` holds only a made-up `example.json` |
 | Reference store, DTC lookup, playbooks, `check_citations` | not built | n/a |
 
 ## Roadmap
 
 1. Run `shadetree-ai probe` and the console against the Ridgeline: confirm Mode 09 reads, reply classes, Mode 06, Mode 02/readiness and the 29-bit header parse.
-   Then: the quirks file keyed by vehicle key (probe step 4).
+   Then: accept the Ridgeline's quirks proposal once its probe has been reviewed.
 2. More legacy-bus cars (Austin's older ones): ISO 9141 and KWP are decoded but only a J1850 VPW truck has been tried; legacy CAL ID/CVN/ECU name reads.
 3. Reference store with provenance-tagged records, NHTSA lookups, and the grounding check.
 4. Author and review the first playbooks (P0171/P0174, misfire, P0420, charging, parasitic draw).

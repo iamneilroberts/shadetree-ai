@@ -10,6 +10,7 @@ runs/
 !/examples/runs/
 profiles/
 probes/
+quirks-local/
 cache/
 !tests/fixtures/**
 .claude/worktrees/

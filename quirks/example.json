@@ -1,0 +1,16 @@
+{
+  "key": "ZZZ",
+  "example": true,
+  "protocol": "6",
+  "max_hz": 2.0,
+  "pids_lie": ["0F"],
+  "ecus": {"7E8": "engine (example)", "7E9": "transmission (example)"},
+  "notes": [
+    {
+      "text": "EXAMPLE ONLY, made up to show the format: no car was probed. A real file is named <vehicle key>.json or <WMI>.json; this one's name is never looked up.",
+      "source": "example",
+      "confidence": "unverified",
+      "verified": false
+    }
+  ]
+}

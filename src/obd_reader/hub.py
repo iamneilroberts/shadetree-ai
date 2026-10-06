@@ -19,6 +19,7 @@ from obd_reader.live import MAX_HZ, MAX_PIDS, MIN_HZ, LiveLimitError, read_pid_v
 from obd_reader.mode06 import read_all as read_mode06, read_all_legacy as read_mode06_legacy
 from obd_reader.pids import PIDS, pid_label
 from obd_reader.profiles import ProfileStore
+from obd_reader.quirks import QuirkStore, applied as quirks_applied
 from obd_reader.readiness import parse_readiness
 from obd_reader.replay_run import Run
 from obd_reader.scanner import read_freeze_frame
@@ -71,6 +72,8 @@ class LiveHub:
         self._unsaved = False               # the last run ended with samples that could not be saved
         self._lock = threading.Lock()       # serialises start()
         self._profiles = ProfileStore(session.config.home)
+        self._quirk_store = QuirkStore(session.config.home)
+        self._last_key: str | None = None   # the car the last run named; kept across runs for the quirks protocol hint
         self._data_lock = threading.Lock()  # guards the buffers: the sampler writes, viewers read
         self._thread: threading.Thread | None = None
         self._stop = threading.Event()
@@ -101,6 +104,8 @@ class LiveHub:
         self._key: str | None = None
         self._supported: set[str] = set()
         self._prior: dict | None = None
+        self._quirks: dict | None = None     # the quirks file applied to this run (quirks.applied + protocol_pinned, hz_capped)
+        self._lie: set[str] = set()          # its pids_lie: left out of the extras
         self._saved: tuple[Path, int] | None = None  # (file, seq) of the last save of this run
         self._transcript: str | None = None  # this run's raw transcript, relative to home
         self._replay: dict | None = None     # while a saved run is loaded: name, run, pos, speed, playing, ended, i
@@ -293,7 +298,14 @@ class LiveHub:
 
     def _run(self, pids: list[str], hz: float, seconds: float, level: str = "std") -> None:
         try:
-            with self._s.connection("console") as t:
+            # the car the last run named: its quirks protocol is tried instead of automatic search (the fallback
+            # search still runs if that finds nothing, so a different car is not locked out)
+            pin = self._quirk_store.load(self._last_key)
+            pinned = pin is not None and bool(pin[0].protocol) and self._s.config.protocol == "0"
+            if pinned:
+                with self._data_lock:
+                    self._quirks = {**quirks_applied(*pin), "protocol_pinned": True, "hz_capped": False}
+            with self._s.connection("console", **({"quirks": pin[0]} if pinned else {})) as t:
                 if t.transcript_path is not None:  # relative, so a shared run file does not carry the home path
                     self._transcript = t.transcript_path.relative_to(self._s.config.home).as_posix()
                 a = identify(t)
@@ -332,9 +344,14 @@ class LiveHub:
                             dp = (t.send("ATDP") or [None])[0]
                             self._adapter["protocol"] = dp.removeprefix("AUTO, ") if dp else None
                             prior = self._read_identity(t)  # first: the car's make picks which code meanings apply
-                            for p in (prior["unsupported"] if prior else []):
+                            lie, cap = self._apply_quirks()
+                            for p in (prior["unsupported"] if prior else []) + lie:
                                 if p in misses:
                                     misses[p] = _UNSUPPORTED_SWEEPS - 1
+                            if cap is not None:
+                                period = 1.0 / cap
+                            if lie and not plan:
+                                fv = -1  # re-plan the extras without them
                             if not self._stop.is_set():
                                 self._read_codes(t)
                             if not self._stop.is_set():
@@ -368,7 +385,7 @@ class LiveHub:
         """The scenario's supported PIDs first, then EXTRA_PIDS in order, up to the PID cap. A channel no longer read
         keeps its samples (it goes stale on the page). focus_only (capture level min): no EXTRA_PIDS; a live run's channels are decoder-table PIDs, at most 59 < 64."""
         with self._data_lock:
-            ok = lambda p: p in self._supported and p in PIDS and p not in core  # noqa: E731
+            ok = lambda p: p in self._supported and p in PIDS and p not in core and p not in self._lie  # noqa: E731
             extras = list(dict.fromkeys([p for p in self._focus if ok(p)] + ([] if focus_only else [p for p in EXTRA_PIDS if ok(p)])))[:MAX_PIDS - len(core)]
             self._extras = extras
             for p in extras:
@@ -438,9 +455,28 @@ class LiveHub:
             return None
         prior = self._profiles.load(key)
         with self._data_lock:
-            self._key, self._prior = key, prior
+            self._key, self._prior, self._last_key = key, prior, key
             self._vehicle = {"key": key, "known": prior is not None, "runs": prior["runs"] if prior else 0, "note": None}
         return prior
+
+    def _apply_quirks(self) -> tuple[list[str], float | None]:
+        """The quirks file for the car just named (key before WMI, quirks-local/ before quirks/). Hints, never decisions:
+        its pids_lie leave the extras and get one silent sweep, not three, before they are dropped (one that answers
+        stays); its max_hz caps the sweep rate. Returns (pids_lie, the cap if it lowered the rate)."""
+        found = self._quirk_store.load(self._key)
+        if found is None:
+            return [], None
+        q, path = found
+        info = quirks_applied(q, path)
+        cap = q.max_hz if q.max_hz is not None and self.hz and q.max_hz < self.hz else None
+        with self._data_lock:
+            prev = self._quirks
+            self._lie = set(q.pids_lie)
+            if cap is not None:
+                self.hz = cap
+            self._quirks = {**info, "protocol_pinned": bool(prev and prev["protocol_pinned"] and prev["file"] == info["file"]),
+                            "hz_capped": cap is not None}
+        return list(q.pids_lie), cap
 
     def _save_profile(self) -> None:
         if not self._key or self.seq == 0:
@@ -592,6 +628,7 @@ class LiveHub:
             tiers = None if self._tiers is None else dict(self._tiers)
             capture = self._capture  # the level of the last started run (min | std | max); null before any run; kept in a replay
             vehicle = None if self._vehicle is None else dict(self._vehicle)
+            quirks = None if self._quirks is None else dict(self._quirks)  # "quirks applied": null when none
             # only sweeps up to `seq`: anything newer is not complete yet
             channels = {
                 p: {"name": self._meta(p)[0], "unit": self._meta(p)[1], "labels": self._meta(p)[2],
@@ -623,7 +660,7 @@ class LiveHub:
                              if status == "running" and deadline else None),
             "adapter": adapter, "codes": codes, "unsupported": unsupported,
             "extras": extras, "tiers": tiers, "capture": capture, "mode06": m06, "readiness": ready, "freeze_frame": ff, "vehicle": vehicle, "replay": replay,
-            "supported": supported, "focus": focus,
+            "supported": supported, "focus": focus, "quirks": quirks,
             "channels": channels, "stats": stats,
         }
 

@@ -6,16 +6,51 @@ versions, shared by every car with that software), the supported-PID bitmaps, ev
 latency, and the raw bytes of undecoded PIDs. It never carries the VIN, the VIN serial or the transcript,
 and write_probe refuses to write a report that has a VIN-looking token in it."""
 import json
+import math
 import statistics
 from collections import Counter
 from pathlib import Path
 
+from obd_reader.live import MAX_HZ, MIN_HZ
+from obd_reader.quirks import ATSP_VALUES, HEADER_RE, Quirks
 from obd_reader.snapshot import Snapshot
 from obd_reader.vehicle import vehicle_key
 from obd_reader.vin import find_vins
 
+_SWEEP_REQUESTS = 12  # one standard console sweep: 8 core PIDs + 4 rotating extras (hub.DEFAULT_PIDS, _EXTRAS_PER_SWEEP)
 
-def report(snap: Snapshot) -> dict:
+
+def propose_quirks(snap: Snapshot) -> dict | None:
+    """Quirks entries from what this one probe saw, for a person to review and accept (`shadetree-ai quirks accept`).
+    Never applied or written here. None when no vehicle key was read."""
+    key = vehicle_key(snap.vehicle.vin)
+    if key is None:
+        return None
+    src = f"probe {snap.snapshot_id}"
+    notes = []
+    note = lambda text: notes.append({"text": text, "source": src, "confidence": "low", "verified": False})  # noqa: E731
+    advertised = set(snap.supported_pids.get("01", []))
+    classes: dict[str, set[str]] = {}
+    for r in snap.replies:
+        if len(r.cmd) == 4 and r.cmd.startswith("01") and r.cmd[2:] in advertised and int(r.cmd[2:], 16) % 0x20:
+            classes.setdefault(r.cmd[2:], set()).add(r.reply)
+    lie = sorted(p for p, c in classes.items() if c == {"no_data"})
+    if lie:
+        note(f"advertised but answered NO DATA in one probe: {', '.join(lie)}")
+    ms = [r.ms for r in snap.replies if r.cmd.startswith("01") and r.reply == "ok" and r.ms]
+    hz = math.floor(1000 / (statistics.median(ms) * _SWEEP_REQUESTS) * 10) / 10 if ms else None
+    max_hz = max(MIN_HZ, hz) if hz is not None and hz < MAX_HZ else None
+    if max_hz is not None:
+        note(f"median Mode 01 latency {statistics.median(ms):g} ms: about {max_hz:g} sweeps a second of {_SWEEP_REQUESTS} requests")
+    protocol = snap.protocol.atsp if snap.protocol.atsp in ATSP_VALUES else None  # a pin or a fallback find, not "0"
+    if protocol is not None:
+        note(f"answered on protocol {protocol} ({snap.protocol.name or 'name not read'})")
+    return Quirks(key=key, protocol=protocol, max_hz=max_hz, pids_lie=lie,
+                  ecus={e.header: (e.role or "unknown")[:40] for e in snap.ecus if HEADER_RE.fullmatch(e.header)},
+                  notes=notes).model_dump()
+
+
+def report(snap: Snapshot, quirks: dict | None = None) -> dict:
     return {
         "probe_id": snap.snapshot_id,
         "captured_at": snap.captured_at.isoformat(),
@@ -31,6 +66,8 @@ def report(snap: Snapshot) -> dict:
         "undecoded": [u.model_dump() for u in snap.undecoded],
         # a VIN warning can quote the VIN (or an invalid one): keep only its lead-in
         "warnings": [w.split(":", 1)[0] if "VIN" in w else w for w in snap.warnings],
+        "quirks_applied": quirks,                 # quirks.applied() of the file found for this vehicle key, or None
+        "quirks_proposal": propose_quirks(snap),  # never applied: a person accepts it
     }
 
 
@@ -53,13 +90,17 @@ def markdown(rep: dict) -> str:
         "- not ok: " + j([r["cmd"] + " " + r["reply"] for r in rs if r["reply"] != "ok"]),
         "- undecoded PIDs: " + j([u["pid"] + " " + u["reply"] + " [" + " ".join(u["raw"]) + "]" for u in rep["undecoded"]]),
         *(f"- warning: {w}" for w in rep["warnings"]),
+        "- quirks applied: " + (f"{qa['file']}" + (" (example)" if qa["example"] else "") if (qa := rep["quirks_applied"]) else "none"),
+        "- quirks proposed (hints, not applied; review, then `shadetree-ai quirks accept <this .json>`): "
+        + (f"pids_lie {j(qp['pids_lie'])}; max_hz {qp['max_hz'] or 'none'}; protocol {qp['protocol'] or 'none'}"
+           if (qp := rep["quirks_proposal"]) else "none (no vehicle key)"),
     ]
     return "\n".join(lines) + "\n"
 
 
-def write_probe(snap: Snapshot, out_dir: Path) -> tuple[Path, Path]:
+def write_probe(snap: Snapshot, out_dir: Path, quirks: dict | None = None) -> tuple[Path, Path]:
     """Write probes/<snapshot_id>.json and .md under out_dir. Never overwrites."""
-    rep = report(snap)
+    rep = report(snap, quirks)
     text, md = json.dumps(rep, indent=2) + "\n", markdown(rep)
     if find_vins(text + md):
         raise RuntimeError("the probe report contains a VIN-looking token; nothing was written")

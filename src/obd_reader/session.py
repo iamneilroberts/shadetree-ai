@@ -85,7 +85,11 @@ class Session:
             self._lock.release()
 
     @contextmanager
-    def connection(self, label: str, protocol: str | None = _CONFIG_PROTOCOL) -> Iterator[Transport]:
+    def connection(self, label: str, protocol: str | None = _CONFIG_PROTOCOL, quirks=None) -> Iterator[Transport]:
+        """`quirks` (a quirks.Quirks) is a hint: its protocol replaces automatic search ("0"), never an explicit pin."""
+        protocol = self.config.protocol if protocol is _CONFIG_PROTOCOL else protocol
+        if quirks is not None and quirks.protocol and protocol == "0":
+            protocol = quirks.protocol
         self._acquire()
         transport = None
         try:
@@ -94,7 +98,7 @@ class Session:
             stamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%S-%fZ")
             recorder = TranscriptRecorder(tdir / f"{stamp}-{label}.jsonl")
             transport = Transport(self._factory(), recorder=recorder, default_timeout=self.config.timeout)
-            init_adapter(transport, self.config.protocol if protocol is _CONFIG_PROTOCOL else protocol)
+            init_adapter(transport, protocol)
             yield transport
         finally:
             if transport is not None:

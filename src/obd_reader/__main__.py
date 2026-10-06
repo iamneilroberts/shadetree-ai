@@ -63,9 +63,24 @@ def _probe(args) -> int:
         snap, s_path, t_path = capture(SerialPort(args.port, baudrate=args.baud), args.out_dir, label=args.label,
                                        protocol=args.protocol or "0", timeout=args.timeout, mode06=True)
         print(f"snapshot and transcript (contain the VIN, keep local): {s_path}, {t_path}")
-    j_path, m_path = write_probe(snap, args.out_dir)
+    from obd_reader.quirks import QuirkStore, applied
+    from obd_reader.vehicle import vehicle_key
+
+    found = QuirkStore(args.out_dir).load(vehicle_key(snap.vehicle.vin))
+    j_path, m_path = write_probe(snap, args.out_dir, applied(*found) if found else None)
     print(m_path.read_text(encoding="utf-8"), end="")
     print(f"report (no VIN, safe to share): {j_path} and {m_path}")
+    if args.propose_quirks:  # printed only; `quirks accept` is the one writer
+        import json
+
+        print(json.dumps(json.loads(j_path.read_text(encoding="utf-8"))["quirks_proposal"], indent=2))
+    return 0
+
+
+def _quirks_accept(args) -> int:
+    from obd_reader.quirks import accept
+
+    print(f"wrote {accept(args.file, args.out_dir)} (local, gitignored; a hint for runs on this class of car)")
     return 0
 
 
@@ -162,7 +177,15 @@ def build_parser() -> argparse.ArgumentParser:
     pr.add_argument("--timeout", type=float, default=10.0, help="seconds to wait per command")
     pr.add_argument("--label", default="probe", help="short name for the probe, [a-z0-9-]")
     pr.add_argument("--out-dir", type=Path, default=Path("."), help="probes/ (and, live, snapshots/ and transcripts/) go here")
+    pr.add_argument("--propose-quirks", action="store_true", help="also print the proposed quirks JSON (nothing is written)")
     pr.set_defaults(func=_probe)
+
+    qk = sub.add_parser("quirks", help="per-car hints (quirks/ committed, quirks-local/ private)")
+    qsub = qk.add_subparsers(dest="qcmd", required=True)
+    qa = qsub.add_parser("accept", help="write a reviewed probe proposal to quirks-local/<key>.json (never overwrites)")
+    qa.add_argument("file", type=Path, help="a probe report .json (its quirks_proposal) or a quirks .json")
+    qa.add_argument("--out-dir", type=Path, default=Path("."), help="quirks-local/ goes here (the data home)")
+    qa.set_defaults(func=_quirks_accept)
 
     co = sub.add_parser("console", help="open the live console web page (read-only)")
     co.add_argument("--port", default=None, help="adapter serial device (not needed with --demo)")
