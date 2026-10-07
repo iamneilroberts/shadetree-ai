@@ -279,7 +279,7 @@ try {
     Write-Host 'What to try:'
     Write-Host '  - Check the internet connection, then run the installer again (it is safe to repeat).'
     Write-Host '  - Restart the laptop if Python was just installed, then run it again.'
-    Write-Host '  - Still stuck? Send Neil a photo of this window.'
+    Write-Host '  - Still stuck? Open an issue at https://github.com/iamneilroberts/shadetree-ai/issues with a photo of this window.'
     Wait-Close
     exit 1
 }

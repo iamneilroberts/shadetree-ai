@@ -7,7 +7,7 @@ from obd_reader.__main__ import build_parser
 ROOT = Path(__file__).resolve().parents[1]
 PS1 = ROOT / "install" / "install-windows.ps1"
 BAT = ROOT / "install" / "shadetree-start.bat"
-GUIDE = ROOT / "docs" / "austin-start-here.md"
+GUIDE = ROOT / "docs" / "windows-start-here.md"
 
 
 def _console_flags() -> set[str]:

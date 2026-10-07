@@ -2,7 +2,7 @@
 
 Shadetree shows a car's live engine data and trouble codes in your web browser, through an OBDLink EX adapter. It is **read-only**: it never clears codes, never changes a setting and never runs a test on the car. It only asks the car questions and shows the answers.
 
-> Honest status: the Windows installer and launcher have **not been tested on a Windows machine yet** by the author. If something below does not match what you see, take a photo of the window and send it to Neil.
+> Honest status: the Windows installer and launcher have **not been tested on a Windows machine yet** by the author. If something below does not match what you see, open an issue at https://github.com/iamneilroberts/shadetree-ai/issues with a photo of the window.
 
 ## What you need
 
@@ -92,7 +92,7 @@ Anyone on the same Wi-Fi who has the full link can watch the live data and start
 
 ## Where your files are saved, and privacy
 
-Everything goes in `Documents\Shadetree`: saved runs in `runs`, the adapter's raw conversation in `transcripts`, and what Shadetree learned about each car in `profiles`. **Transcripts can contain your car's VIN** (its serial number): keep this folder private and do not post its files online. To share a run with Neil, send it to him directly.
+Everything goes in `Documents\Shadetree`: saved runs in `runs`, the adapter's raw conversation in `transcripts`, and what Shadetree learned about each car in `profiles`. **Transcripts can contain your car's VIN** (its serial number): keep this folder private and do not post its files online. To share a run with someone, send it to them directly.
 
 ## Updating
 

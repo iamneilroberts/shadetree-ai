@@ -91,13 +91,13 @@ def emails(fake):
 
 def test_setup_creates_the_tunnel_route_dns_and_an_email_gate():
     f = FakeCF()
-    out = ra.setup(f, HOST, ["Neil@Example.com", "friend@example.org"])
+    out = ra.setup(f, HOST, ["Owner@Example.com", "friend@example.org"])
     assert f.tunnels[0]["name"] == "shadetree" and out["tunnel"] == f.tunnels[0]["id"]
     assert f.ingress == [{"hostname": HOST, "service": "http://127.0.0.1:8765"}, {"service": "http_status:404"}]
     assert f.dns == [dict(type="CNAME", name=HOST, content=f"{out['tunnel']}.cfargotunnel.com", proxied=True, id=f.dns[0]["id"])]
     app = f.apps[0]
     assert app["domain"] == HOST and app["type"] == "self_hosted" and app["session_duration"] == "24h"
-    assert emails(f) == ["friend@example.org", "neil@example.com"]
+    assert emails(f) == ["friend@example.org", "owner@example.com"]
     assert all(p["decision"] == "allow" for p in f.policies[app["id"]])
     assert "TOKEN" not in json.dumps(out), "the connector token is never part of setup's output"
 
