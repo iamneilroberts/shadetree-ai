@@ -80,7 +80,43 @@ def _probe(args) -> int:
 def _quirks_accept(args) -> int:
     from obd_reader.quirks import accept
 
-    print(f"wrote {accept(args.file, args.out_dir)} (local, gitignored; a hint for runs on this class of car)")
+    print(f"wrote {accept(args.file, args.out_dir, replace=args.replace)} (local, gitignored; a hint for runs on this class of car)")
+    return 0
+
+
+def _quirks_check(args) -> int:
+    from obd_reader.quirks import check, hints
+
+    q, why = check(args.file)
+    if not why:
+        print(f"ok: {q.key}, hints: {hints(q)}")
+        return 0
+    for w in why:
+        print(f"problem: {w}")
+    return 1
+
+
+def _quirks_show(args) -> int:
+    from obd_reader.quirks import KEY_RE, REPO_QUIRKS, WMI_RE, QuirkStore, hints
+    from obd_reader.vehicle import vehicle_key
+
+    typed = args.key.strip().upper()
+    key = vehicle_key(typed) or typed
+    if key != typed:
+        print(f"vehicle key {key} (from the VIN typed; the VIN is not printed or kept)")
+    if not (KEY_RE.fullmatch(key) or WMI_RE.fullmatch(key)):
+        raise ValueError("not a vehicle key (VIN characters 1-8, a dash, VIN character 10, e.g. 1HGCM826-3) "
+                         "or a WMI (VIN characters 1-3, e.g. 1HG)")
+    found = None
+    for path, q, why in QuirkStore(args.out_dir).candidates(key):
+        status = "applies" if q else "missing" if why == ["missing"] else "skipped: " + "; ".join(why)
+        print(f"  {path.parent.name}/{path.name}: {status}")
+        if q is not None:
+            found = (q, path)
+            break
+    if not REPO_QUIRKS.is_dir():
+        print("  (no committed quirks/ folder here: it only loads from a source checkout)")
+    print(f"applies: {found[1].parent.name}/{found[1].name}: {hints(found[0])}" if found else f"no quirks file applies to {key}")
     return 0
 
 
@@ -182,10 +218,22 @@ def build_parser() -> argparse.ArgumentParser:
 
     qk = sub.add_parser("quirks", help="per-car hints (quirks/ committed, quirks-local/ private)")
     qsub = qk.add_subparsers(dest="qcmd", required=True)
-    qa = qsub.add_parser("accept", help="write a reviewed probe proposal to quirks-local/<key>.json (never overwrites)")
+    qa = qsub.add_parser("accept", help="write a reviewed probe proposal to quirks-local/<key>.json (overwrites only with --replace)")
     qa.add_argument("file", type=Path, help="a probe report .json (its quirks_proposal) or a quirks .json")
     qa.add_argument("--out-dir", type=Path, default=Path("."), help="quirks-local/ goes here (the data home)")
+    qa.add_argument("--replace", action="store_true", help="overwrite an existing quirks-local/<key>.json")
     qa.set_defaults(func=_quirks_accept)
+    qc = qsub.add_parser("check", help="check a quirks .json (or a probe report's proposal) with the loader's rules; exit 1 on problems")
+    qc.add_argument("file", type=Path, help="a quirks .json (must be named <key>.json) or a probe report .json")
+    qc.set_defaults(func=_quirks_check)
+    qs = qsub.add_parser("show", help="which quirks file applies to a car, and why the others were skipped",
+                         description="Search order: quirks-local/<key>.json, quirks/<key>.json, quirks-local/<WMI>.json, "
+                                     "quirks/<WMI>.json; the first that loads applies.")
+    qs.add_argument("key", metavar="KEY_OR_WMI",
+                    help="vehicle key: VIN characters 1-8, a dash, VIN character 10 (model year), e.g. 1HGCM826-3 "
+                         "(the probe report's vehicle_key); or a WMI: VIN characters 1-3, e.g. 1HG")
+    qs.add_argument("--out-dir", type=Path, default=Path("."), help="the data home that holds quirks-local/")
+    qs.set_defaults(func=_quirks_show)
 
     co = sub.add_parser("console", help="open the live console web page (read-only)")
     co.add_argument("--port", default=None, help="adapter serial device (not needed with --demo)")

@@ -8,7 +8,7 @@ import re
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 from obd_reader.live import MAX_HZ, MIN_HZ
 from obd_reader.profiles import KEY_RE
@@ -71,13 +71,62 @@ class Quirks(_Model):
         return v
 
 
-def _read(path: Path, name: str) -> Quirks | None:
+def _plain(err: dict) -> str:
+    """A pydantic error in plain words: `notes[0].verified: missing (required)`."""
+    where = ""
+    for part in err["loc"]:
+        where += f"[{part}]" if isinstance(part, int) else f".{part}" if where else str(part)
+    if not where:
+        return "the file must hold one JSON object ({ ... }), not a list or a single value"
+    if err["type"] == "missing":
+        return f"{where}: missing (required)"
+    if err["type"] == "extra_forbidden":
+        known = Note.model_fields if err["loc"][0] == "notes" else Quirks.model_fields
+        return f"{where}: not a known field (known: {', '.join(known)})"
+    return f"{where}: {err['msg'].removeprefix('Value error, ').removeprefix(f'{where} ')}"
+
+
+def validate(text: str, name: str | None = None) -> tuple[Quirks | None, list[str]]:
+    """The loader's rules, with reasons in plain words: (quirks, []) when `text` loads as `<name>.json`.
+    name None skips the file-name check (a probe report's proposal). Never echoes a VIN-looking token."""
+    q, why = None, []
     try:
-        text = path.read_text(encoding="utf-8")
         q = Quirks.model_validate(json.loads(text))
-    except (OSError, ValueError):  # pydantic's ValidationError is a ValueError
-        return None
-    return q if q.key == name and not find_vins(text) else None
+    except json.JSONDecodeError as e:
+        why.append(f"not valid JSON: {e.msg} at line {e.lineno}, column {e.colno}")
+    except ValidationError as e:
+        why += [_plain(x) for x in e.errors()]
+    if q is not None and name is not None and q.key != name and not q.example:  # an example is never looked up by name
+        shown = "a VIN-looking name" if find_vins(name) else f"{name}.json"
+        why.append(f"key is {q.key} but the file is named {shown}; it is only looked up as {q.key}.json")
+    for v in find_vins(text):
+        why.append(f"line {text.count(chr(10), 0, text.find(v)) + 1}: a VIN-looking token (not shown); "
+                   "a quirks file must never carry a VIN")
+    return q, why
+
+
+def hints(q: Quirks) -> str:
+    """The file's hints on one line, for `quirks check` and `quirks show`."""
+    parts = [f"protocol {q.protocol}" if q.protocol else "", f"max_hz {q.max_hz:g}" if q.max_hz is not None else "",
+             f"pids_lie {' '.join(q.pids_lie)}" if q.pids_lie else "",
+             f"ecus {', '.join(f'{h}={r}' for h, r in q.ecus.items())}" if q.ecus else "",
+             f"{len(q.notes)} note(s)" if q.notes else "", "example (made up)" if q.example else ""]
+    return ", ".join(p for p in parts if p) or "none"
+
+
+def check(path: Path) -> tuple[Quirks | None, list[str]]:
+    """`shadetree-ai quirks check`: a quirks .json, or a probe report's quirks_proposal, against the loader's rules."""
+    text = Path(path).read_text(encoding="utf-8")
+    try:
+        d = json.loads(text)
+    except ValueError:
+        d = None
+    if isinstance(d, dict) and "quirks_proposal" in d:
+        if d["quirks_proposal"] is None:
+            return None, ["the report has no quirks proposal (the probe did not read a vehicle key)"]
+        q, why = validate(json.dumps(d["quirks_proposal"], indent=2))
+        return q, [f"quirks_proposal: {w}" for w in why]
+    return validate(text, Path(path).stem)
 
 
 def applied(q: Quirks, path: Path) -> dict:
@@ -90,33 +139,48 @@ class QuirkStore:
     def __init__(self, home: Path, committed: Path = REPO_QUIRKS):
         self._dirs = (Path(home) / LOCAL_DIR, Path(committed))
 
+    def candidates(self, key: str):
+        """Each file the loader tries for a vehicle key (or a WMI), in order: (path, quirks or None, why skipped)."""
+        names = (key, key[:3]) if KEY_RE.fullmatch(key) else (key,) if WMI_RE.fullmatch(key) else ()
+        for name in names:
+            for d in self._dirs:
+                try:
+                    text = (d / f"{name}.json").read_text(encoding="utf-8")
+                except FileNotFoundError:
+                    yield d / f"{name}.json", None, ["missing"]
+                    continue
+                except (OSError, ValueError) as e:
+                    yield d / f"{name}.json", None, [f"unreadable ({type(e).__name__})"]
+                    continue
+                q, why = validate(text, name)
+                yield d / f"{name}.json", None if why else q, why
+
     def load(self, key: str | None) -> tuple[Quirks, Path] | None:
         """The most specific file first: <key>.json, then <WMI>.json, each in quirks-local/ before quirks/.
         A file that does not load is skipped, as if absent."""
         if not isinstance(key, str) or not KEY_RE.fullmatch(key):
             return None
-        for name in (key, key[:3]):
-            for d in self._dirs:
-                q = _read(d / f"{name}.json", name)
-                if q is not None:
-                    return q, d / f"{name}.json"
-        return None
+        return next(((q, p) for p, q, _ in self.candidates(key) if q is not None), None)
 
 
-def accept(source: Path, home: Path) -> Path:
+def accept(source: Path, home: Path, replace: bool = False) -> Path:
     """Write a reviewed proposal (a probe report's `quirks_proposal`, or a bare quirks object) to
-    <home>/quirks-local/<key>.json. The only writer; refuses a VIN-looking token and never overwrites."""
+    <home>/quirks-local/<key>.json. The only writer; refuses a VIN-looking token; overwrites only with replace."""
     d = json.loads(Path(source).read_text(encoding="utf-8"))
     if isinstance(d, dict) and "quirks_proposal" in d:
         d = d["quirks_proposal"]
     if d is None:
         raise ValueError("the report has no quirks proposal (the probe did not read a vehicle key)")
-    q = Quirks.model_validate(d)
+    q, why = validate(json.dumps(d, indent=2))  # plain-word reasons; never echoes the input (it could hold a VIN)
+    if why:
+        raise ValueError("nothing was written: " + "; ".join(why))
     text = q.model_dump_json(indent=2) + "\n"
-    if find_vins(text):
-        raise ValueError("the proposal contains a VIN-looking token; nothing was written")
     out = Path(home) / LOCAL_DIR / f"{q.key}.json"
     out.parent.mkdir(parents=True, exist_ok=True)
-    with open(out, "x", encoding="utf-8") as fh:  # FileExistsError: delete or edit the old file by hand
-        fh.write(text)
+    try:
+        with open(out, "w" if replace else "x", encoding="utf-8") as fh:
+            fh.write(text)
+    except FileExistsError:
+        raise ValueError(f"{LOCAL_DIR}/{out.name} already exists; nothing was written. "
+                         "Use --replace to overwrite it, or edit that file by hand") from None
     return out

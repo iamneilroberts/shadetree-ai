@@ -120,6 +120,68 @@ def test_the_console_state_shows_the_quirks_applied(tmp_path):
     assert st["seq"] >= 4 and "0B" not in st["unsupported"]  # a hint, not a decision: 0B answers, so it stays
 
 
+def test_check_says_ok_with_the_hints_for_a_file_and_a_report_proposal(tmp_path, capsys):
+    put(tmp_path, KEY, {"key": KEY, "max_hz": 2.5, "pids_lie": ["13"]})
+    put(tmp_path, "report", {"probe_id": "p", "quirks_proposal": {"key": KEY, "protocol": "6"}})
+    assert main(["quirks", "check", str(tmp_path / f"{KEY}.json")]) == 0
+    assert main(["quirks", "check", str(tmp_path / "report.json")]) == 0
+    assert capsys.readouterr().out == f"ok: {KEY}, hints: max_hz 2.5, pids_lie 13\nok: {KEY}, hints: protocol 6\n"
+
+
+@pytest.mark.parametrize("name, body, problem", [
+    (KEY, '{"key": "1HGCM826-3",\n "max_hz" 2}', "not valid JSON: Expecting ':' delimiter at line 2, column 11"),
+    (KEY, [], "the file must hold one JSON object"),
+    (KEY, {"key": KEY, "bogus": 1}, "bogus: not a known field (known: key, example,"),
+    (KEY, {"key": KEY, "notes": [{"text": "x", "source": "y", "confidence": "low"}]}, "notes[0].verified: missing (required)"),
+    (KEY, {"key": KEY, "protocol": "0"}, "protocol: must be an ATSP value 1-9 or A-C"),
+    ("draft", {"key": KEY}, f"key is {KEY} but the file is named draft.json; it is only looked up as {KEY}.json"),
+    ("ZZZ", {"key": "ZZZ", "notes": [{"text": SIM_VIN, "source": "y", "confidence": "low", "verified": False}]},
+     "line 1: a VIN-looking token (not shown)"),
+    ("report", {"probe_id": "p", "quirks_proposal": None}, "the report has no quirks proposal"),
+    ("report", {"probe_id": "p", "quirks_proposal": {"key": KEY, "max_hz": 99}},
+     "quirks_proposal: max_hz: Input should be less than or equal to 10"),
+])
+def test_check_names_each_problem_in_plain_words_and_never_echoes_a_vin(tmp_path, capsys, name, body, problem):
+    put(tmp_path, name, body)
+    assert main(["quirks", "check", str(tmp_path / f"{name}.json")]) == 1
+    out = capsys.readouterr().out
+    assert f"problem: {problem}" in out and SIM_VIN not in out and "input_value" not in out
+
+
+def test_show_lists_each_file_tried_in_order_with_why_it_was_skipped(tmp_path, capsys):
+    put(tmp_path / "home" / "quirks-local", KEY, [])
+    put(tmp_path / "committed", KEY, {"key": "1HG"})
+    put(tmp_path / "home" / "quirks-local", "1HG", {"key": "1HG", "max_hz": 1.0})
+    put(tmp_path / "committed", "1HG", {"key": "1HG", "max_hz": 2.0})
+    lines = [(p.parent.name, p.name, q is not None, why) for p, q, why in store(tmp_path).candidates(KEY)]
+    assert [line[:2] for line in lines] == [("quirks-local", f"{KEY}.json"), ("committed", f"{KEY}.json"),
+                                            ("quirks-local", "1HG.json"), ("committed", "1HG.json")]
+    assert lines[0][3][0].startswith("the file must hold one JSON object") and lines[1][3][0].startswith("key is 1HG")
+    assert lines[2][2] and lines[3][2]
+    assert main(["quirks", "show", SIM_VIN.lower(), "--out-dir", str(tmp_path / "home")]) == 0
+    out = capsys.readouterr().out
+    key = vehicle_key(SIM_VIN)
+    assert SIM_VIN not in out and f"vehicle key {key}" in out and f"  quirks-local/{key}.json: missing" in out
+    assert out.rstrip().endswith(f"no quirks file applies to {key}")
+    assert main(["quirks", "show", "not-a-key"]) == 1
+
+
+def test_accept_overwrites_only_with_replace_and_the_refusal_says_how(tmp_path, capsys):
+    src = tmp_path / "proposal.json"
+    src.write_text(json.dumps({"key": KEY, "max_hz": 2.0}))
+    assert main(["quirks", "accept", str(src), "--out-dir", str(tmp_path)]) == 0
+    src.write_text(json.dumps({"key": KEY, "max_hz": 1.0}))
+    assert main(["quirks", "accept", str(src), "--out-dir", str(tmp_path)]) == 1
+    err = capsys.readouterr().err
+    assert f"quirks-local/{KEY}.json already exists; nothing was written. Use --replace" in err
+    assert QuirkStore(tmp_path).load(KEY)[0].max_hz == 2.0
+    assert main(["quirks", "accept", str(src), "--out-dir", str(tmp_path), "--replace"]) == 0
+    assert QuirkStore(tmp_path).load(KEY)[0].max_hz == 1.0
+    src.write_text(json.dumps({"key": KEY, "notes": [{"text": SIM_VIN, "source": "y", "confidence": "low", "verified": False}]}))
+    assert main(["quirks", "accept", str(src), "--out-dir", str(tmp_path), "--replace"]) == 1  # still refuses a VIN
+    assert QuirkStore(tmp_path).load(KEY)[0].max_hz == 1.0
+
+
 def test_committed_quirks_carry_no_vin_and_the_example_is_marked():
     files = [p for p in REPO_QUIRKS.rglob("*") if p.is_file()]
     assert files, "quirks/ should hold at least the example"
