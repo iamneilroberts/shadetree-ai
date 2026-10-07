@@ -24,6 +24,10 @@ shadetree-ai is an MCP server that lets Claude read your car's trouble codes, fr
 | **Retro skin**: the Dashboard as a 1970s engine-analyzer cabinet | **Handheld**: the phone layout, Live and Codes modes |
 | ![Terminal view: the run as command-line text](docs/img/terminal.png) | ![All readings: every reading with min, max, average, std and samples](docs/img/all-readings.png) |
 | **Terminal**: the run as text, with a Copy button | **All readings**: statistics for every reading in the run |
+| ![Light theme Dashboard with trouble codes, freeze frame, readiness monitors and the needs-attention list](docs/img/light-dashboard.png) | ![Guided fuel-trim test: idle and 2500 rpm captures with an engine-speed chart](docs/img/light-guided-test.png) |
+| **Light theme Dashboard**: codes, freeze frame, readiness monitors and what needs attention | **Guided test**: the draft fuel-trim check with timed captures |
+| ![Light theme All readings with Mode 06 on-board test results](docs/img/light-all-readings-mode06.png) | |
+| **All readings and Mode 06**: light theme, with on-board test results against their limits | |
 
 All screenshots are of the built-in simulated car (the "rich" scenario), not a real vehicle.
 
