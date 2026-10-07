@@ -4,6 +4,8 @@ Check engine light on? I gave Claude an OBD-II adapter and a strict read-only ru
 
 shadetree-ai is an MCP server that lets Claude read your car's trouble codes, freeze frame and live data through a USB OBD-II adapter and explain them, plus a local live dashboard in your browser that works without Claude.
 
+**Claude is optional.** The dashboard and the command-line `scan` work standalone and make no AI calls: nothing in the program contacts Anthropic or any other AI service, and the plain-words code meanings are fixed text written ahead of time. Claude is an extra layer on top, through the MCP server, if you want it.
+
 ![The live console's Dashboard on the simulated car: gauges, warning lamps and three trouble codes with plain-words meanings](docs/img/dashboard.png)
 
 ## Features
