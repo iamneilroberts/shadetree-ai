@@ -22,12 +22,14 @@ from obd_reader.replay_run import MAX_FILE_BYTES, list_runs, load_run, read_run_
 from obd_reader.session import AdapterBusy, Config, NoAdapterError, Session
 from obd_reader.simulator import SimPort
 from obd_reader.stat_help import HELP, MODE06
+from obd_reader.vin_decode import LookupUnavailable
 
 MAX_BODY = 4096
 _HOSTNAME = re.compile(r"(?=.{1,253}$)[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*")
 MAX_UPLOAD = MAX_FILE_BYTES  # the replay upload route only
 _LOOPBACK = {"127.0.0.1", "localhost", "::1"}
-_POST_ROUTES = ("/api/start", "/api/stop", "/api/save", "/api/sim", "/api/replay", "/api/replay/control", "/api/focus")
+_POST_ROUTES = ("/api/start", "/api/stop", "/api/save", "/api/sim", "/api/replay", "/api/replay/control", "/api/focus",
+                "/api/car/lookup", "/api/car/name")
 _GET_ROUTES = ("/", "/api/state", "/api/help", "/api/runs", "/api/scenarios", "/api/export.zip")
 _CSP_JSON = "default-src 'none'"
 _SOURCES = ("examples", "mine")   # replay sources: the public example runs, and the user's own runs/
@@ -250,6 +252,13 @@ class ConsoleServer:
                     if path == "/api/focus":  # the scenario's PIDs: hex ids only, filtered by the car's bitmap in the hub
                         outer.hub.set_focus(body.get("pids"))
                         return self._json(200, {"ok": True})
+                    if path == "/api/car/lookup":  # the server asks NHTSA with the vehicle key only; the page never does
+                        try:
+                            return self._json(200, {"ok": True, **outer.hub.car_lookup()})
+                        except LookupUnavailable:
+                            return self._json(503, {"error": "lookup unavailable"})
+                    if path == "/api/car/name":
+                        return self._json(200, {"ok": True, **outer.hub.set_car_name(body.get("make"), body.get("model"), body.get("year"))})
                     if path == "/api/stop":
                         outer.hub.stop()
                         return self._json(200, {"ok": True})

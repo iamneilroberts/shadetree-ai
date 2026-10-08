@@ -3,6 +3,7 @@ anything unreadable or malformed loads as 'no profile'."""
 import json
 import os
 import re
+from datetime import datetime, timezone
 from pathlib import Path
 
 KEY_RE = re.compile(r"[A-HJ-NPR-Z0-9]{8}-[A-HJ-NPR-Z0-9]")
@@ -14,6 +15,15 @@ def _pids(v) -> list[str] | None:
     if not isinstance(v, list):
         return None
     return [p for p in v if isinstance(p, str) and _PID_RE.fullmatch(p)]
+
+
+def clean_name(make, model, year) -> dict:
+    """The car's name the user saved: {make, model, year} under the run label's rules (replay_run.clean_meta)."""
+    from obd_reader.replay_run import clean_meta  # replay_run imports this module
+
+    s = lambda v: v.strip() if isinstance(v, str) else v  # noqa: E731
+    m = clean_meta({"make": s(make), "model": s(model), "year": year, "title": "-"})
+    return {"make": m["make"], "model": m["model"], "year": m["year"]}
 
 
 class ProfileStore:
@@ -35,8 +45,21 @@ class ProfileStore:
         lists = {k: _pids(d.get(k)) for k in _LISTS}
         if any(v is None for v in lists.values()):
             return None
+        try:  # a saved name is kept only if it is still valid; a bad one loads as no name
+            name = clean_name(d["make"], d["model"], d["year"]) if "make" in d else {}
+        except (ValueError, KeyError):
+            name = {}
         return {"schema": 1, "key": key, "updated": str(d.get("updated", "")), "runs": d["runs"],
-                "protocol": d.get("protocol") if isinstance(d.get("protocol"), str) else None, **lists}
+                "protocol": d.get("protocol") if isinstance(d.get("protocol"), str) else None, **lists, **name}
+
+    def set_name(self, key: str, make, model, year) -> dict:
+        """Store the car's make, model and year in its profile (a new profile with no runs if there is none)."""
+        name = clean_name(make, model, year)
+        prof = self.load(key) or {"schema": 1, "key": key, "runs": 0, "protocol": None,
+                                  "supported_pids": [], "unsupported": [], "extras": []}
+        prof.update(name, updated=datetime.now(timezone.utc).isoformat(timespec="seconds"))
+        self.save(key, prof)
+        return name
 
     def save(self, key: str, profile: dict) -> None:
         path = self._path(key)

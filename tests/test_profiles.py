@@ -1,4 +1,5 @@
 import json
+import pytest
 
 from obd_reader.profiles import ProfileStore
 
@@ -50,3 +51,18 @@ def test_save_replaces_atomically_and_leaves_no_temp_files(tmp_path):
     s.save(KEY, {**GOOD, "runs": 3})
     assert s.load(KEY)["runs"] == 3
     assert [p.name for p in (tmp_path / "profiles").iterdir()] == [f"{KEY}.json"]
+
+
+def test_set_name_keeps_the_runs_and_a_bad_name_loads_as_no_name(tmp_path):
+    s = ProfileStore(tmp_path)
+    assert s.set_name(KEY, "Simco", "Bench", 2026) == {"make": "Simco", "model": "Bench", "year": 2026}
+    assert s.load(KEY)["runs"] == 0 and s.load(KEY)["model"] == "Bench"   # a new profile with no runs
+    s.save(KEY, GOOD)
+    s.set_name(KEY, "Simco", "Bench", 2026)
+    assert {k: v for k, v in s.load(KEY).items() if k not in ("make", "model", "year", "updated")} == \
+        {k: v for k, v in GOOD.items() if k != "updated"}
+    s.save(KEY, {**GOOD, "make": "Simco", "model": "x" * 99, "year": 2026})
+    assert "make" not in s.load(KEY)
+    for bad in (("", "B", 2026), ("S", "B", 1950), ("S", "B", "2026"), ("S", "1HGCM82633A004352", 2026)):
+        with pytest.raises(ValueError):
+            s.set_name(KEY, *bad)

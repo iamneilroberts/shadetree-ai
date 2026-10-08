@@ -27,6 +27,7 @@ from obd_reader.session import Session
 from obd_reader.simulator import SimPort
 from obd_reader.snapshot import VIN_RE, LiveSample, Series
 from obd_reader.vehicle import make_of, vehicle_key
+from obd_reader import vin_decode
 
 MAX_RUN_S = 1800.0
 DEFAULT_PIDS = ["0C", "05", "06", "07", "08", "09", "0B", "42"]
@@ -102,6 +103,7 @@ class LiveHub:
         self._m06: dict = {"read": False, "note": None, "mids": [], "results": []}
         self._vehicle: dict | None = None
         self._key: str | None = None
+        self._name: dict | None = None       # the make, model and year saved in this car's profile, if any
         self._supported: set[str] = set()
         self._prior: dict | None = None
         self._quirks: dict | None = None     # the quirks file applied to this run (quirks.applied + protocol_pinned, hz_capped)
@@ -456,7 +458,8 @@ class LiveHub:
         prior = self._profiles.load(key)
         with self._data_lock:
             self._key, self._prior, self._last_key = key, prior, key
-            self._vehicle = {"key": key, "known": prior is not None, "runs": prior["runs"] if prior else 0, "note": None}
+            self._name = {k: prior[k] for k in ("make", "model", "year")} if prior and "make" in prior else None
+            self._vehicle = {"key": key, "known": bool(prior and prior["runs"]), "runs": prior["runs"] if prior else 0, "note": None}
         return prior
 
     def _apply_quirks(self) -> tuple[list[str], float | None]:
@@ -485,7 +488,7 @@ class LiveHub:
         profile = {"schema": 1, "key": self._key, "updated": datetime.now(timezone.utc).isoformat(timespec="seconds"),
                    "runs": (prior["runs"] if prior else 0) + 1, "protocol": self._adapter["protocol"],
                    "supported_pids": sorted(self._supported), "unsupported": sorted(set(self._unsupported)),
-                   "extras": list(self._extras)}
+                   "extras": list(self._extras), **(self._name or {})}
         try:
             self._profiles.save(self._key, profile)
         except OSError as e:
@@ -629,6 +632,7 @@ class LiveHub:
             capture = self._capture  # the level of the last started run (min | std | max); null before any run; kept in a replay
             vehicle = None if self._vehicle is None else dict(self._vehicle)
             quirks = None if self._quirks is None else dict(self._quirks)  # "quirks applied": null when none
+            key, name = (None, None) if self._replay else (self._key, self._name)
             # only sweeps up to `seq`: anything newer is not complete yet
             channels = {
                 p: {"name": self._meta(p)[0], "unit": self._meta(p)[1], "labels": self._meta(p)[2],
@@ -660,9 +664,38 @@ class LiveHub:
                              if status == "running" and deadline else None),
             "adapter": adapter, "codes": codes, "unsupported": unsupported,
             "extras": extras, "tiers": tiers, "capture": capture, "mode06": m06, "readiness": ready, "freeze_frame": ff, "vehicle": vehicle, "replay": replay,
-            "supported": supported, "focus": focus, "quirks": quirks,
+            "supported": supported, "focus": focus, "quirks": quirks, "car": self._car(key, name),
             "channels": channels, "stats": stats,
         }
+
+    @staticmethod
+    def _car(key: str | None, name: dict | None) -> dict | None:
+        """The live or simulated car's name: the one saved in its profile, else the offline suggestion (no model)."""
+        if key is None:
+            return None
+        if name:
+            return {"key": key, **name, "source": "saved", "saved": True}
+        off = vin_decode.offline(key)
+        return {"key": key, "make": off["make"] or "", "model": "", "year": off["year"], "source": "offline", "saved": False}
+
+    def _car_key(self) -> str:
+        with self._data_lock:
+            if self._replay is not None or self._key is None:
+                raise ValueError("no car identified yet: start sampling first")
+            return self._key
+
+    def set_car_name(self, make, model, year) -> dict:
+        """Save the car's make, model and year in its profile; new saved runs of this car carry them as their label."""
+        key = self._car_key()
+        name = self._profiles.set_name(key, make, model, year)
+        with self._data_lock:
+            if self._key == key:
+                self._name = name
+        return name
+
+    def car_lookup(self) -> dict:
+        """NHTSA vPIC's make, model, year and trim for the current car, asked with the vehicle key only."""
+        return vin_decode.lookup(self._car_key(), self._s.config.home)
 
     def recent(self, seconds: float) -> dict:
         out: dict[str, dict] = {}
@@ -700,7 +733,7 @@ class LiveHub:
             series = {p: Series(name=PIDS[p].name, unit=PIDS[p].unit,
                                 samples=[(tt, v) for s, tt, v in d if s <= seq])
                       for p, d in self._full.items()}
-            codes, m06, key, tr = dict(self._codes), dict(self._m06), self._key, self._transcript
+            codes, m06, key, tr, name = dict(self._codes), dict(self._m06), self._key, self._transcript, self._name
             ready, ff = dict(self._ready), dict(self._ff)
         ls = LiveSample(duration_s=self.state()["now"], rate_hz=self.hz or 0.0, series=series)
         rdir = Path(self._s.config.home) / "runs"
@@ -709,7 +742,8 @@ class LiveHub:
         with open(path, "x", encoding="utf-8") as fh:
             json.dump({"kind": "live_run", "demo": self._sim is not None, "adapter": self._adapter,
                        "live_sample": ls.model_dump(mode="json"), "codes": codes, "mode06": m06, "readiness": ready, "freeze_frame": ff,
-                       "vehicle": {"key": key} if key else None, "vehicle_key": key, "transcript": tr}, fh, indent=2)  # the key, never the VIN
+                       "vehicle": {"key": key} if key else None, "vehicle_key": key, "transcript": tr,  # the key, never the VIN
+                       **({"meta": {**name, "title": "auto-saved" if label == "auto" else label}} if name else {})}, fh, indent=2)
         with self._data_lock:
             self._saved = (path, seq)
         return path

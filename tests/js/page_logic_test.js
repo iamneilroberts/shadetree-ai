@@ -1685,5 +1685,23 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
     assert.ok(/&lt;b&gt;/.test(vv.el('t_scr').innerHTML) && !/<b>/.test(vv.el('t_scr').innerHTML), 'adapter text escaped');
   }
 
+  {   // a newly identified car: the New car prompt is filled once per car, Look up and Save post to their routes
+    const car = { key: '1HGCM826-3', make: 'Honda', model: '', year: 2003, source: 'offline', saved: false };
+    const sts = statesFor(4, idle).map((st, k) => Object.assign(st, { car: k < 3 ? car : Object.assign({}, car, { saved: true, model: 'Accord' }) }));
+    const cn = makeEnv(sts, 'v0', null, [], {}, { postReply: (url) => (/car\/lookup/.test(url) ? { ok: false, status: 503, j: { error: 'lookup unavailable' } } : null) });
+    await cn.tick();
+    assert.ok(!cn.el('carNew').hidden && cn.el('cn_make').value === 'Honda' && cn.el('cn_model').value === '' && cn.el('cn_year').value === 2003, 'prompt shows the offline suggestion');
+    cn.el('cn_model').value = 'Accord'; await cn.tick();
+    assert.strictEqual(cn.el('cn_model').value, 'Accord', 'a poll never overwrites what the user typed');
+    cn.handlers['cn_look:click'](); await new Promise(r => setImmediate(r)); await new Promise(r => setImmediate(r));
+    assert.strictEqual(cn.el('cn_msg').textContent, 'lookup unavailable', 'a failed lookup says so and keeps the fields');
+    assert.strictEqual(cn.el('cn_make').value, 'Honda');
+    cn.handlers['cn_save:click']();
+    const sv = cn.posts.find(p => /car\/name/.test(p.url));
+    assert.deepStrictEqual(sv && sv.body, { make: 'Honda', model: 'Accord', year: 2003 }, 'Save posts the edited fields');
+    await cn.tick(); await cn.tick();
+    assert.ok(cn.el('carNew').hidden, 'a saved car shows no prompt');
+  }
+
   console.log('page logic OK');
 })().catch(e => { console.error('FAIL', e.message); process.exit(1); });

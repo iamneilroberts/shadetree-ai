@@ -484,3 +484,39 @@ def test_export_zip_sends_a_zip_attachment(srv_ex):
     assert status == 200 and headers["Content-Type"] == "application/zip" and body[:2] == b"PK"
     assert re.fullmatch(r'attachment; filename="shadetree-runs-\d{4}-\d{2}-\d{2}\.zip"', headers["Content-Disposition"])
     assert "X-Shadetree-Left-Out" not in headers
+
+
+def test_car_routes_need_the_token_host_and_origin(srv):
+    server, _, _ = srv
+    for path in ("/api/car/lookup", "/api/car/name"):
+        assert call(server, "POST", path, {}, token=None)[0] == 401
+        assert call(server, "POST", path, {}, host="evil.example:80")[0] == 403
+        assert call(server, "POST", path, {}, headers={"Origin": "http://evil.example"})[0] == 403
+        assert call(server, "GET", path)[0] == 405
+        assert call(server, "POST", path, {})[0] == 400   # no car identified yet
+
+
+def test_new_car_gets_an_offline_suggestion_then_save_names_it_and_new_runs_carry_it(srv, monkeypatch):
+    from obd_reader import vin_decode
+    from obd_reader.simulator import SIM_VIN
+    from obd_reader.vehicle import vehicle_key
+
+    server, hub, _ = srv
+    monkeypatch.setattr(vin_decode, "_fetch", lambda url: (_ for _ in ()).throw(OSError("offline")))
+    call(server, "POST", "/api/start", {"pids": DEFAULT_PIDS, "hz": 10, "seconds": 30})
+    assert wait_seq(server, 3)
+    key = vehicle_key(SIM_VIN)
+    car = call(server, "GET", "/api/state")[1]["car"]
+    assert car == {"key": key, "make": "", "model": "", "year": vin_decode.model_year(key), "source": "offline", "saved": False}
+    assert call(server, "POST", "/api/car/lookup", {}) == (503, {"error": "lookup unavailable"})
+    assert call(server, "POST", "/api/car/name", {"make": "Simco", "model": "", "year": 2026})[0] == 400  # all three needed
+    st, body = call(server, "POST", "/api/car/name", {"make": " Simco ", "model": "Bench", "year": 2026})
+    assert st == 200 and body == {"ok": True, "make": "Simco", "model": "Bench", "year": 2026}
+    assert call(server, "GET", "/api/state")[1]["car"]["saved"] is True
+    prof = json.loads((server.hub.runs_dir.parent / "profiles" / f"{key}.json").read_text())
+    assert (prof["make"], prof["model"], prof["year"]) == ("Simco", "Bench", 2026)
+    st, body = call(server, "POST", "/api/save", {"label": "bench"})
+    assert json.loads(open(body["path"]).read())["meta"] == {"make": "Simco", "model": "Bench", "year": 2026, "title": "bench"}
+    hub.stop()
+    prof = json.loads((server.hub.runs_dir.parent / "profiles" / f"{key}.json").read_text())
+    assert prof["runs"] == 1 and prof["model"] == "Bench"   # the end-of-run profile keeps the name

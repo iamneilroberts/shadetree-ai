@@ -720,6 +720,9 @@
 </div>
 <div class="msgbar" id="msg" hidden></div>
 <div class="msgbar" id="exNote" hidden></div>
+<div class="msgbar" id="carNew" hidden><b>New car:</b> <label>Make <input id="cn_make" maxlength="40" size="12"></label> <label>Model <input id="cn_model" maxlength="40" size="12"></label> <label>Year <input id="cn_year" type="number" min="1996" max="2100" style="width:5.5em"></label>
+  <button class="b" id="cn_look">Look up model (NHTSA)</button> <button class="b primary" id="cn_save">Save</button> <button class="b" id="cn_skip">Not now</button> <span id="cn_msg" role="status"></span>
+  <br><small>Look up sends NHTSA only the first part of the VIN (make, model and year characters), never the serial.</small></div>
 <div id="replayPanel" hidden>
   <label>Source <select class="b" id="rp_src"><option value="examples">Examples</option><option value="mine">My runs</option></select></label>
   <label>Make <select class="b" id="rp_make"></select></label>
@@ -1134,10 +1137,33 @@
     $('simctl').hidden = !st.demo; $('demoBanner').hidden = !st.demo; $('demoBtn').hidden = st.status === 'running'; 
     ['min', 'std', 'max'].forEach(function (v) { $('cap_' + v).disabled = st.status === 'running'; });   // the level applies at Start
     if (st.status === 'running' && !st.replay && (st.capture === 'min' || st.capture === 'std' || st.capture === 'max')) $('cap_' + st.capture).checked = true;   // the running run's level, after a reload too
-    renderReplay(); renderLost();
+    renderReplay(); renderLost(); carPrompt();
     showMsg(st.message || '');
     hhAlert();
   }
+  /* a newly identified car: suggest make and year (offline), let the user edit, look up the model, and save */
+  var cnKey = null, cnSkip = {};
+  function carPrompt() {
+    var c = (state || {}).car, box = $('carNew');
+    box.hidden = !c || c.saved || !!cnSkip[c.key];
+    if (box.hidden || cnKey === c.key) return;   // fill once per car, so typing is never overwritten by a poll
+    cnKey = c.key; $('cn_make').value = c.make || ''; $('cn_model').value = c.model || ''; $('cn_year').value = c.year || ''; $('cn_msg').textContent = '';
+  }
+  $('cn_look').addEventListener('click', function () {
+    var m = $('cn_msg'); m.textContent = 'Looking up\u2026';
+    post('/api/car/lookup', {}).then(function (r) {
+      if (!r.ok) { m.textContent = (r.j && r.j.error) || 'lookup unavailable'; return; }
+      ['make', 'model', 'year'].forEach(function (k) { if (r.j[k]) $('cn_' + k).value = r.j[k]; });
+      m.textContent = 'NHTSA: ' + [r.j.year, r.j.make, r.j.model, r.j.trim].filter(Boolean).join(' ') + '. Check it, then Save.';
+    }).catch(function () { m.textContent = 'lookup unavailable'; });
+  });
+  $('cn_save').addEventListener('click', function () {
+    post('/api/car/name', { make: $('cn_make').value, model: $('cn_model').value, year: Number($('cn_year').value) }).then(function (r) {
+      $('cn_msg').textContent = r.ok ? '' : (r.j && r.j.error) || 'could not save';
+      if (r.ok) { $('carNew').hidden = true; poll(); }
+    }).catch(function () { $('cn_msg').textContent = 'could not save'; });
+  });
+  $('cn_skip').addEventListener('click', function () { cnSkip[cnKey] = 1; $('carNew').hidden = true; });
   function hhAlert() {   // the page's notices, repeated as text inside the Handheld frame (a phone hides the page's own banners there)
     var seen = {}, lines = ['demoBanner', 'replayBanner', 'lostBanner', 'msg', 'exNote'].map(function (id) { var n = $(id); return n.hidden ? '' : n.textContent; })
       .filter(function (t) { return t && !seen[t] && (seen[t] = true); });

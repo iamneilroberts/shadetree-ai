@@ -201,6 +201,27 @@ def _label_run(args) -> int:
     return 0
 
 
+def _vin_info(args) -> int:
+    from obd_reader import vin_decode as vd
+
+    key = vd.to_key(args.vin)  # a full VIN is cut to its key here, before anything is printed or sent
+    off = vd.offline(key)
+    print(f"vehicle key: {key} (VIN characters 1-8 and 10; the serial is not used)")
+    print(f"make:        {off['make'] or 'unknown (WMI ' + key[:3] + ' is not in the offline table)'}")
+    print(f"model year:  {off['year'] or 'unknown'} (from character 10; check it)")
+    print("model:       not decodable offline" + ("" if args.lookup else " (add --lookup to ask NHTSA)"))
+    if args.lookup:
+        print(f"asking NHTSA vPIC with {vd.partial_vin(key)} ...")
+        try:
+            r = vd.lookup(key, args.out_dir)
+        except vd.LookupUnavailable as e:
+            print(f"lookup unavailable: {e}")
+            return 1
+        for k in ("make", "model", "year", "trim", "cylinders", "displacement_l", "fuel"):
+            print(f"  {k + ':':16}{r.get(k) or '-'}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(prog="shadetree-ai")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -282,6 +303,14 @@ def build_parser() -> argparse.ArgumentParser:
     lr.add_argument("--year", required=True, type=int, help="model year, e.g. 2024")
     lr.add_argument("--title", required=True, help="short description, e.g. 'Ridgeline 6 min drive' (at most 80 characters)")
     lr.set_defaults(func=_label_run)
+    vi = sub.add_parser("vin-info", help="suggest make and model year from a vehicle key (offline); --lookup asks NHTSA for the model")
+    vi.add_argument("vin", metavar="KEY_OR_PARTIAL",
+                    help="vehicle key such as 1HGCM826-3, partial VIN such as 1HGCM826*3*******, or a full VIN "
+                         "(reduced to the key at once; never echoed or sent)")
+    vi.add_argument("--lookup", action="store_true",
+                    help="ask NHTSA vPIC (one HTTPS call, sends only the key characters, no serial; cached)")
+    vi.add_argument("--out-dir", type=Path, default=Path("."), help="the data home that holds the lookup cache")
+    vi.set_defaults(func=_vin_info)
     return ap
 
 
