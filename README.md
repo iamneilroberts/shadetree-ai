@@ -6,7 +6,7 @@ shadetree-ai is an MCP server that lets Claude read your car's trouble codes, fr
 
 **Claude is optional.** The dashboard and the command-line `scan` work standalone and make no AI calls: nothing in the program contacts Anthropic or any other AI service, and the plain-words code meanings are fixed text written ahead of time. There is one optional internet call, and only when you press its button: the NHTSA model lookup for a new car, which sends only the vehicle key characters (make, model and year codes; never the serial) and involves no AI. Claude is an extra layer on top, through the MCP server, if you want it.
 
-![The live console's Dashboard on the simulated car: gauges, warning lamps and three trouble codes with plain-words meanings](docs/img/dashboard.png)
+![The live console's Dashboard on the simulated car: gauges, warning lamps and a trouble code with its plain-words meaning](docs/img/dashboard.png)
 
 ## Features
 
@@ -20,16 +20,16 @@ shadetree-ai is an MCP server that lets Claude read your car's trouble codes, fr
 
 | | |
 |---|---|
-| ![Retro skin: the Dashboard drawn as a 1970s engine-analyzer cabinet](docs/img/retro-cabinet.png) | ![Handheld view on a phone](docs/img/handheld.png) |
-| **Retro skin**: the Dashboard as a 1970s engine-analyzer cabinet | **Handheld**: the phone layout, Live and Codes modes |
+| ![Retro skin: a 1970s shop engine tester with a scope, meters and a test knob](docs/img/retro-cabinet.png) | ![Handheld view on a phone](docs/img/handheld.png) |
+| **Retro skin**: a 1970s shop engine tester; the knob under the scope picks the test | **Handheld**: the phone layout, Live and Codes modes |
 | ![Terminal view: the run as command-line text](docs/img/terminal.png) | ![All readings: every reading with min, max, average, std and samples](docs/img/all-readings.png) |
 | **Terminal**: the run as text, with a Copy button | **All readings**: statistics for every reading in the run |
 | ![Light theme Dashboard with trouble codes, freeze frame, readiness monitors and the needs-attention list](docs/img/light-dashboard.png) | ![Guided fuel-trim test: idle and 2500 rpm captures with an engine-speed chart](docs/img/light-guided-test.png) |
 | **Light theme Dashboard**: codes, freeze frame, readiness monitors and what needs attention | **Guided test**: the draft fuel-trim check with timed captures |
-| ![Light theme All readings with Mode 06 on-board test results](docs/img/light-all-readings-mode06.png) | |
-| **All readings and Mode 06**: light theme, with on-board test results against their limits | |
+| ![Light theme All readings with Mode 06 on-board test results](docs/img/light-all-readings-mode06.png) | ![Retro skin with the knob on Fuel trims: trim scope and meters](docs/img/retro-fuel-trims.png) |
+| **All readings and Mode 06**: light theme, with on-board test results against their limits | **Retro, Fuel trims**: the knob swaps the scope and meters to the trim readings |
 
-All screenshots are of the built-in simulated car (the "rich" scenario), not a real vehicle.
+All screenshots are of the built-in simulated car (modelled on a real 2024 Ridgeline at idle, with a coolant sensor reading cold), not a real vehicle.
 
 ## What you need
 
