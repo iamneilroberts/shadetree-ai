@@ -111,3 +111,40 @@ def test_serial_port_reads_up_to_prompt_using_loopback():
     port._ser.write(b"NO DATA\r\r>")
     assert port.read_until_prompt(1.0) == "NO DATA\r\r"
     port.close()
+
+
+class _TimedSerial:
+    """pyserial-like: bytes arrive at set times on a fake clock; read(n) returns at once if n bytes are buffered,
+    else waits until they are or the 0.1 s timeout ends (pyserial's blocking read), whichever is first."""
+
+    def __init__(self, clock, arrivals):
+        self._clock, self._arrivals, self._got = clock, list(arrivals), 0
+
+    def _buffered(self) -> bytes:
+        return b"".join(b for at, b in self._arrivals if at <= self._clock[0])[self._got:]
+
+    @property
+    def in_waiting(self) -> int:
+        return len(self._buffered())
+
+    def read(self, n: int) -> bytes:
+        if len(self._buffered()) < n:
+            ready = [at for at, _ in self._arrivals if at > self._clock[0]]
+            enough = next((at for at in sorted(ready) if len(b"".join(b for t, b in self._arrivals if t <= at)) - self._got >= n), None)
+            self._clock[0] = enough if enough is not None and enough <= self._clock[0] + 0.1 else self._clock[0] + 0.1
+        out = self._buffered()[:n]
+        self._got += len(out)
+        return out
+
+
+def test_short_reply_returns_when_the_prompt_arrives_and_split_replies_assemble(monkeypatch):
+    import obd_reader.transport as tr
+
+    clock = [0.0]
+    monkeypatch.setattr(tr.time, "monotonic", lambda: clock[0])
+    port = SerialPort.__new__(SerialPort)
+    # a short reply split over three arrivals; the prompt is in by t = 0.02 s
+    port._ser = _TimedSerial(clock, [(0.005, b"41 0C"), (0.012, b" 0B 40\r"), (0.02, b"\r>")])
+    assert port.read_until_prompt(1.0) == "41 0C 0B 40\r\r"
+    assert clock[0] < 0.05  # read(64) waited the whole 0.1 s serial timeout here
+    assert port._prompt_seen is True

@@ -14,7 +14,7 @@ from typing import Callable
 
 from obd_reader.adapter import fallback_search, identify
 from obd_reader.dtc_text import describe
-from obd_reader.elm import decode_dtc_list, decode_supported, is_legacy, parse_all, parse_vin_legacy
+from obd_reader.elm import classify, decode_dtc_list, decode_supported, is_legacy, parse_all, parse_vin_legacy
 from obd_reader.live import MAX_HZ, MAX_PIDS, MIN_HZ, LiveLimitError, read_pid_value, summarize, validate_pids
 from obd_reader.mode06 import read_all as read_mode06, read_all_legacy as read_mode06_legacy
 from obd_reader.pids import PIDS, pid_label
@@ -33,9 +33,12 @@ MAX_RUN_S = 1800.0
 DEFAULT_PIDS = ["0C", "05", "06", "07", "08", "09", "0B", "42"]
 # Readings added to a run, in order of usefulness, for whichever of them the car says it supports.
 # The core channels are read every sweep; these rotate _EXTRAS_PER_SWEEP at a time so the fast ones stay fast.
-EXTRA_PIDS = ["04", "11", "0D", "0E", "43", "44", "0F", "5C", "46", "33", "2F", "24", "28", "15", "19", "3C", "3D",
-              "3E", "3F", "2C", "2D", "2E", "23", "47", "49", "4A", "62", "63", "8E", "55", "56", "57", "58", "03",
-              "1C", "51", "1F", "30", "31", "21", "A6"]
+EXTRA_PIDS = ["04", "11", "0D", "0E", "43", "44", "0F", "10", "5C", "46", "33", "2F", "24", "28", "15", "19", "14",
+              "18", "3C", "3D", "3E", "3F", "2C", "2D", "2E", "23", "47", "49", "4A", "62", "63", "8E", "55", "56", "57",
+              "58", "03", "1C", "51", "1F", "30", "31", "21", "A6", "66", "67", "68"]
+# A car that lacks coolant (05), intake air (0F) or MAF (10) may report the same reading as sensor 1 of the
+# multi-sensor PIDs: a core, focus or extra PID the car's bitmap does not list is replaced by its fallback here.
+FALLBACK_PIDS = {"05": "67", "0F": "68", "10": "66"}
 _EXTRAS_PER_SWEEP = 4
 # Capture level max (was "Capture all supported"): every decodable Mode 01 PID the car reports, in two tiers. The fast tier is read every
 # sweep (the run's rate, 2.5 Hz from the page); the rest rotate, enough per sweep for about SLOW_HZ each, at most
@@ -98,6 +101,7 @@ class LiveHub:
         self._unsupported: list[str] = []
         self._missed: set[str] = set()
         self._extras: list[str] = []
+        self._fallbacks: dict[str, str] = {}  # core or focus PID the car lacks -> the fallback PID read in its place
         self._capture: str | None = None   # the last started run's level (min | std | max); None before any run
         self._tiers: dict | None = None      # capture-all runs: {"fast", "slow", "slow_per_sweep"}
         self._m06: dict = {"read": False, "note": None, "mids": [], "results": []}
@@ -388,8 +392,11 @@ class LiveHub:
         keeps its samples (it goes stale on the page). focus_only (capture level min): no EXTRA_PIDS; a live run's channels are decoder-table PIDs, at most 59 < 64."""
         with self._data_lock:
             ok = lambda p: p in self._supported and p in PIDS and p not in core and p not in self._lie  # noqa: E731
-            extras = list(dict.fromkeys([p for p in self._focus if ok(p)] + ([] if focus_only else [p for p in EXTRA_PIDS if ok(p)])))[:MAX_PIDS - len(core)]
+            fb = lambda p: FALLBACK_PIDS[p] if p in FALLBACK_PIDS and p not in self._supported else p  # noqa: E731
+            lead = [fb(p) for p in core if fb(p) != p] + [fb(p) for p in self._focus]
+            extras = list(dict.fromkeys([p for p in lead if ok(p)] + ([] if focus_only else [fb(p) for p in EXTRA_PIDS if ok(fb(p))])))[:MAX_PIDS - len(core)]
             self._extras = extras
+            self._fallbacks = {p: fb(p) for p in [*core, *self._focus] if fb(p) != p and fb(p) in extras}
             for p in extras:
                 if p not in self._ch:
                     self._ch[p], self._full[p] = deque(maxlen=self._max), []
@@ -531,14 +538,18 @@ class LiveHub:
         # `unanswered`, so the page never turns silence into "no codes" or "lamp off".
         out, missed = {}, []
         asked = (("stored", "03", 0x43), ("pending", "07", 0x47)) + (() if legacy else (("permanent", "0A", 0x4A),))
+        stored_no_data = False
         if legacy:
             out["permanent"], missed = [], ["permanent"]
         for k, cmd, sid in asked:
             if self._stop.is_set():  # Stop pressed: do not finish reading the lists
                 return
-            payloads = parse_all(t.send(cmd), sid)
+            lines = t.send(cmd)
+            payloads = parse_all(lines, sid)
             if not payloads:
                 missed.append(k)
+                if k == "stored" and legacy and classify(lines, sid) == "no_data":
+                    stored_no_data = True
             codes: list[str] = []
             for p in payloads:
                 codes += [c for c in decode_dtc_list(p, legacy) if c not in codes]
@@ -547,6 +558,8 @@ class LiveHub:
         mil = any(p[2] & 0x80 for p in status) if status else None
         if mil is None:
             missed.append("mil")
+        elif stored_no_data and sum(p[2] & 0x7F for p in status) == 0:
+            missed.remove("stored")  # a legacy ECU can answer Mode 03 NO DATA when none are stored: 0101 says zero
         read = len([k for k in missed if k != "mil"]) < 3
         ignition, monitors = parse_readiness(status)  # the same 0101 answer: each ECU counts its own codes
         ready = ({"read": True, "note": None, "mil": mil, "dtc_count": sum(p[2] & 0x7F for p in status), "ignition": ignition,
@@ -626,6 +639,7 @@ class LiveHub:
             status, message, hz, run = self.status, self.message, self.hz, self._run_id
             adapter, st, codes = dict(self._adapter), list(self._sweep_t), dict(self._codes)
             unsupported, extras, m06 = list(self._unsupported), list(self._extras), dict(self._m06)
+            fallbacks = dict(self._fallbacks)
             ready, ff = dict(self._ready), dict(self._ff)
             supported, focus = sorted(self._supported), list(self._focus)
             tiers = None if self._tiers is None else dict(self._tiers)
@@ -664,7 +678,7 @@ class LiveHub:
                              if status == "running" and deadline else None),
             "adapter": adapter, "codes": codes, "unsupported": unsupported,
             "extras": extras, "tiers": tiers, "capture": capture, "mode06": m06, "readiness": ready, "freeze_frame": ff, "vehicle": vehicle, "replay": replay,
-            "supported": supported, "focus": focus, "quirks": quirks, "car": self._car(key, name),
+            "supported": supported, "focus": focus, "fallbacks": fallbacks, "quirks": quirks, "car": self._car(key, name),
             "channels": channels, "stats": stats,
         }
 

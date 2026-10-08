@@ -100,7 +100,8 @@ class SerialPort:
         deadline = time.monotonic() + timeout
         buf = bytearray()
         while time.monotonic() < deadline:
-            chunk = self._ser.read(64)
+            # what is already buffered, else one byte: read(64) waited the whole 0.1 s timeout for any shorter reply
+            chunk = self._ser.read(self._ser.in_waiting or 1)
             if chunk:
                 buf += chunk
                 if b">" in buf:

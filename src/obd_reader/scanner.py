@@ -273,6 +273,10 @@ def scan(
     status = [p for p in parse_all(transport.send("0101"), 0x41) if len(p) >= 3 and p[1] == 0x01]
     if status:  # the lamp is on if any ECU commands it; each ECU counts its own codes
         mil = Mil(on=any(p[2] & 0x80 for p in status), dtc_count=sum(p[2] & 0x7F for p in status))
+        # a legacy ECU can answer Mode 03 NO DATA when no code is stored: with 0101 counting zero, that is "none"
+        if legacy and "stored" in dtcs.unanswered and mil.dtc_count == 0 and \
+                next((r.reply for r in transport.replies if r.cmd == "03"), None) == "no_data":
+            dtcs.unanswered.remove("stored")
     ignition, monitors = parse_readiness(status)
     undecoded = _undecoded(transport, supported.get("01", []), warnings)
     freeze_frame = _freeze_frame(transport) if dtcs.stored else None

@@ -73,3 +73,12 @@ def test_legacy_read_all_reads_every_listed_tid_and_nothing_else():
     tids, res = read_all_legacy(Transport(port))
     assert tids == ["02", "05", "0A", "0C", "0E"] and len(res) == 8
     assert port.unmatched == []
+
+
+def test_signed_uas_ids_read_value_and_limits_as_twos_complement():
+    # synthetic rows, UAS 0x83 (signed per J1979): -20 within [-200, 300]; -300 below -200; 0x0A stays unsigned
+    payload = bytes.fromhex("46" "31E683FFECFF38012C" "31E783FED4FF38012C" "31E80AFFEC0000FFFF")
+    res = parse_results(payload)
+    assert [(r.value, r.minimum, r.maximum, r.within_limits) for r in res] == [
+        (-20, -200, 300, True), (-300, -200, 300, False), (0xFFEC, 0, 0xFFFF, True)]
+    assert res[0].raw == (0xFFEC, 0xFF38, 0x012C) and res[2].raw is None

@@ -114,6 +114,10 @@ def _mode06(m) -> dict | None:
         wl = r.get("within_limits")
         out.append({"mid": ids[0], "tid": ids[1], "uasid": ids[2], "value": nums[0], "minimum": nums[1], "maximum": nums[2],
                     "within_limits": wl if isinstance(wl, bool) else None})
+        if "raw" in r:  # a signed UAS row's words as received (None otherwise); files from before it have no key
+            raw = r["raw"]
+            ok = isinstance(raw, list) and len(raw) == 3 and all(type(x) is int and 0 <= x <= 0xFFFF for x in raw)
+            out[-1]["raw"] = raw if ok else None
     return {"read": True, "note": None, "mids": [x for x in mids if isinstance(x, str) and _HEX2.fullmatch(x)], "results": out}
 
 

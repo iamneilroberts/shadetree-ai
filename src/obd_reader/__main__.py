@@ -275,7 +275,8 @@ def build_parser() -> argparse.ArgumentParser:
     co.add_argument("--port", default=None, help="adapter serial device (not needed with --demo)")
     co.add_argument("--protocol", default="0", help="ATSP value; 0 = automatic search (default), 2 = J1850 VPW")
     co.add_argument("--demo", action="store_true", help="use the built-in simulated car instead of an adapter; the page comes up idle and its Demo button starts the simulated run")
-    co.add_argument("--scenario", default="rich", choices=["healthy", "rich", "lean"], help="demo scenario")
+    co.add_argument("--scenario", default="rich", choices=["healthy", "rich", "lean"],
+                    help="demo scenario: healthy; rich = coolant sensor reads cold (P0118, open loop); lean = vacuum leak (P0171, P0174)")
     co.add_argument("--http-port", type=int, default=8765, help="local web port (0 = any free port)")
     co.add_argument("--host", default="127.0.0.1", help="bind address (non-loopback needs --allow-lan)")
     co.add_argument("--allow-lan", action="store_true", help="allow binding a non-loopback address")

@@ -13,7 +13,7 @@ class PidDef:
     name: str
     unit: str | None
     nbytes: int
-    decode: Callable[[bytes], float | int]
+    decode: Callable[[bytes], float | int | None]  # None: the reply says this reading is not present
     labels: dict[int, str] | None = None  # enumerated PIDs: value -> meaning (curated, unverified against J1979)
 
 
@@ -43,6 +43,13 @@ def _cat_temp(d: bytes) -> float:
 
 def _u32(d: bytes) -> int:
     return int.from_bytes(d[:4], "big")
+
+
+# Multi-sensor PIDs (J1979 layout [general knowledge, unverified]): byte A says which sensors are present (bit 0 is
+# sensor 1 / A), then each sensor's value. Only sensor 1 is decoded; a reply that marks it absent gives no value.
+# nbytes is what sensor 1 needs, not the whole reply, so a reply shorter than the full layout still reads.
+def _sensor1(scale: Callable[[bytes], float | int]) -> Callable[[bytes], float | int | None]:
+    return lambda d: scale(d[1:]) if d[0] & 1 else None
 
 
 _FUEL_SYSTEM = {1: "Open loop, engine cold", 2: "Closed loop", 4: "Open loop, load or decel",
@@ -108,6 +115,9 @@ _DEFS = [
     PidDef("5E", "fuel_rate", "L/h", 2, lambda d: _u16(d) / 20),
     PidDef("62", "actual_engine_torque", "%", 1, _torque_pct),
     PidDef("63", "engine_reference_torque", "Nm", 2, _u16),
+    PidDef("66", "maf_sensor_a", "g/s", 3, _sensor1(lambda d: round(_u16(d) / 32, 2))),
+    PidDef("67", "coolant_temp_sensor_1", "C", 2, _sensor1(_temp)),
+    PidDef("68", "intake_air_temp_sensor_1", "C", 2, _sensor1(_temp)),
     PidDef("8E", "engine_friction_torque", "%", 1, _torque_pct),
     PidDef("A6", "odometer", "km", 4, lambda d: _u32(d) / 10),
 ]
@@ -120,7 +130,8 @@ def decode_pid(pid: str, data: bytes) -> PidValue | None:
     if d is None or len(data) < d.nbytes:
         return None
     raw = data[: d.nbytes]
-    return PidValue(name=d.name, value=d.decode(raw), unit=d.unit, raw=raw.hex().upper())
+    value = d.decode(raw)
+    return None if value is None else PidValue(name=d.name, value=value, unit=d.unit, raw=raw.hex().upper())
 
 
 def pid_label(pid: str, value: float | int | None) -> str | None:

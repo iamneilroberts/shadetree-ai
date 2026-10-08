@@ -92,6 +92,13 @@ def test_vpw_codes_that_do_not_answer_are_unanswered_not_empty():
     assert snap.freeze_frame is None
 
 
+def test_vpw_mode03_no_data_is_no_stored_codes_only_when_0101_counts_zero():
+    none, _ = run(vpw_records(**{"03": ["NO DATA"], "0101": ["41 01 00 07 65 00"], "020200": None, "020000": None}))
+    assert none.dtcs.stored == [] and none.dtcs.unanswered == ["permanent"]
+    some, _ = run(vpw_records(**{"03": ["NO DATA"], "020200": None, "020000": None}))  # 0101 counts one code
+    assert some.dtcs.unanswered == ["stored", "permanent"]
+
+
 def test_vpw_mode09_identity_items_are_not_decoded_but_said_so():
     snap, port = run(vpw_records(**{"0900": ["49 00 01 55 40 00 00"]}))  # advertises 02, 04, 06, 08, 0A
     assert snap.mode09.cal_ids == [] and "0904" not in port.written

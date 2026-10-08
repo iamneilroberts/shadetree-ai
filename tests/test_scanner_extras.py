@@ -56,20 +56,21 @@ def test_advertised_pids_without_a_decoder_are_read_once_and_kept_raw():
 
 
 def test_ridgeline_bitmap_undecoded_pids_are_requested_and_nothing_else():
-    # Synthetic replies layered on the real bitmaps: 66 answers, 67 is refused, 41 answers from both ECUs.
-    extra = [{"tx": "0166", "rx": ["41 66 03 01 F4 01 E0"]}, {"tx": "0167", "rx": ["7F 01 12"]},
+    # Synthetic replies layered on the real bitmaps: 6C answers, 9D is refused, 41 answers from both ECUs.
+    # 66, 67 and 68 (multi-sensor MAF, coolant, intake air) are decoded now, so they are no longer listed here.
+    extra = [{"tx": "016C", "rx": ["41 6C 03 01 F4 01 E0"]}, {"tx": "019D", "rx": ["7F 01 12"]},
              {"tx": "0141", "rx": ["41 41 00 07 E5 00", "41 41 00 04 00 00"]}]
     snap, port = _scan_records(load_transcript(REAL) + extra, protocol="0")
-    expected = ["41", "66", "67", "68", "6C", "9D", "9E", "9F", "A3"]
+    expected = ["41", "6C", "9D", "9E", "9F", "A3"]
     assert [u.pid for u in snap.undecoded] == expected
     requested = [c for c in port.written if c.startswith("01") and c[2:] in PIDS]
     assert requested == []  # decodable PIDs are not read here; only the undecoded ones are
     assert port.written.count("0101") == 1  # status is read once, by the readiness step
     got = {u.pid: u for u in snap.undecoded}
-    assert got["66"].reply == "ok" and got["66"].raw == ["0301F401E0"]
-    assert got["67"].reply == "nrc:12" and got["67"].raw == []
+    assert got["6C"].reply == "ok" and got["6C"].raw == ["0301F401E0"]
+    assert got["9D"].reply == "nrc:12" and got["9D"].raw == []
     assert got["41"].raw == ["0007E500", "00040000"]
-    assert got["68"].reply == "adapter_error"  # not in the capture: replay answers "?"
+    assert got["9E"].reply == "adapter_error"  # not in the capture: replay answers "?"
 
 
 def test_undecoded_reads_are_capped_with_a_warning():

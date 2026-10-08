@@ -17,7 +17,7 @@ def test_manufacturer_specific_code_is_labelled_as_such():
 
 
 def test_every_code_the_demo_car_reports_is_described():
-    for code in ("P0117", "P0172", "P0175", "P0171", "P0174", "P0101"):
+    for code in ("P0118", "P0171", "P0174"):
         assert describe(code)["known"], code
 
 
@@ -25,3 +25,10 @@ def test_a_make_specific_meaning_applies_only_to_that_make():
     honda = describe("P1456", "Honda")
     assert honda["known"] and "Honda" in honda["desc"] and describe("P1456", "Acura") == honda
     assert describe("P1456")["known"] is False and describe("P1456", "Toyota")["known"] is False
+
+
+def test_sensor_circuit_low_reads_hot_and_high_reads_cold():
+    # thermistor sensors: low voltage = hot reading, high voltage (open circuit) = cold reading [general knowledge, unverified]
+    low, high = describe("P0117")["hint"].lower(), describe("P0118")["hint"].lower()
+    assert "hot" in low and "cold" not in low
+    assert "cold" in high and "hot" not in high and "open circuit" in high

@@ -2,8 +2,9 @@
 
 Layout (verified on a 2024 Ridgeline, 2026-09-30): `46` then repeated 9-byte groups
 `MID TID UASID VAL_H VAL_L MIN_H MIN_L MAX_H MAX_L`, so one reply can carry several tests
-and the MID repeats in each group. Values are raw integers: the UASID unit/scaling table
-is not applied.
+and the MID repeats in each group. Values are integers: the UASID unit/scaling table
+is not applied, but UAS IDs 80-FE are signed (two's complement) per J1979 [general knowledge, unverified],
+so their value and limits are read signed and the words as received are kept in `raw`.
 
 Legacy layout (seen on a J1850 VPW GMC truck, 2026-10-04): the support bitmap `0600` answers
 `46 00 FF <4 bitmap bytes> `, one filler byte before the bitmap (every TID it lists answered, none of the
@@ -27,6 +28,7 @@ class Mode06Result(BaseModel):
     minimum: int
     maximum: int
     within_limits: bool | None
+    raw: tuple[int, int, int] | None = None  # (value, min, max) unsigned as received; set only for a signed UAS ID
 
 
 class LegacyTestResult(BaseModel):
@@ -61,10 +63,12 @@ def parse_results(payload: bytes) -> list[Mode06Result]:
     body, out = payload[1:], []
     for i in range(0, len(body) - 8, 9):
         g = body[i : i + 9]
-        value, lo, hi = (int.from_bytes(g[a : a + 2], "big") for a in (3, 5, 7))
+        signed = 0x80 <= g[2] <= 0xFE
+        raw = tuple(int.from_bytes(g[a : a + 2], "big") for a in (3, 5, 7))
+        value, lo, hi = (int.from_bytes(g[a : a + 2], "big", signed=signed) for a in (3, 5, 7))
         out.append(Mode06Result(
             mid=f"{g[0]:02X}", tid=f"{g[1]:02X}", uasid=f"{g[2]:02X}", value=value, minimum=lo, maximum=hi,
-            within_limits=(lo <= value <= hi) if lo <= hi else None,
+            within_limits=(lo <= value <= hi) if lo <= hi else None, raw=raw if signed else None,
         ))
     return out
 

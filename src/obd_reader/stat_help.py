@@ -159,6 +159,14 @@ HELP = {
               "Very high readings can mean a misfire is dumping fuel into the exhaust."],
              "300-800 °C (570-1470 °F) once warm."),
 }
+# Multi-sensor PIDs: sensor 1 of each, the same reading on a car that reports these instead of 05, 0F or 10
+HELP["66"] = {**HELP["10"], "title": "Mass air flow (MAF), sensor A",
+              "measures": "Air entering the engine, in grams per second, from airflow sensor A (PID 66, for cars that "
+                          "report the multi-sensor layout instead of PID 10)."}
+HELP["67"] = {**HELP["05"], "title": "Coolant temperature, sensor 1",
+              "measures": "Engine coolant temperature from sensor 1 (PID 67, the multi-sensor layout of PID 05)."}
+HELP["68"] = {**HELP["0F"], "title": "Intake air temperature, sensor 1",
+              "measures": "Temperature of the air going into the engine, bank 1 sensor 1 (PID 68, the multi-sensor layout of PID 0F)."}
 
 MODE06 = {
     "o2_sensor": _e("Oxygen sensor monitor", "Tests how quickly and how far the oxygen sensors switch.",

@@ -66,3 +66,13 @@ def test_readings_added_for_the_ridgeline_decode_from_its_real_bytes():
     assert decode_pid("A6", bytes.fromhex("0012ADD6")).value == 122415.0
     assert decode_pid("55", bytes.fromhex("80")).value == 0
     assert pid_label("51", 1) == "Gasoline" and pid_label("03", 2) == "Closed loop" and pid_label("0C", 800) is None
+
+
+def test_multi_sensor_pids_read_sensor_1_and_honour_the_support_byte():
+    # synthetic replies in the J1979 layout [general knowledge, unverified]: byte A = sensors present, bit 0 = sensor 1
+    assert decode_pid("66", bytes.fromhex("01" "0190" "0000")).value == 12.5          # 400 / 32 g/s
+    assert decode_pid("67", bytes.fromhex("03" "80" "7F")).value == 88               # sensor 1 of two
+    assert decode_pid("68", bytes.fromhex("01" "41" "000000000000")).value == 25
+    assert decode_pid("68", bytes.fromhex("01" "41")).unit == "C"                    # sensor 1 needs only two bytes
+    for pid, data in (("66", "02" "0190" "0320"), ("67", "02" "00" "80"), ("68", "08" "00" "41")):
+        assert decode_pid(pid, bytes.fromhex(data)) is None, pid                     # only another sensor present

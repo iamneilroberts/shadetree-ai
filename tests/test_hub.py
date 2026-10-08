@@ -193,8 +193,8 @@ def _codes_after_start(tmp_path, scenario, sim=None):
 
 def test_state_carries_the_trouble_codes_with_descriptions(tmp_path):
     c = _codes_after_start(tmp_path, "rich")
-    assert [x["code"] for x in c["stored"]] == ["P0117", "P0172"]
-    assert [x["code"] for x in c["pending"]] == ["P0175"] and c["permanent"] == []
+    assert [x["code"] for x in c["stored"]] == ["P0118"]
+    assert c["pending"] == [] and [x["code"] for x in c["permanent"]] == ["P0118"]
     assert c["mil"] is True and c["stored"][0]["desc"] and c["stored"][0]["known"] is True
 
 
@@ -247,6 +247,20 @@ def test_legacy_protocol_reads_codes_with_the_legacy_layout(tmp_path):
     assert [c["code"] for c in codes["stored"]] == ["P0133"] and codes["pending"] == []
     assert codes["permanent"] == [] and "permanent" in codes["unanswered"]  # Mode 0A is never asked on VPW
     assert "03" in sim.sent and "0A" not in sim.sent
+
+
+@pytest.mark.parametrize("status, unanswered", [("41 01 00 07 65 04", ["permanent"]), ("41 01 81 07 65 04", ["permanent", "stored"]),
+                                                ("NO DATA", ["permanent", "stored", "mil"])])
+def test_legacy_mode03_no_data_with_a_zero_code_count_is_no_stored_codes(tmp_path, status, unanswered):
+    # synthetic VPW replies: Mode 03 says NO DATA; only a 0101 count of zero turns that into "none stored"
+    sim = _sim_with({"ATDP": "SAE J1850 VPW\r", "03": "NO DATA\r", "07": "47 00 00 00 00 00 00\r", "0101": status + "\r"})
+    hub, _, _ = make(tmp_path, sim=None, port_factory=lambda: sim)
+    hub._sim = None
+    hub.start(DEFAULT_PIDS, hz=10, seconds=30)
+    assert wait_for(lambda: hub.state()["codes"].get("unanswered") is not None)
+    codes = hub.state()["codes"]
+    hub.stop()
+    assert codes["stored"] == [] and codes["unanswered"] == unanswered
 
 
 class _NoMapSim(SimPort):
@@ -744,16 +758,17 @@ def test_capture_all_polls_the_fast_tier_every_sweep_and_rotates_every_other_sup
     hub = _capture_run(tmp_path)
     assert wait_for(lambda: hub.state()["tiers"] is not None)
     tiers = hub.state()["tiers"]
-    assert tiers["fast"] == FAST_PIDS == ["0C", "0D", "04", "11"] and tiers["slow_per_sweep"] == 1
-    assert 16 <= len(tiers["slow"]) <= 26 and not set(tiers["slow"]) & set(FAST_PIDS)
-    assert {"05", "06", "07", "42", "3C", "5C", "46"} <= set(tiers["slow"]), "every supported reading, not just the 8 defaults"
+    # the demo car mirrors the Ridgeline: 45 decodable slow PIDs at 10 Hz is ceil(45 x 0.25 / 10) = 2 a sweep
+    assert tiers["fast"] == FAST_PIDS == ["0C", "0D", "04", "11"] and tiers["slow_per_sweep"] == 2
+    assert len(tiers["slow"]) == 45 and not set(tiers["slow"]) & set(FAST_PIDS)
+    assert {"05", "06", "07", "42", "3C", "66", "67", "68"} <= set(tiers["slow"]), "every supported reading, not just the 8 defaults"
     assert wait_for(lambda: all(hub.state()["stats"].get(p) for p in tiers["slow"]), secs=10), "every slow PID gets read"
     hub.stop()
     st, sweeps = hub.state(), hub.state()["seq"]
     assert set(st["channels"]) == set(tiers["fast"]) | set(tiers["slow"])
     n = {p: st["stats"][p]["n"] for p in st["channels"]}
     assert all(n[p] == sweeps for p in FAST_PIDS), "fast tier: one sample per sweep"
-    per_slow = sweeps / len(tiers["slow"])
+    per_slow = sweeps * tiers["slow_per_sweep"] / len(tiers["slow"])
     assert all(n[p] <= per_slow + 1 for p in tiers["slow"]), n
     assert max(n[p] for p in tiers["slow"]) < min(n[p] for p in FAST_PIDS) / 4
 
@@ -783,16 +798,16 @@ def test_capture_min_reads_only_the_core_pids_and_the_supported_focus_pids_every
     sent, orig = [], sim.write
     sim.write = lambda data: (sent.append(data.decode("ascii").rstrip("\r")), orig(data))[1]
     hub, _, _ = make(tmp_path, sim=sim)
-    hub.set_focus(["0F", "3E", "5C", "0C"])  # 0F: not in this car's bitmap; 0C: already core
+    hub.set_focus(["14", "3D", "2E", "0C"])  # 14: not in this car's bitmap (and no fallback); 0C: already core
     hub.start(DEFAULT_PIDS, hz=10, seconds=30, capture="min")
     assert wait_for(lambda: hub.state()["seq"] >= 4)
     st = hub.state()
-    assert st["extras"] == ["3E", "5C"] and set(st["channels"]) == set(DEFAULT_PIDS) | {"3E", "5C"}
-    assert wait_for(lambda: hub.state()["stats"]["5C"]["n"] >= 3), "focus PIDs are read every sweep, not rotated"
+    assert st["extras"] == ["3D", "2E"] and set(st["channels"]) == set(DEFAULT_PIDS) | {"3D", "2E"}
+    assert wait_for(lambda: hub.state()["stats"]["2E"]["n"] >= 3), "focus PIDs are read every sweep, not rotated"
     hub.set_focus([])  # the old focus-only PIDs are dropped on the next sweep
     assert wait_for(lambda: hub.state()["extras"] == [])
     hub.stop()
-    rotating = {"01" + p for p in EXTRA_PIDS if p not in DEFAULT_PIDS} - {"013E", "015C"}
+    rotating = {"01" + p for p in EXTRA_PIDS if p not in DEFAULT_PIDS} - {"013D", "012E"}
     assert not rotating & set(sent), "no rotating extras"
 
 
@@ -909,7 +924,7 @@ def test_no_answer_to_any_code_request_is_not_read_and_the_lamp_is_unknown(tmp_p
 def test_one_unanswered_list_is_named_and_the_answered_ones_are_kept(tmp_path):
     st = _state_when(tmp_path, _SilentSim("rich", ["07"]), lambda s: s["codes"]["read"])
     c = st["codes"]
-    assert c["unanswered"] == ["pending"] and c["pending"] == [] and [x["code"] for x in c["stored"]] == ["P0117", "P0172"]
+    assert c["unanswered"] == ["pending"] and c["pending"] == [] and [x["code"] for x in c["stored"]] == ["P0118"]
     assert c["mil"] is True
 
 
@@ -949,14 +964,14 @@ def test_a_scenario_chosen_mid_run_gets_its_supported_pids_read_and_never_one_th
     hub, _, _ = make(tmp_path, sim=sim)
     hub.start(DEFAULT_PIDS, hz=10, seconds=30)
     assert wait_for(lambda: hub.state()["seq"] >= 3)
-    assert "3E" not in hub.state()["extras"]  # not one of the default extras on this car
-    hub.set_focus(["0F", "3e", "5C", "0C"])  # 0F: not in this car's bitmap; 0C: already a core channel
-    assert wait_for(lambda: hub.state()["channels"].get("3E", {}).get("samples"))
+    assert "3D" not in hub.state()["extras"]  # not one of the default extras on this car
+    hub.set_focus(["14", "3d", "2E", "0C"])  # 14: not in this car's bitmap; 0C: already a core channel
+    assert wait_for(lambda: hub.state()["channels"].get("3D", {}).get("samples"))
     st = hub.state()
     hub.stop()
-    assert st["focus"] == ["0F", "3E", "5C", "0C"] and st["extras"][:2] == ["3E", "5C"] and len(DEFAULT_PIDS) + len(st["extras"]) <= 16
-    assert "0F" not in st["supported"] and "3E" in st["supported"] and "0F" not in st["channels"]
-    assert "010F" not in sent, "a PID the car does not list is never asked for"
+    assert st["focus"] == ["14", "3D", "2E", "0C"] and st["extras"][:2] == ["3D", "2E"] and len(DEFAULT_PIDS) + len(st["extras"]) <= 16
+    assert "14" not in st["supported"] and "3D" in st["supported"] and "14" not in st["channels"]
+    assert "0114" not in sent, "a PID the car does not list is never asked for"
 
 
 @pytest.mark.parametrize("bad", ["0C", ["0C\r04"], ["ATZ"], [5], [f"{i:02X}" for i in range(9)]])
@@ -969,11 +984,12 @@ def test_focus_takes_only_a_short_list_of_hex_pids(tmp_path, bad):
 def test_readiness_and_freeze_frame_are_read_once_with_the_codes_and_carried_in_state(tmp_path):
     st = _state_when(tmp_path, SimPort("rich"), lambda s: s["freeze_frame"]["read"])
     r, ff = st["readiness"], st["freeze_frame"]
-    assert r["read"] is True and r["mil"] is True and r["dtc_count"] == 2 and r["ignition"] == "spark"
+    assert r["read"] is True and r["mil"] is True and r["dtc_count"] == 1 and r["ignition"] == "spark"
     assert r["monitors"]["evap"] == {"supported": True, "complete": False} and r["monitors"]["catalyst"]["complete"] is True
     assert r["monitors"]["secondary_air"] == {"supported": False, "complete": None}
-    assert ff["dtc"] == "P0117" and ff["pids"]["05"]["value"] == 38 and ff["pids"]["05"]["unit"] == "C"
-    assert ff["pids"]["03"]["label"] == "Open loop, engine cold"
+    # the cold-reading sensor's frame: -40 C, open loop "engine cold", no short-term correction, normal long-term trim
+    assert ff["dtc"] == "P0118" and ff["pids"]["05"]["value"] == -40 and ff["pids"]["05"]["unit"] == "C"
+    assert ff["pids"]["03"]["label"] == "Open loop, engine cold" and ff["pids"]["06"]["value"] == 0 and abs(ff["pids"]["07"]["value"]) < 5
 
 
 def test_no_stored_code_means_no_freeze_frame_request_and_it_says_so(tmp_path):
@@ -996,7 +1012,7 @@ def test_saved_run_replays_readiness_and_freeze_frame_and_an_old_file_says_not_i
     hub2, _, _ = make(tmp_path)
     hub2.start_replay(load_run(data), "a.json", playing=False)
     st = hub2.state()
-    assert st["readiness"] == data["readiness"] and st["freeze_frame"] == data["freeze_frame"] and st["freeze_frame"]["dtc"] == "P0117"
+    assert st["readiness"] == data["readiness"] and st["freeze_frame"] == data["freeze_frame"] and st["freeze_frame"]["dtc"] == "P0118"
     hub2.start_replay(load_run(_run_obj()), "old.json", playing=False)
     st = hub2.state()
     assert st["readiness"] == st["freeze_frame"] == {"read": False, "note": "not in this recording"}
@@ -1039,3 +1055,28 @@ def test_legacy_protocol_reads_mode06_with_the_one_limit_layout(tmp_path):
     assert m["layout"] == "legacy" and m["mids"] == ["02"]
     assert m["results"] == [{"tid": "02", "component": "50", "value": 0x8003, "limit": 0x806E, "limit_type": "min"},
                             {"tid": "02", "component": "0A", "value": 0x10, "limit": 0x5AA, "limit_type": "max"}]
+
+
+def test_a_car_without_0f_10_or_05_gets_the_multi_sensor_fallbacks_and_never_the_missing_pid(tmp_path, monkeypatch):
+    import obd_reader.simulator as simulator
+    sim = SimPort("healthy")  # mirrors the Ridgeline: no 0F or 10; 66, 67 and 68 advertised
+    sent, orig = [], sim.write
+    sim.write = lambda data: (sent.append(data.decode("ascii").rstrip("\r")), orig(data))[1]
+    hub, _, _ = make(tmp_path, sim=sim)
+    hub.start(DEFAULT_PIDS, hz=10, seconds=30)
+    assert wait_for(lambda: hub.state()["seq"] >= 2)
+    assert hub.state()["extras"][:8] == ["04", "11", "0D", "0E", "43", "44", "68", "66"]  # in the 0F and 10 slots
+    hub.set_focus(["0F", "10", "05"])  # a coolant / IAT / MAF scenario: 05 is supported, so it keeps its own PID
+    assert wait_for(lambda: hub.state()["fallbacks"] == {"0F": "68", "10": "66"})
+    assert wait_for(lambda: hub.state()["channels"].get("66", {}).get("samples"))
+    hub.stop()
+    assert "010F" not in sent and "0110" not in sent
+    # a car whose bitmap lacks 05: the core coolant channel's fallback 67 leads the extras
+    monkeypatch.setattr(simulator, "ECU2_PIDS", simulator.ECU2_PIDS - {"05"})
+    monkeypatch.setattr(simulator, "SUPPORTED", simulator.SUPPORTED - {"05"})
+    hub2, _, _ = make(tmp_path, sim=SimPort("healthy"))
+    hub2.start(DEFAULT_PIDS, hz=10, seconds=30)
+    assert wait_for(lambda: hub2.state()["seq"] >= 2)
+    st = hub2.state()
+    hub2.stop()
+    assert st["extras"][0] == "67" and st["fallbacks"] == {"05": "67"}
