@@ -633,6 +633,18 @@ def test_d_scope_knob_sits_on_a_plate_under_the_crt_at_every_width():
         assert "'" + k + "'" in js, k
 
 
+def test_d2_domes_keep_their_proportions_and_white_labels_are_not_tiny():
+    css = _css()
+    assert re.search(r"\.dd \.rf \{ aspect-ratio: 200 / 120;", css), "a dome is 200 x 120 (its window about 1.8:1, as on the reference tester)"
+    assert "aspect-ratio: 320" not in css and re.search(r"\.dd \.drects > \.w \{[^}]*justify-self: center; width: min\(100%, 300px\);", css), "a lone dome is centred at a capped width, never stretched"
+    js = re.search(r"<script>(.*?)</script>", HTML, re.S).group(1)
+    assert "M8 114V61A108.3 108 0 0 1 192 61V114Z" in js, "the dome window: flat bottom, arched top"
+    # every white type on the red panels is at least 10 px (names 11-12 px, values 16 px)
+    sizes = {s: int(m.group(1)) for _, ss, b in _d_rules() for s in ss for m in [re.search(r"font: \d+ (\d+)(?:\.\d+)?px", b)] if m}
+    for sel, least in ((".dd .sk", 12), (".dd .val", 16), ("#d_knob .r-opt", 11), (".dd .sec h5", 11), (".dd .lb", 10), (".dd .pls small", 10), ("#d_stat .lampbox", 11), ("#d_stat .sumbar", 13)):
+        assert sizes[sel] >= least, (sel, sizes[sel])
+
+
 def test_d_phone_layout_stacks_the_panels():
     phone = {s: " ".join(b.split()) for m, ss, b in _d_rules() if m == "(max-width: 600px)" for s in ss}
     assert "grid-template-columns: 1fr;" in phone[".dd .dfc"] and ".dd .dlow" in phone and ".dd .dalu" in phone, "one column on a phone"

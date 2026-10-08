@@ -228,22 +228,22 @@
   .dd .dline { display: flex; align-items: center; justify-content: center; padding: 0 16px; border-radius: 4px; font: 700 23px/1 Georgia, "Times New Roman", serif; letter-spacing: .16em; text-transform: uppercase;
     box-shadow: inset 0 0 0 2px rgba(255,255,255,.8); text-shadow: 0 2px 0 rgba(0,0,0,.35); }
   /* the face: enamel panels with dark seams */
-  .dd .dfc { display: grid; grid-template-columns: minmax(0, 1.12fr) minmax(0, 1.5fr) minmax(0, .66fr); gap: 3px; padding: 3px; border-radius: 6px; background: var(--d-seam); box-shadow: inset 0 0 0 1px #000, 0 1px 0 rgba(255,255,255,.35); }
+  .dd .dfc { display: grid; grid-template-columns: minmax(0, 1.12fr) minmax(0, 1.3fr) minmax(0, .8fr); gap: 3px; padding: 3px; border-radius: 6px; background: var(--d-seam); box-shadow: inset 0 0 0 1px #000, 0 1px 0 rgba(255,255,255,.35); }
   .dd .pnl { position: relative; min-width: 0; padding: 16px 16px 14px; background: radial-gradient(120% 60% at 50% 0%, rgba(255,255,255,.08), transparent 60%), linear-gradient(180deg, var(--d-r1) 0%, var(--d-r2) 45%, var(--d-r3) 100%);
     box-shadow: inset 0 1px 0 rgba(255,255,255,.3), inset 0 -1px 0 rgba(0,0,0,.25); }
   .dd .full { grid-column: 1 / -1; }
-  .dd .sk { font: 700 9.5px/1.25 var(--d-lab); letter-spacing: .2em; text-transform: uppercase; color: var(--d-white); text-shadow: 0 1px 0 rgba(0,0,0,.3); }
-  .dd .sk small { display: block; font-weight: 400; letter-spacing: .06em; font-size: 9px; text-transform: none; color: var(--d-ink2); }
-  .dd .val { font: 700 12px/1 var(--d-mono); white-space: nowrap; color: var(--d-white); text-shadow: 0 1px 0 rgba(0,0,0,.3); }
-  .dd .val small { font: 700 8.5px var(--d-lab); letter-spacing: .12em; margin-left: 3px; color: var(--d-ink2); }
+  .dd .sk { font: 700 12px/1.25 var(--d-lab); letter-spacing: .16em; text-transform: uppercase; color: var(--d-white); text-shadow: 0 1px 0 rgba(0,0,0,.3); }
+  .dd .sk small { display: block; font-weight: 400; letter-spacing: .06em; font-size: 11px; text-transform: none; color: var(--d-ink2); }
+  .dd .val { font: 700 16px/1 var(--d-mono); white-space: nowrap; color: var(--d-white); text-shadow: 0 1px 0 rgba(0,0,0,.3); }
+  .dd .val small { font: 700 11px var(--d-lab); letter-spacing: .12em; margin-left: 3px; color: var(--d-ink2); }
   .dd .q { width: 18px; height: 18px; flex: none; font-size: 11px; line-height: 16px; padding: 0; border-color: var(--d-ink2); background: transparent; color: var(--d-white); }
   /* status strip: the summary in silkscreen and the jewel lamps */
   #d_stat { display: flex; align-items: center; flex-wrap: wrap; gap: 12px 28px; padding: 12px 18px; }
-  #d_stat .sumbar { display: block; flex: 1 1 360px; margin: 0; padding: 0; background: none; border: 0; color: var(--d-white); font: 700 11.5px/1.5 var(--d-lab); letter-spacing: .14em; text-transform: uppercase; text-shadow: 0 1px 0 rgba(0,0,0,.35); }
+  #d_stat .sumbar { display: block; flex: 1 1 360px; margin: 0; padding: 0; background: none; border: 0; color: var(--d-white); font: 700 13.5px/1.5 var(--d-lab); letter-spacing: .14em; text-transform: uppercase; text-shadow: 0 1px 0 rgba(0,0,0,.35); }
   #d_stat .sumbar span + span::before { content: "\00a0\00b7\00a0"; } #d_stat .sumbar span:last-child { display: none; } #d_stat .sumbar .on { color: var(--d-hot); }
   #d_stat .lamps { display: flex; flex-wrap: wrap; gap: 8px 14px; margin: 0; }
-  #d_stat .lampbox { flex-direction: column; justify-content: flex-start; gap: 9px; width: 84px; padding: 0; background: none; text-align: center; color: var(--d-white); font: 700 9.5px/1.2 var(--d-lab); letter-spacing: .1em; text-transform: uppercase; }
-  #d_stat .lampbox em { margin-top: 3px; font: 400 10px/1.2 var(--d-lab); letter-spacing: .03em; text-transform: none; color: var(--d-ink2); opacity: 1; }
+  #d_stat .lampbox { flex-direction: column; justify-content: flex-start; gap: 9px; width: 96px; padding: 0; background: none; text-align: center; color: var(--d-white); font: 700 11px/1.2 var(--d-lab); letter-spacing: .1em; text-transform: uppercase; }
+  #d_stat .lampbox em { margin-top: 3px; font: 600 11px/1.2 var(--d-lab); letter-spacing: .03em; text-transform: none; color: var(--d-ink2); opacity: 1; }
   #d_stat .lens { --lc: var(--d-lens-r); width: 24px; height: 24px; border: 0; background: radial-gradient(circle at 38% 34%, color-mix(in srgb, var(--lc) 55%, var(--d-white)) 0, color-mix(in srgb, var(--lc) 40%, #000) 32%, color-mix(in srgb, var(--lc) 15%, #000) 85%);
     box-shadow: inset 0 -4px 6px rgba(0,0,0,.55), 0 0 0 3px var(--d-alu-ink), 0 0 0 5px var(--d-lens-rim), 0 0 0 6px var(--d-lens-rim2), 0 2px 4px 6px rgba(0,0,0,.5); }
   #d_stat .lens.grn { --lc: var(--d-lens-g); } #d_stat .lens.amb { --lc: var(--d-lens-a); }
@@ -267,11 +267,11 @@
   .dd .cr { position: absolute; left: 12px; top: 9px; max-width: calc(100% - 24px); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font: 700 10.5px/1 var(--d-mono); letter-spacing: .12em; text-transform: uppercase; color: var(--d-white); text-shadow: 0 0 4px rgba(255,255,255,.7); }
   .dd .cr.r { left: auto; right: 12px; } .dd .cr.b { top: auto; bottom: 9px; }
   /* the SCOPE plate: the test selector knob under the hood, its positions silkscreened round it (placed by the script) */
-  .dd .scp { position: relative; height: 116px; margin-top: 12px; border-radius: 5px; background: linear-gradient(180deg, var(--d-p1), var(--d-p2) 60%, var(--d-p3)); box-shadow: inset 0 0 0 1px var(--d-seam), inset 0 1px 0 rgba(255,255,255,.16), 0 1px 0 rgba(255,255,255,.2); }
+  .dd .scp { position: relative; height: 136px; margin-top: 12px; border-radius: 5px; background: linear-gradient(180deg, var(--d-p1), var(--d-p2) 60%, var(--d-p3)); box-shadow: inset 0 0 0 1px var(--d-seam), inset 0 1px 0 rgba(255,255,255,.16), 0 1px 0 rgba(255,255,255,.2); }
   .dd .scp > .sk { position: absolute; left: 11px; top: 9px; }
   #d_knob, #d_knob > div { position: absolute; inset: 0; }
   #d_knob .dt { position: absolute; left: 50%; bottom: 36px; width: 2px; height: 43px; margin-left: -1px; transform-origin: 50% 100%; transform: rotate(var(--a)); background: linear-gradient(to top, transparent 34px, var(--d-white) 34px); opacity: .9; }
-  #d_knob .r-opt { position: absolute; padding: 3px 2px; font: 700 8px/1 var(--d-lab); letter-spacing: .12em; text-transform: uppercase; white-space: nowrap; color: var(--d-ink2); text-shadow: 0 1px 0 rgba(0,0,0,.3); cursor: pointer; }
+  #d_knob .r-opt { position: absolute; padding: 3px 2px; font: 700 11px/1 var(--d-lab); letter-spacing: .12em; text-transform: uppercase; white-space: nowrap; color: var(--d-ink2); text-shadow: 0 1px 0 rgba(0,0,0,.3); cursor: pointer; }
   #d_knob .r-opt[aria-checked="true"] { color: var(--d-white); text-shadow: 0 0 6px rgba(255,255,255,.6), 0 1px 0 rgba(0,0,0,.3); }
   #d_knob .r-opt:focus-visible, .dd .pbn:focus-visible, .dd .ltest:focus-visible { outline: 2px solid var(--d-white); outline-offset: 2px; }
   .dd .kn { position: relative; display: block; width: 40px; height: 40px; border-radius: 50%; transform: rotate(var(--a, 0deg)); background: radial-gradient(circle at 36% 30%, var(--d-kn1), var(--d-kn2) 52%, var(--d-kn3) 100%);
@@ -281,31 +281,35 @@
   #d_knob .kn { position: absolute; left: 50%; bottom: 11px; width: 50px; height: 50px; margin-left: -25px; cursor: pointer; transition: transform .3s; }
   @media (prefers-reduced-motion: reduce) { #d_knob .kn { transition: none; } }
   /* meters: rectangular cream faces in thick black frames, and round gauges; a slot with no reading stays dark */
-  .dd .drects { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 18px; align-content: space-evenly; }
-  .dd .dround { display: flex; flex-direction: column; gap: 12px; justify-content: space-evenly; }
+  .dd .drects { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 18px; align-content: space-evenly; }
+  .dd .drects > .w { grid-column: 1 / -1; justify-self: center; width: min(100%, 300px); }   /* a lone dome keeps its proportions: centred, never stretched */
+  .dd .dround { display: flex; flex-direction: column; gap: 12px; justify-content: space-evenly; } .dd .rnd { width: 100%; max-width: 224px; margin: 0 auto; }
   .dd .rm { position: relative; padding: 9px; border-radius: 7px; background: linear-gradient(180deg, var(--d-blk1), var(--d-blk2) 50%, var(--d-blk3));
     box-shadow: inset 0 1px 0 rgba(255,255,255,.14), inset 0 -1px 0 #000, 0 0 0 1px #000, 0 1px 0 2px rgba(255,255,255,.2), 0 4px 8px rgba(0,0,0,.45); }
   .dd .rf, .dd .face { position: relative; overflow: hidden; box-shadow: inset 0 4px 10px rgba(0,0,0,.45), inset 0 0 0 1px rgba(0,0,0,.6); }
-  .dd .rf { aspect-ratio: 200 / 140; border-radius: 3px; background: radial-gradient(120% 120% at 50% 110%, var(--d-face1), var(--d-face2) 70%, var(--d-face3)); }
-  .dd .rf::after, .dd .face::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(160deg, rgba(255,255,255,.45) 0%, rgba(255,255,255,.1) 28%, rgba(255,255,255,0) 42%); }
-  .dd .rnd .rm { padding: 10px; } .dd .meter { max-width: 170px; margin: 0 auto; padding: 6%; aspect-ratio: 1 / 1; border-radius: 50%; background: linear-gradient(160deg, var(--d-ring1), var(--d-ring2) 60%, var(--d-ring3)); box-shadow: 0 4px 10px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.18), 0 0 0 1px #000; }
+  .dd .rf { aspect-ratio: 200 / 120; border-radius: 3px; background: linear-gradient(180deg, var(--d-blk3), var(--d-blk2) 55%, var(--d-blk1)); }   /* a dome's black glass; the cream window is drawn in the SVG */
+  .dd .face::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(160deg, rgba(255,255,255,.45) 0%, rgba(255,255,255,.1) 28%, rgba(255,255,255,0) 42%); }
+  .dd .rf::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(160deg, rgba(255,255,255,.16) 0%, rgba(255,255,255,.04) 26%, rgba(255,255,255,0) 40%); }
+  .dd .rnd .rm { padding: 10px; } .dd .meter { margin: 0 auto; padding: 6%; aspect-ratio: 1 / 1; border-radius: 50%; background: linear-gradient(160deg, var(--d-ring1), var(--d-ring2) 60%, var(--d-ring3)); box-shadow: 0 4px 10px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.18), 0 0 0 1px #000; }
   .dd .face { width: 100%; height: 100%; border-radius: 50%; background: radial-gradient(100% 100% at 50% 100%, var(--d-white), var(--d-rface) 80%); }
   .dd .rf svg, .dd .face svg { position: absolute; inset: 0; width: 100%; height: 100%; }
-  .dd .dm.dark .rf, .dd .dm.dark .face { background: var(--d-blk2); box-shadow: inset 0 4px 10px rgba(0,0,0,.9); } .dd .dm.dark .rf::after, .dd .dm.dark .face::after { opacity: .15; }
+  .dd .dm.dark .face { background: var(--d-blk2); box-shadow: inset 0 4px 10px rgba(0,0,0,.9); } .dd .dm.dark .rf::after, .dd .dm.dark .face::after { opacity: .15; }
   .dd .dm.stale svg { opacity: .45; }
   .dd .dm svg .tk { stroke: var(--d-face-ink); stroke-width: 2; } .dd .dm svg .tm { stroke: var(--d-face-ink); stroke-width: 1; opacity: .8; }
   .dd .dm svg .rim { fill: none; stroke: var(--d-out); stroke-width: 1.8; }
   .dd .dm svg .bd { fill: none; stroke-width: 7; } .dd .dm svg .bd.ok { stroke: var(--d-ok); } .dd .dm svg .bd.watch { stroke: var(--d-watch); } .dd .dm svg .bd.out { stroke: var(--d-out); }
   .dd .dm svg text { fill: var(--d-face-ink); font: 700 12px var(--d-lab); text-anchor: middle; dominant-baseline: middle; }
-  .dd .dm svg text.lab { fill: var(--d-face-red); font-size: 8.5px; letter-spacing: .16em; } .dd .dm svg text.bv { font: 700 30px var(--d-mono); } .dd .dm svg text.bv.sm { font-size: 12px; }
-  .dd .rnd svg text { font-size: 15px; } .dd .rnd svg text.lab { font-size: 10px; }
+  .dd .dm svg text.lab { fill: var(--d-face-red); font-size: 9px; letter-spacing: .14em; } .dd .dm svg text.s { font-size: 8px; } .dd .dm svg .bd.in { stroke-width: 5; }
+  .dd .dm svg .ie { fill: none; stroke: #000; stroke-width: 9; opacity: .28; } .dd .dm svg .gg { fill: none; stroke-width: 7; stroke-linecap: round; }
+  .dd .dm .f1 { stop-color: var(--d-face1); } .dd .dm .f2 { stop-color: var(--d-face2); } .dd .dm .f3 { stop-color: var(--d-face3); } .dd .dm .g1 { stop-color: var(--d-white); stop-opacity: .7; } .dd .dm .g2 { stop-color: var(--d-white); stop-opacity: 0; } .dd .dm svg text.bv { font: 700 30px var(--d-mono); } .dd .dm svg text.bv.sm { font-size: 12px; }
+  .dd .rnd svg text { font-size: 14px; } .dd .rnd svg text.lab { font-size: 10px; } .dd .rf svg text { font-size: 11px; }
   .dd .dm svg .ndl { fill: var(--d-needle); filter: drop-shadow(0 2px 1.5px rgba(0,0,0,.5)); }
-  .dd .dm svg .hub { fill: var(--d-script); stroke: var(--d-hub-bd); stroke-width: 1.5; } .dd .dm svg .hub2 { fill: var(--d-white); }
-  .dd .mu { display: flex; justify-content: space-between; align-items: center; gap: 6px 8px; margin-top: 8px; padding: 0 2px; }
+  .dd .dm svg .hub { fill: var(--d-script); stroke: var(--d-hub-bd); stroke-width: 1.5; } .dd .dm svg .hub2 { fill: var(--d-white); } .dd .dm .rf svg .hub { fill: var(--d-blk3); stroke: var(--d-kn-ring); }
+  .dd .mu { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 6px 8px; margin-top: 8px; padding: 0 2px; }
   .dd .mu .sk { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .dd .rnd .mu, .dd .mid .mu { justify-content: center; flex-wrap: wrap; }
   .dd .pls { display: flex; gap: 5px; align-items: center; }
-  .dd .pls small { font: 700 7.5px/1 var(--d-lab); letter-spacing: .1em; text-transform: uppercase; color: var(--d-ink2); }
+  .dd .pls small { font: 700 10px/1 var(--d-lab); letter-spacing: .1em; text-transform: uppercase; color: var(--d-ink2); }
   .dd .pl { flex: none; width: 18px; height: 9px; border-radius: 2px; background: linear-gradient(180deg, var(--d-pl1), var(--d-pl2)); box-shadow: 0 0 7px var(--d-pl-glow), inset 0 0 0 1px rgba(0,0,0,.6), 0 0 0 1px rgba(0,0,0,.5); }
   .dd .pl.off { background: linear-gradient(180deg, var(--d-pl-off1), var(--d-pl-off2)); box-shadow: inset 0 0 0 1px rgba(0,0,0,.6), 0 0 0 1px rgba(0,0,0,.5); }
   .dd .pl.a { background: linear-gradient(180deg, var(--d-pa1), var(--d-pa2)); box-shadow: 0 0 7px var(--d-pa-glow), inset 0 0 0 1px rgba(0,0,0,.6), 0 0 0 1px rgba(0,0,0,.5); }
@@ -317,14 +321,14 @@
     background-blend-mode: overlay, normal; box-shadow: inset 0 1px 0 rgba(255,255,255,.8), inset 0 -1px 0 rgba(0,0,0,.4), 0 0 0 1px var(--d-alu-edge); }
   .dd .sec { position: relative; min-width: 0; padding: 10px 14px 12px; border-right: 1px solid var(--d-sep); box-shadow: inset 1px 0 0 rgba(255,255,255,.7); }
   .dd .sec:last-child { border-right: 0; }
-  .dd .sec h5 { margin: 0 0 8px; font: 700 8.5px/1 var(--d-lab); letter-spacing: .24em; text-transform: uppercase; color: var(--d-alu-ink); }
+  .dd .sec h5 { margin: 0 0 10px; font: 700 11px/1 var(--d-lab); letter-spacing: .2em; text-transform: uppercase; color: var(--d-alu-ink); }
   .dd .cl { display: flex; gap: 10px 14px; align-items: flex-end; flex-wrap: wrap; }
   .dd .sec.fn { display: flex; flex-direction: column; } .dd .sec.fn .cl { flex: 1; flex-wrap: nowrap; align-items: center; justify-content: space-between; gap: 8px; }
-  .dd .lb { font: 700 7.5px/1.2 var(--d-lab); letter-spacing: .12em; text-transform: uppercase; color: var(--d-alu-ink); text-align: center; }
+  .dd .lb { font: 700 10px/1.2 var(--d-lab); letter-spacing: .12em; text-transform: uppercase; color: var(--d-alu-ink); text-align: center; }
   .dd .pbn, .dd .ltest { appearance: none; display: flex; flex-direction: column; align-items: center; gap: 5px; margin: 0; padding: 0; border: 0; background: none; cursor: pointer; white-space: nowrap;
-    font: 700 7.5px/1.2 var(--d-lab); letter-spacing: .1em; text-transform: uppercase; color: var(--d-alu-ink); }
+    font: 700 10px/1.2 var(--d-lab); letter-spacing: .08em; text-transform: uppercase; color: var(--d-alu-ink); }
   .dd .pbn i, .dd .ltest i { display: block; width: 26px; height: 17px; border-radius: 3px; background: linear-gradient(180deg, var(--d-key1), var(--d-key2)); box-shadow: inset 0 1px 0 var(--d-white), inset 0 -1px 0 rgba(0,0,0,.25), 0 3px 0 var(--d-key3), 0 4px 4px rgba(0,0,0,.45); }
-  .dd .sec.fn .pbn { font-size: 8px; letter-spacing: .08em; gap: 7px; } .dd .sec.fn .pbn i { width: 38px; height: 24px; }
+  .dd .sec.fn .pbn { font-size: 10px; letter-spacing: .04em; gap: 7px; } .dd .sec.fn .pbn i { width: 38px; height: 24px; }
   .dd .pbn.on i, .dd .pbn:active i, .dd .ltest:active i, .dd:has(.lamp-test) .ltest i { transform: translateY(2px); background: linear-gradient(180deg, var(--d-on1), var(--d-on2)); box-shadow: inset 0 1px 0 rgba(255,255,255,.7), 0 1px 0 var(--d-on3), 0 1px 2px rgba(0,0,0,.45), 0 0 8px var(--d-on-glow); }
   .dd .pbn.red i { background: linear-gradient(180deg, var(--d-red1), var(--d-r2)); box-shadow: inset 0 1px 0 rgba(255,255,255,.5), inset 0 -1px 0 rgba(0,0,0,.25), 0 3px 0 var(--d-red3), 0 4px 4px rgba(0,0,0,.45); }
   .dd .pbn.blk i { background: linear-gradient(180deg, var(--d-dk1), var(--d-dk2)); box-shadow: inset 0 1px 0 rgba(255,255,255,.3), 0 3px 0 var(--d-dk3), 0 4px 4px rgba(0,0,0,.45); }
@@ -336,13 +340,13 @@
   .dd .sl[data-v="std"] .tr::after { left: 23px; } .dd .sl[data-v="max"] .tr::after { left: 44px; }
   .dd .sl .pos { display: flex; justify-content: space-between; width: 72px; }
   .dd .sl .pbn { padding: 2px 1px; color: var(--d-alu-ink2); } .dd .sl .pbn[aria-checked="true"] { color: var(--d-alu-ink); text-decoration: underline; text-underline-offset: 2px; }
-  .dd .sw { gap: 6px; } .dd .sw b { font: 700 9.5px/1 var(--d-lab); letter-spacing: .16em; } .dd .sw > span { font: 700 9px/1 var(--d-lab); letter-spacing: .1em; text-transform: none; color: var(--d-alu-ink2); }
+  .dd .sw { gap: 6px; } .dd .sw b { font: 700 11px/1 var(--d-lab); letter-spacing: .14em; } .dd .sw > span { font: 700 10px/1 var(--d-lab); letter-spacing: .1em; text-transform: none; color: var(--d-alu-ink2); }
   .dd .tog { position: relative; width: 36px; height: 36px; margin-bottom: 10px; border-radius: 50%; background: radial-gradient(circle, var(--d-blk2) 0 27%, var(--d-tog2) 29%, var(--d-tog3) 40%, var(--d-tog4) 54%, var(--d-knurl1) 72%, transparent 73%); filter: drop-shadow(0 2px 2px rgba(0,0,0,.6)); }
   .dd .tog::after { content: ""; position: absolute; left: 50%; top: 50%; width: 13px; height: 28px; margin: -28px 0 0 -6.5px; border-radius: 7px 7px 5px 5px; transform-origin: 50% 100%; transform: rotate(-24deg); transition: transform .2s;
     background: linear-gradient(90deg, var(--d-hdl1), var(--d-hdl2) 45%, var(--d-th1) 80%, var(--d-hdl1)); box-shadow: 0 2px 4px rgba(0,0,0,.6); }
   .dd .sw.dn .tog::after { transform: rotate(204deg); }
   .dd .kw { display: flex; flex-direction: column; align-items: center; gap: 3px; } .dd .kw .kn { margin: 6px 6px 4px; padding: 0; border: 0; cursor: pointer; }
-  .dd .kw .pos { display: flex; gap: 5px; } .dd .kw .pos .pbn { color: var(--d-alu-ink2); font-size: 7px; letter-spacing: .06em; } .dd .kw .pos .pbn[aria-checked="true"] { color: var(--d-alu-ink); text-decoration: underline; text-underline-offset: 2px; }
+  .dd .kw .pos { display: flex; gap: 5px; } .dd .kw .pos .pbn { color: var(--d-alu-ink2); font-size: 9.5px; letter-spacing: .04em; } .dd .kw .pos .pbn[aria-checked="true"] { color: var(--d-alu-ink); text-decoration: underline; text-underline-offset: 2px; }
   .dd .model { margin-bottom: 6px; font: 700 22px/1 var(--d-lab); letter-spacing: .06em; text-align: center; }
   .dd .sec .pls { justify-content: center; } .dd .sec .pls small { color: var(--d-alu-ink); }
   /* lower module: the printout, LED count, throttle and speed, readiness lamps, freeze frame, leads */
@@ -359,11 +363,11 @@
   .dd .lw { padding: 5px; border-radius: 9px; background: linear-gradient(180deg, var(--d-lw1), var(--d-lw2)); box-shadow: 0 1px 0 rgba(255,255,255,.35), inset 0 1px 2px rgba(0,0,0,.9); margin-bottom: 12px; }
   .dd .gl { display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 8px 10px; border-radius: 5px; background: radial-gradient(130% 90% at 50% -10%, var(--d-gl1), var(--d-gl2) 72%); box-shadow: inset 0 4px 12px rgba(0,0,0,.95), inset 0 0 0 1px #000; }
   .dd .gl .cnt { width: 64px; } .dd .gl .cnt svg { filter: drop-shadow(0 0 var(--glow) var(--seg-red)); }
-  .dd .gl span { font: 700 11px/1 var(--d-lab); letter-spacing: .14em; text-transform: uppercase; color: var(--d-cap); }
+  .dd .gl span { font: 700 12px/1 var(--d-lab); letter-spacing: .14em; text-transform: uppercase; color: var(--d-cap); }
   .dd .ready { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px 6px; margin-top: 10px; }
   .dd .ready div { display: flex; flex-direction: column; align-items: center; gap: 5px; } .dd .ready .lb { color: var(--d-white); }
-  .dd .ff { margin-top: 12px; font: 400 10.5px/1.5 var(--d-lab); color: var(--d-ink2); letter-spacing: .03em; }
-  .dd .ff b { display: block; color: var(--d-white); letter-spacing: .14em; text-transform: uppercase; font-size: 9px; }
+  .dd .ff { margin-top: 12px; font: 600 12px/1.5 var(--d-lab); color: var(--d-ink2); letter-spacing: .03em; }
+  .dd .ff b { display: block; color: var(--d-white); letter-spacing: .14em; text-transform: uppercase; font-size: 11px; }
   .dd .jacks { display: flex; gap: 14px 26px; align-items: flex-end; flex-wrap: wrap; padding: 10px 18px 14px; }
   .dd .jk { display: flex; flex-direction: column-reverse; align-items: center; gap: 5px; } .dd .jk .lb { color: var(--d-white); }
   .dd .jk i { width: 22px; height: 22px; border-radius: 50%; box-shadow: 0 1px 2px rgba(0,0,0,.6);
@@ -376,7 +380,7 @@
   .dd .tbl::before, .dd .tbl::after { content: ""; position: absolute; top: 100%; width: 18px; height: 34px; border-radius: 0 0 3px 3px; background: linear-gradient(90deg, var(--d-tb4), var(--d-tb2) 50%, var(--d-tb4)); }
   .dd .tbl::before { left: 48px; } .dd .tbl::after { right: 48px; }
   @media (max-width: 1000px) {
-    .dd .dfc { grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); } .dd .dround { grid-column: 1 / -1; flex-direction: row; } .dd .dround > div { flex: 1; min-width: 0; }
+    .dd .dfc { grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); } .dd .dround { grid-column: 1 / -1; flex-direction: row; flex-wrap: wrap; } .dd .dround > div { flex: 1 1 40%; min-width: 0; }
     .dd .dalu { grid-template-columns: 1fr 1fr; } .dd .sec:nth-child(2) { border-right: 0; } .dd .sec:nth-child(-n+2) { border-bottom: 1px solid var(--d-sep); }
     .dd .dlow { grid-template-columns: 1fr 1fr; } .dd .dlow > .pnl:first-child { grid-column: 1 / -1; }
   }
@@ -385,8 +389,8 @@
     :root[data-skin="retro"] #v0 .dd { margin: 0 -8px 44px; padding: 10px 8px 0; }
     .dd .dsign { grid-template-columns: 1fr; gap: 6px; padding: 8px 10px; } .dd .dname { justify-content: center; padding: 4px 12px 0; font-size: 30px; } .dd .dline { padding: 7px 8px; font-size: 13px; letter-spacing: .1em; }
     .dd .dfc, .dd .dlow, .dd .dalu { grid-template-columns: 1fr; } .dd .pnl { padding: 12px 10px; }
-    #d_stat { padding: 10px; } #d_stat .sumbar { flex-basis: 100%; font-size: 10.5px; }
-    #d_stat .lamps { width: 100%; justify-content: space-between; gap: 2px; } #d_stat .lampbox { width: auto; flex: 1 1 0; min-width: 0; font-size: 8px; letter-spacing: .04em; } #d_stat .lampbox em { display: none; } #d_stat .lens { width: 20px; height: 20px; }
+    #d_stat { padding: 10px; } #d_stat .sumbar { flex-basis: 100%; font-size: 12px; }
+    #d_stat .lamps { width: 100%; justify-content: space-between; gap: 2px; } #d_stat .lampbox { width: auto; flex: 1 1 0; min-width: 0; font-size: 10px; letter-spacing: .02em; } #d_stat .lampbox em { display: none; } #d_stat .lens { width: 20px; height: 20px; }
     .dd .hood { padding: 10px; } .dd .drects { gap: 10px; } .dd .mu { flex-wrap: wrap; } .dd .rm { padding: 6px; }
     .dd .sec { border-right: 0; border-bottom: 1px solid var(--d-sep); } .dd .sec:last-child { border-bottom: 0; } .dd .sec.fn .cl { flex-wrap: wrap; justify-content: flex-start; gap: 12px 16px; }
     .dd .pbn, .dd .ltest { min-height: 44px; min-width: 44px; justify-content: flex-end; }
@@ -1768,37 +1772,57 @@
     var t = head.join(' · '); if ($('d_crt_t').textContent !== t) $('d_crt_t').textContent = t;
     $('d_crt_a').hidden = $('d_crt_b').hidden = !foot;
   }
-  /* the meters: slots 0-3 rectangular, 4-5 round (the scenario's first six readings, in order), 6 throttle and 7 speed in the lower module; a slot with no reading in the run stays dark */
-  var DM = null, PL = { ok: '', watch: ' a', out: ' r' };
-  function dSlot(i, round) {
+  /* the meters (D2): a reading's shape follows what it measures: wide-sweep readings are round dials, limited-range ones are domes (a D on its back:
+     flat bottom, arched top, a needle pivoting below the flat edge). Slots 0-5 are the scenario's first six readings (domes in the middle panel, round dials
+     at the right, at most three, the rest after the domes), 6-7 the lower module's two; a reading not in the run stays dark */
+  var DM = { sig: {} }, PL = { ok: '', watch: ' a', out: ' r' }, DROUND = { '0C': 1, '0D': 1, '0B': 1, '87': 1, '05': 1, '67': 1, '10': 1, '66': 1 };
+  function dSlot(i, round, w) {
     var f = ' id="d_mf' + i + '"></div>';
-    return '<div class="dm' + (round ? ' rnd' : '') + '" id="d_m' + i + '"><div class="rm">' + (round ? '<div class="meter"><div class="face"' + f + '</div>' : '<div class="rf"' + f) +
+    return '<div class="dm' + (round ? ' rnd' : '') + (w ? ' w' : '') + '" id="d_m' + i + '"><div class="rm">' + (round ? '<div class="meter"><div class="face"' + f + '</div>' : '<div class="rf"' + f) +
       '</div><div class="mu"><span class="sk" id="d_mn' + i + '"></span><span class="val" id="d_mv' + i + '"></span><span class="pls" id="d_mp' + i + '"></span><button class="q" type="button" id="d_mq' + i + '" aria-label="Help" hidden>?</button></div></div>';
   }
-  function dFace(it, u) {   // the face: watch-range bands, scale, label and needle (numbers and fixed markup; the label is escaped); a reading with no range shows its value
-    var lo = it.lo, hi = it.hi, s = '<svg viewBox="0 0 200 140" aria-hidden="true">';
-    var bv = String(it.lab || fmt(it.v, it.dp));
-    if (lo === null) return s + '<text class="bv' + (bv.length > 7 ? ' sm' : '') + '" x="100" y="78">' + esc(bv) + '</text></svg>';
-    function A(v) { return -52 + 104 * (Math.max(lo, Math.min(hi, v)) - lo) / (hi - lo); }
-    function P(a, r) { a = (a - 90) * Math.PI / 180; return (100 + r * Math.cos(a)).toFixed(1) + ' ' + (118 + r * Math.sin(a)).toFixed(1); }
-    function arc(r, f, t) { return 'M' + P(f, r) + 'A' + r + ' ' + r + ' 0 0 1 ' + P(t, r); }
-    it.zones.forEach(function (z) { s += '<path class="bd ' + z.s + '" d="' + arc(93, A(z.from), A(z.to)) + '"/>'; });
-    s += '<path class="rim" d="' + arc(87, -52, 52) + '"/>';
+  function dPut(box, ks, sig) {   // (re)build a panel's slots only when its readings or shapes change, so a ? is not replaced under the pointer every poll
+    if (DM.sig[box] === sig) return; DM.sig[box] = sig;
+    $(box).innerHTML = ks.map(function (k, j) { return dSlot(k[0], k[1], k[2] || (box === 'd_rects' && (ks.length === 3 || (ks.length % 2 === 1 && j === 0)))); }).join('');
+  }
+  // the geometry: a dome is 200 x 120 (window 184 x 104, about 1.8:1), pivot (100, 118) below the window, +-52 deg; a round dial is 200 x 200, pivot at the centre, +-130 deg.
+  // The engraved label sits outside the needle's sweep: a dome's in the bottom-left corner (left of the -52 deg ray), a round dial's in the gap under the pivot
+  var DGEO = { d: { H: 120, cy: 118, R: 100, a: 52, lab: [14, 108, 'start'], tip: 28, tail: 16 }, r: { H: 200, cy: 100, R: 90, a: 130, lab: [100, 156, 'middle'], tip: 22, tail: 18 } };
+  function dFace(it, u, round, i) {   // numbers and fixed markup; the label is escaped; a reading with no range shows its value
+    var g = DGEO[round ? 'r' : 'd'], lo = it.lo, hi = it.hi, cy = g.cy, R = g.R, id = 'dw' + i, win = 'M8 114V61A108.3 108 0 0 1 192 61V114Z', bv = String(it.lab || fmt(it.v, it.dp)),
+        s = '<svg viewBox="0 0 200 ' + g.H + '" aria-hidden="true">', end = '</svg>';
+    if (!round) {   // the cream window and its glass, clipped to the dome
+      s += '<defs><clipPath id="' + id + '"><path d="' + win + '"/></clipPath><radialGradient id="' + id + 'f" cx=".5" cy="1" r="1"><stop class="f1" offset="0"/><stop class="f2" offset=".7"/><stop class="f3" offset="1"/></radialGradient>' +
+        '<linearGradient id="' + id + 'g" x1="0" y1="0" x2="1" y2="1"><stop class="g1" offset="0"/><stop class="g2" offset="1"/></linearGradient></defs><path d="' + win + '" fill="url(#' + id + 'f)"/><g clip-path="url(#' + id + ')"><path class="ie" d="' + win + '"/>';
+      end = '<path class="gg" stroke="url(#' + id + 'g)" d="M8.7 69.4A103.3 103 0 0 1 89.2 15.6"/></g></svg>';
+    }
+    if (lo === null) return s + '<text class="bv' + (bv.length > 7 ? ' sm' : '') + '" x="100" y="' + (round ? 100 : 78) + '">' + esc(bv) + '</text>' + end;
+    function A(v) { return -g.a + 2 * g.a * (Math.max(lo, Math.min(hi, v)) - lo) / (hi - lo); }
+    function P(a, r) { a = (a - 90) * Math.PI / 180; return (100 + r * Math.cos(a)).toFixed(1) + ' ' + (cy + r * Math.sin(a)).toFixed(1); }
+    function arc(r, f, t) { return 'M' + P(f, r) + 'A' + r + ' ' + r + ' 0 ' + (t - f > 180 ? 1 : 0) + ' 1 ' + P(t, r); }
+    function tx(a, r, v, c) { var t = P(a, r).split(' '); return '<text' + (c ? ' class="' + c + '"' : '') + ' x="' + t[0] + '" y="' + t[1] + '">' + v + '</text>'; }
+    it.zones.forEach(function (z) {   // a round dial: every band outside; a dome: watch and out outside, the normal range as a narrower inner arc with its ends marked
+      var f = A(z.from), t = A(z.to), inner = !round && z.s === 'ok';
+      s += '<path class="bd ' + z.s + (inner ? ' in' : '') + '" d="' + arc(inner ? R - 46 : R - 3, f, t) + '"/>';
+      if (inner) s += '<path class="tm" d="M' + P(f, R - 50) + 'L' + P(f, R - 42) + 'M' + P(t, R - 50) + 'L' + P(t, R - 42) + '"/>' + tx(f, R - 57, +z.from.toFixed(2), 's') + tx(t, R - 57, +z.to.toFixed(2), 's');
+    });
+    s += '<path class="rim" d="' + arc(R - 9, -g.a, g.a) + '"/>';
     var T = niceTicks(lo, hi, it.majors, it.div);
-    T.minors.forEach(function (dv) { var a = A(dv * it.div); s += '<path class="tm" d="M' + P(a, 87) + 'L' + P(a, 81) + '"/>'; });
-    T.values.forEach(function (dv) { var a = A(dv * it.div), t = P(a, 64).split(' '); s += '<path class="tk" d="M' + P(a, 87) + 'L' + P(a, 75) + '"/><text x="' + t[0] + '" y="' + t[1] + '">' + dv.toFixed(T.dec) + '</text>'; });
-    s += '<text class="lab" x="100" y="86">' + esc((it.div !== 1 ? 'x' + it.div + ' ' : '') + u.toUpperCase()) + '</text>';
-    if (it.v !== null) s += '<path class="ndl" transform="rotate(' + A(it.v).toFixed(1) + ' 100 118)" d="M97.8 134L99 32L101 32L102.2 134Z"/>';
-    return s + '<circle class="hub" cx="100" cy="118" r="8"/><circle class="hub2" cx="100" cy="118" r="2.5"/></svg>';
+    T.minors.forEach(function (dv) { var a = A(dv * it.div); s += '<path class="tm" d="M' + P(a, R - 9) + 'L' + P(a, R - 15) + '"/>'; });
+    T.values.forEach(function (dv) { var a = A(dv * it.div); s += '<path class="tk" d="M' + P(a, R - 9) + 'L' + P(a, R - 21) + '"/>' + tx(a, R - 31, dv.toFixed(T.dec)); });
+    s += '<text class="lab" x="' + g.lab[0] + '" y="' + g.lab[1] + '" style="text-anchor:' + g.lab[2] + '">' + esc((it.div !== 1 ? 'x' + it.div + ' ' : '') + u.toUpperCase()) + '</text>';
+    if (it.v !== null) s += '<path class="ndl" transform="rotate(' + A(it.v).toFixed(1) + ' 100 ' + cy + ')" d="M97.8 ' + (cy + g.tail) + 'L99 ' + g.tip + 'L101 ' + g.tip + 'L102.2 ' + (cy + g.tail) + 'Z"/>';
+    return s + '<circle class="hub" cx="100" cy="' + cy + '" r="' + (round ? 8 : 9) + '"/>' + (round ? '<circle class="hub2" cx="100" cy="100" r="2.5"/>' : '') + end;
   }
   function dMeter(i, pid) {
-    var it = pid ? gaugeModel(DRNG[pid] ? { pid: pid, form: 'dial', lo: DRNG[pid][0], hi: DRNG[pid][1] } : { pid: pid, form: 'dial' }) : null, on = !!(it && it.present), s = on ? it.s : 'none', u = pid ? unitOf(pid) : '', rnd = i === 4 || i === 5 || i === 7, q = $('d_mq' + i), nm = pid ? DTITLE[pid] || pidTitle(pid, pidName(pid)) : '';
-    $('d_m' + i).className = 'dm' + (rnd ? ' rnd' : '') + (on ? '' : ' dark') + (s === 'stale' ? ' stale' : '');
+    var it = pid ? gaugeModel(DRNG[pid] ? { pid: pid, form: 'dial', lo: DRNG[pid][0], hi: DRNG[pid][1] } : { pid: pid, form: 'dial' }) : null, on = !!(it && it.present), s = on ? it.s : 'none', u = pid ? unitOf(pid) : '',
+        rnd = !!DROUND[pid], q = $('d_mq' + i), nm = pid ? DTITLE[pid] || pidTitle(pid, pidName(pid)) : '', w = (DM.w || {})[i];
+    $('d_m' + i).className = 'dm' + (rnd ? ' rnd' : '') + (w ? ' w' : '') + (on ? '' : ' dark') + (s === 'stale' ? ' stale' : '');
     if ($('d_mn' + i).textContent !== nm) $('d_mn' + i).textContent = nm;
     setHtml($('d_mv' + i), on && (it.lab || it.v !== null) ? esc(it.lab || fmt(it.v, it.dp)) + (it.lab || !u ? '' : '<small>' + esc(u) + '</small>') : '');
-    setHtml($('d_mp' + i), !pid ? '' : i > 3 ? '<span class="pl' + (PL[s] === undefined ? ' off' : PL[s]) + '"></span>'   // pilot lamps, the 10 s state: one on the round and lower meters (blue OK, amber watch, red out), two on the rectangular ones
+    setHtml($('d_mp' + i), !pid ? '' : rnd ? '<span class="pl' + (PL[s] === undefined ? ' off' : PL[s]) + '"></span>'   // pilot lamps, the 10 s state: one on a round dial (blue OK, amber watch, red out), two on a dome
       : '<span class="pl' + (s === 'ok' ? '' : ' off') + '"></span><small>OK</small><span class="pl' + (s === 'ok' || PL[s] === undefined ? ' off' : PL[s]) + '"></span><small>' + (s === 'out' ? 'Out' : 'Watch') + '</small>');
-    setHtml($('d_mf' + i), on ? dFace(it, u) : '');
+    setHtml($('d_mf' + i), on ? dFace(it, u, rnd, i) : '');
     q.hidden = !pid; if (pid && q.getAttribute('data-help') !== pid) q.setAttribute('data-help', pid);
   }
   // the lower module's two meters: the first of these the six slots do not show (fallback PIDs applied); none left, the slot stays dark
@@ -1811,13 +1835,18 @@
     return out;
   }
   function renderD() {
-    if (!DM) { DM = 1; $('d_rects').innerHTML = dSlot(0) + dSlot(1) + dSlot(2) + dSlot(3); $('d_round').innerHTML = dSlot(4, 1) + dSlot(5, 1); $('d_thr').innerHTML = dSlot(6); $('d_spd').innerHTML = dSlot(7, 1); }
     var sc = curScenario(), ps = [], lw = [], st = state || {}, r = retroCommon(), run = st.status === 'running', chs = st.channels || {};
     specsFor(sc).forEach(function (g) { var p = dFb(g.pid); if (ps.indexOf(p) < 0 && !DTEXT[p] && !(chs[p] && chs[p].labels)) ps.push(p); });   // a text reading (fuel system status) is skipped: the next numeric one takes the slot
     ps = ps.slice(0, 6);
     DLOW.map(dFb).forEach(function (p) { if (ps.indexOf(p) < 0 && lw.indexOf(p) < 0) lw.push(p); });   // the lower module: readings the six slots do not show, the ones in the run first
     lw = lw.filter(function (p) { return chs[p]; }).concat(lw.filter(function (p) { return !chs[p]; }));
-    for (var k = 0; k < 6; k++) dMeter(k, ps[k] || null);
+    var dome = [], rd = [];   // the layout: domes in the middle panel, round dials at the right (three at most; the rest join the domes)
+    ps.forEach(function (p, k) { (DROUND[p] ? rd : dome).push([k, !!DROUND[p]]); });
+    dome = dome.concat(rd.slice(3)); rd = rd.slice(0, 3); DM.w = {};
+    dome.forEach(function (k, j) { if (dome.length === 3 || (dome.length % 2 === 1 && j === 0)) DM.w[k[0]] = 1; });
+    dPut('d_rects', dome, ps.join() + '|d'); dPut('d_round', rd, ps.join() + '|r');
+    dPut('d_thr', [[6, !!DROUND[lw[0]]]], 'l' + lw[0]); dPut('d_spd', [[7, !!DROUND[lw[1]]]], 'l' + lw[1]);
+    for (var k = 0; k < 6; k++) if (ps[k]) dMeter(k, ps[k]);
     dMeter(6, lw[0] || null); dMeter(7, lw[1] || null); dScope(sc);
     // the printout and the LED count
     var car = st.car || {}, who = st.demo ? 'sim car' : [car.year, car.make, car.model].filter(Boolean).join(' ') || (st.vehicle && st.vehicle.key) || '';

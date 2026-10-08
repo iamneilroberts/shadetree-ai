@@ -1489,16 +1489,42 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
     assert.ok(/RPM/.test(de.el('d_crt').innerHTML) && /<polyline class="dsh"/.test(de.el('d_crt').innerHTML), 'General: rpm solid, load dashed');
     // meters: the scenario's first six PIDs in order (General: 0C 0D 05 04 11 0B), a PID not in the run dark, its ? kept; throttle and speed in the lower module
     const slot = (i) => [de.el('d_m' + i).className, de.el('d_mn' + i).textContent, de.el('d_mq' + i).getAttribute('data-help')];
-    assert.deepStrictEqual([0, 1, 2, 3, 4, 5].map(i => slot(i)), [['dm', 'Engine speed', '0C'], ['dm dark', 'Speed', '0D'], ['dm', 'Coolant', '05'], ['dm', 'Engine load', '04'], ['dm rnd dark', 'Throttle', '11'], ['dm rnd', 'MAP', '0B']]);
+    assert.deepStrictEqual([0, 1, 2, 3, 4, 5].map(i => slot(i)), [['dm rnd', 'Engine speed', '0C'], ['dm rnd dark', 'Speed', '0D'], ['dm rnd', 'Coolant', '05'], ['dm w', 'Engine load', '04'], ['dm w dark', 'Throttle', '11'], ['dm rnd w', 'MAP', '0B']],
+      'D2: the shape follows the reading (rpm, speed, coolant, MAP round; load and throttle domes); three round dials at the right, the fourth joins the domes, three in the middle stack');
+    const ids = (box) => (de.el(box).innerHTML.match(/id="d_m\d"/g) || []).join(' ');
+    assert.deepStrictEqual([ids('d_rects'), ids('d_round')], ['id="d_m3" id="d_m4" id="d_m5"', 'id="d_m0" id="d_m1" id="d_m2"']);
+    assert.ok(!/clipPath/.test(de.el('d_mf0').innerHTML) && /clipPath/.test(de.el('d_mf3').innerHTML) && /viewBox="0 0 200 200"/.test(de.el('d_mf0').innerHTML) && /viewBox="0 0 200 120"/.test(de.el('d_mf3').innerHTML), 'rpm: a round dial; load: a dome window');
+    // the engraved label is never under the needle: every needle position from one end of the scale to the other misses its box
+    const clear = (svg) => {
+      const n = (re) => svg.match(re).slice(1).map(Number), [cy] = n(/<circle class="hub" cx="100" cy="([\d.]+)"/), [tail, tip] = n(/d="M97\.8 ([\d.]+)L99 ([\d.]+)L/);
+      const [x0, y0] = n(/<path class="rim" d="M([\d.]+) ([\d.]+)A/), a = Math.atan2(100 - x0, cy - y0);   // the scale's end, from the rim
+      const m = svg.match(/<text class="lab" x="([\d.]+)" y="([\d.]+)" style="text-anchor:(\w+)">([^<]*)</), w = m[4].length * 7, lx = +m[1] - (m[3] === 'middle' ? w / 2 : 0), ly = +m[2];
+      const box = { x0: lx - 3, x1: lx + w + 3, y0: ly - 10 - 3, y1: ly + 2 + 3 };   // 9 px type, 3 px for the needle's half-width
+      for (let k = -100; k <= 100; k++) {
+        const ang = a * k / 100;
+        for (let r = -(tail - cy); r <= cy - tip; r += 1) {
+          const x = 100 + r * Math.sin(ang), y = cy - r * Math.cos(ang);
+          if (x > box.x0 && x < box.x1 && y > box.y0 && y < box.y1) return false;
+        }
+      }
+      return m[4].length > 0;
+    };
+    assert.ok(clear(de.el('d_mf0').innerHTML), 'the round dial keeps its label (X1000 RPM) out of the needle sweep');
     assert.ok(/<path class="ndl"/.test(de.el('d_mf0').innerHTML) && de.el('d_mf1').innerHTML === '' && /700<small>rpm<\/small>/.test(de.el('d_mv0').innerHTML), 'a lit meter has a needle and its value, a dark one nothing');
     assert.ok(/<path class="bd ok"/.test(de.el('d_mf2').innerHTML) && /class="pl"/.test(de.el('d_mp2').innerHTML), 'coolant: the watch range as bands, the OK pilot lit');
-    assert.deepStrictEqual([slot(6), slot(7)], [['dm dark', 'Fuel level', '2F'], ['dm rnd dark', 'Intake air', '0F']], 'the lower module never repeats a slot: General shows speed and throttle, so it takes the next two');
+    assert.deepStrictEqual([slot(6), slot(7)], [['dm dark', 'Fuel level', '2F'], ['dm dark', 'Intake air', '0F']], 'the lower module never repeats a slot: General shows speed and throttle, so it takes the next two (both domes)');
     const lw = await dash(Object.assign({ 'shadetree.scenario': 'charging' }, R), {}, statesFor(30, () => Object.assign(base(), { '0D': 0, '11': 14 })));
     assert.deepStrictEqual([6, 7].map(i => lw.el('d_mq' + i).getAttribute('data-help')), ['0D', '2F'], 'Charging shows throttle, not speed: speed goes below, then the next reading on the list');
     const ft = await dash(Object.assign({ 'shadetree.scenario': 'fuel' }, R), {}, statesFor(30, () => Object.assign(base(), { '03': 1, '24': 0.98 })).map(s => Object.assign(s, { fallbacks: { '14': '24' } })));
     ft.timer(); await ft.tick();
     assert.deepStrictEqual([0, 1, 2, 3, 4, 5].map(i => ft.el('d_mq' + i).getAttribute('data-help')), ['06', '07', '08', '09', '24', '10'], 'fuel system status (text) is skipped; narrowband 14 shows as its wideband fallback 24');
     assert.ok(ft.el('d_mn4').textContent === 'Lambda B1' && /<path class="ndl"/.test(ft.el('d_mf4').innerHTML) && ft.el('d_mv4').innerHTML !== '', 'the lambda meter has a scale and a needle');
+    assert.ok(!/rnd/.test(ft.el('d_m0').className) && /clipPath/.test(ft.el('d_mf0').innerHTML) && !/rnd/.test(ft.el('d_m4').className) && /clipPath/.test(ft.el('d_mf4').innerHTML) && /rnd/.test(ft.el('d_m5').className),
+      'a trim is a dome, the fallback 24 (lambda) is a dome, MAF is round');
+    assert.ok(/<path class="bd ok in"/.test(ft.el('d_mf0').innerHTML), 'a dome draws the normal range as the narrower inner arc');
+    assert.ok(clear(ft.el('d_mf0').innerHTML), 'the dome keeps its label (%) out of the needle sweep');
+    const mockLab = ft.el('d_mf0').innerHTML.replace(/<text class="lab" x="14" y="108" style="text-anchor:start">%/, '<text class="lab" x="100" y="103" style="text-anchor:middle">STFT B1 %');
+    assert.ok(mockLab !== ft.el('d_mf0').innerHTML && !clear(mockLab), "the check fails for the mock's centred label");
     // the knob turns: the same scenario state as the tabs, the hub is asked for the new PIDs, and the CRT follows
     key('ArrowRight'); await de.tick();
     assert.deepStrictEqual(de.el('d_tabs').children.filter(b => /is-active/.test(b.className)).map(b => b.getAttribute('data-scen')), ['fuel']);
@@ -1507,7 +1533,7 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
     assert.deepStrictEqual([0, 1, 2, 3].map(i => de.el('d_mq' + i).getAttribute('data-help')), ['06', '07', '08', '09'], 'the meters follow the knob');
     key('End'); await de.tick();
     assert.ok(/^Charging · 14\.2 V$/.test(de.el('d_crt_t').textContent), de.el('d_crt_t').textContent);
-    assert.ok(de.el('d_m4').className.includes('dark') && de.el('d_mn4').textContent === '' && de.el('d_mq4').hidden, 'four gauges in Charging: the round slots stay dark and empty');
+    assert.deepStrictEqual([ids('d_rects'), ids('d_round')], ['id="d_m0" id="d_m2" id="d_m3"', 'id="d_m1"'], 'four readings in Charging: battery, load and throttle domes stacked, rpm round; no empty slots drawn');
     // Idle / misfire: the parade only with Mode 06 misfire counts (TID 0C, by cylinder), else the rpm strip alone
     key('ArrowLeft'); await de.tick();
     assert.ok(/^Idle\/misfire · 700 rpm$/.test(de.el('d_crt_t').textContent) && !/class="cb/.test(de.el('d_crt').innerHTML) && !de.el('d_crt_a').hidden, 'no Mode 06: rpm only');
