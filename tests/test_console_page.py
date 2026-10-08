@@ -693,3 +693,12 @@ def test_terminal_is_green_phosphor_in_dark_and_amber_without_scanlines_in_light
     assert {dark[k] for k in TM_TEXT if k != "--tm-warn"} <= {"#4cf28a", "#2fb565", "#b9ffd0"}, "dark: one phosphor colour in three intensities"
     assert light["--tm-fg"] == "#ffb000" and light["--tm-scan"] == "rgba(0,0,0,0)" and dark["--tm-scan"] != "rgba(0,0,0,0)"
     assert len({light[k] for k in ("--tm-key", "--tm-num", "--tm-ok", "--tm-warn", "--tm-text")}) == 5, "light: the colourful CLI palette"
+
+
+@pytest.mark.parametrize("theme", ["dark", "light"])
+def test_every_code_status_badge_reads_on_its_own_colour_and_permanent_has_one(theme):
+    p = _palette("plain", theme)
+    for kind, bg, fg in (("stored", "--led-r", "--on-red"), ("pending", "--led-y", "--on-amber"), ("permanent", "--led-p", "--on-purple")):
+        assert re.search(r"#v0 \.cst\.%s\s*\{\s*background:\s*var\(%s\);\s*color:\s*var\(%s\)" % (kind, bg, fg), HTML), f"{kind} badge rule"
+        assert _contrast(p[fg], p[bg]) >= 4.5, (theme, kind, round(_contrast(p[fg], p[bg]), 2))
+    assert len({p["--led-r"], p["--led-y"], p["--led-p"]}) == 3

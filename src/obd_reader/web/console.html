@@ -156,11 +156,11 @@
     --sil: "Helvetica Neue", Helvetica, Arial, "Liberation Sans", sans-serif; --ghost: .16; --glow: 3px; --ink2: #4a4a4c; --mut: #a39b88; --retro-ink: #ece6d6;
     --rail: linear-gradient(90deg, #3a0f0e, #7d2724 22%, #a5423b 34%, #74221f 62%, #3f100f); --rail-rivet: radial-gradient(circle at 50% 28px, #e4e4e2 0 2.5px, #2b2b2c 3px 5px, transparent 5.5px) 0 0 / 100% 84px repeat-y; --rail-tex: repeating-linear-gradient(90deg, rgba(255,255,255,.05) 0 1px, rgba(0,0,0,.08) 1px 2px); --rail-edge: rgba(230,230,228,.35);
     --face: linear-gradient(#e9e9e6, #d6d6d3); --face-bd: #2b2b2c; --face-ink: #161617; --pan: #b9babc; --pan-bd: #7a7b7e; --plate-bg: #141415; --plate-ink: #f4f4f1; --plate-ink2: #a9aaad; --bench: #a6a7aa; --win-bd: #2b2b2c;
-    --win-bg: #0d0a09; --led-off: rgba(255,255,255,.07); --led-g: #3fe06a; --led-y: #ffc233; --led-r: #ff4a3a; --seg-red: #ff3b2b; --code-amber: #ffb62e;
+    --win-bg: #0d0a09; --led-off: rgba(255,255,255,.07); --led-g: #3fe06a; --led-y: #ffc233; --led-r: #ff4a3a; --led-p: #c9a7ff; --seg-red: #ff3b2b; --code-amber: #ffb62e;
     --lamp-lit: #fff1cf; --lens-bd: #6c6555; --lens-red: radial-gradient(circle at 35% 30%, #5a4a4a, #2a1c1c 70%); --lens-grn: radial-gradient(circle at 35% 30%, #4a5a4a, #1c2a1c 70%); --lens-amb: radial-gradient(circle at 35% 30%, #5a5040, #2a2216 70%);
     --lens-red-lit: radial-gradient(circle at 35% 30%, #ffd0c8, #ff4a3a 55%, #b3170b); --lens-amb-lit: radial-gradient(circle at 35% 30%, #fff0c0, #ffc233 55%, #b37c05); --lens-grn-lit: radial-gradient(circle at 35% 30%, #d6ffe0, #3fe06a 55%, #0e8a30);
     --screw: radial-gradient(circle at 35% 30%, #f1f1ee, #7d8288); --screw-slot: #454a4f; --rocker: linear-gradient(#5a5c60, #2b2c2f); --rocker-bd: #1b1c1e; --rocker-ink: #f1ead4; --rocker-sh: #101112;
-    --nav-on: #e3b04b; --nav-on-bd: #a5782a; --on-amber: #241a06; --on-red: #1a0503; --crow-line: #2a2320; --cdesc: #f3ecd8; --chint: #b9ae94; --wait-ink: #a9aaad; --hlive-off: #ff8a7a;
+    --nav-on: #e3b04b; --nav-on-bd: #a5782a; --on-amber: #241a06; --on-red: #1a0503; --on-purple: #1d0a33; --crow-line: #2a2320; --cdesc: #f3ecd8; --chint: #b9ae94; --wait-ink: #a9aaad; --hlive-off: #ff8a7a;
     --meter-face: #f6f5ef; --meter-rim: #7d765f; --meter-zone: #c9382a; --meter-z-ok: #25793d; --meter-z-watch: #a86b00; --meter-ink: #2a2723; --meter-ink2: #5b5547; --meter-needle: #b22a1c;
     /* black meter faces, the slim bar's caps and lamp colour, and the embedded fonts, the same in both themes */
     --cb-face: #000000; --cb-silk: #f0ece1; --cb-silk-dim: #8f8b82; --cb-needle: #ff7a1a; --cb-redzone: #e0412b; --cb-rim: #62676c; --cb-cap-1: #2c2e30; --cb-cap-2: #111213; --cb-lamp: #ffad2f;
@@ -360,6 +360,7 @@
   .dd .paper .l b { font-size: 14px; } .dd .paper .l span { font-weight: 400; } .dd .paper .l .m { grid-column: 2; color: var(--d-paper-ink2); font-size: 11px; }
   .dd .paper p { margin: 4px 0; font-weight: 400; letter-spacing: .06em; }
   .dd .mid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px 14px; align-content: start; }
+  .dd .mid.one > div:first-child { grid-column: 1 / -1; } .dd #d_thr[hidden], .dd #d_spd[hidden] { display: none; }
   .dd .lw { padding: 5px; border-radius: 9px; background: linear-gradient(180deg, var(--d-lw1), var(--d-lw2)); box-shadow: 0 1px 0 rgba(255,255,255,.35), inset 0 1px 2px rgba(0,0,0,.9); margin-bottom: 12px; }
   .dd .gl { display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 8px 10px; border-radius: 5px; background: radial-gradient(130% 90% at 50% -10%, var(--d-gl1), var(--d-gl2) 72%); box-shadow: inset 0 4px 12px rgba(0,0,0,.95), inset 0 0 0 1px #000; }
   .dd .gl .cnt { width: 64px; } .dd .gl .cnt svg { filter: drop-shadow(0 0 var(--glow) var(--seg-red)); }
@@ -402,12 +403,14 @@
   #v0 .cntbox { display: flex; flex-direction: column; justify-content: center; gap: 6px; }
   #v0 .cntbox small { font: 700 11px var(--sil); letter-spacing: .12em; text-transform: uppercase; color: var(--ink2); text-align: center; }
   #v0 .clist { background: var(--win-bg); border: 3px solid var(--win-bd); border-radius: 4px; padding: 4px 12px; height: auto; min-height: 176px; max-height: 320px; overflow-y: auto; }
-  #v0 .crow { display: grid; grid-template-columns: 104px 86px 1fr; gap: 12px; align-items: center; padding: 7px 0; border-bottom: 1px solid var(--crow-line); }
+  #v0 .crow { display: grid; grid-template-columns: 104px 184px 1fr; gap: 12px; align-items: center; padding: 7px 0; border-bottom: 1px solid var(--crow-line); }
   #v0 .crow:last-child { border-bottom: 0; }
   .retro .ccode, #v0 .ccode { font-weight: 800; font-size: 28px; color: var(--code-amber); text-shadow: 0 0 var(--glow) var(--code-amber); letter-spacing: .04em; }
   .retro .cst, #v0 .cst { font: 700 11px var(--sil); letter-spacing: .12em; padding: 3px 6px; border-radius: 2px; text-align: center; }
   .retro .cst.stored, #v0 .cst.stored { background: var(--led-r); color: var(--on-red); }
   .retro .cst.pending, #v0 .cst.pending { background: var(--led-y); color: var(--on-amber); }
+  .retro .cst.permanent, #v0 .cst.permanent { background: var(--led-p); color: var(--on-purple); }
+  .retro .csts, #v0 .csts { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
   .retro .cdesc, #v0 .cdesc { color: var(--cdesc); font: 600 16px var(--sil); }
   .retro .chint, #v0 .chint { display: block; font: 400 12.5px var(--sil); color: var(--chint); }
   .retro .cnone, #v0 .cnone { color: var(--led-g); font: 800 20px var(--sil); letter-spacing: .14em; padding: 60px 0; text-align: center; text-shadow: 0 0 var(--glow) var(--led-g); }
@@ -791,7 +794,7 @@
       </div>
       <div class="dfc dlow">
         <div class="pnl"><div class="sk l">Trouble codes <button class="q" type="button" data-help="codes" aria-label="Help">?</button></div><div class="slot"></div><div class="paper" id="d_paper"></div></div>
-        <div class="pnl mid"><div><div class="lw"><div class="gl"><div class="cnt" id="d_led"></div><span>codes</span></div></div><div id="d_thr"></div></div><div id="d_spd"></div></div>
+        <div class="pnl mid" id="d_lm"><div><div class="lw"><div class="gl"><div class="cnt" id="d_led"></div><span>codes</span></div></div><div id="d_thr"></div></div><div id="d_spd"></div></div>
         <div class="pnl"><div class="sk l"><span>Readiness monitors<small id="d_rdys"></small></span></div><div class="ready" id="d_rdy"></div><div class="ff" id="d_ff"></div></div>
         <div class="pnl full jacks"><span class="sk">Leads</span><div class="jk"><i></i><span class="lb">OBD</span></div><div class="jk r"><i></i><span class="lb">Batt +</span></div><div class="jk"><i></i><span class="lb">Batt &minus;</span></div><div class="jk"><i></i><span class="lb">Scope</span></div><div class="jk"><i></i><span class="lb">Aux</span></div>
           <span class="sk">Read-only<small>Modes 01 02 03 05 06 07 09 0A</small></span>
@@ -1824,6 +1827,7 @@
       : '<span class="pl' + (s === 'ok' ? '' : ' off') + '"></span><small>OK</small><span class="pl' + (s === 'ok' || PL[s] === undefined ? ' off' : PL[s]) + '"></span><small>' + (s === 'out' ? 'Out' : 'Watch') + '</small>');
     setHtml($('d_mf' + i), on ? dFace(it, u, rnd, i) : '');
     q.hidden = !pid; if (pid && q.getAttribute('data-help') !== pid) q.setAttribute('data-help', pid);
+    return on;
   }
   // the lower module's two meters: the first of these the six slots do not show (fallback PIDs applied); none left, the slot stays dark
   var DLOW = ['0D', '11', '2F', '0F', '33', '46'], DTEXT = { '01': 1, '03': 1, '12': 1, '13': 1, '1C': 1, '1D': 1, '1E': 1, '51': 1 };   // DTEXT: PIDs whose value is a state, not a number
@@ -1847,7 +1851,8 @@
     dPut('d_rects', dome, ps.join() + '|d'); dPut('d_round', rd, ps.join() + '|r');
     dPut('d_thr', [[6, !!DROUND[lw[0]]]], 'l' + lw[0]); dPut('d_spd', [[7, !!DROUND[lw[1]]]], 'l' + lw[1]);
     for (var k = 0; k < 6; k++) if (ps[k]) dMeter(k, ps[k]);
-    dMeter(6, lw[0] || null); dMeter(7, lw[1] || null); dScope(sc);
+    var o6 = dMeter(6, lw[0] || null), o7 = dMeter(7, lw[1] || null); dScope(sc);
+    $('d_thr').hidden = !o6; $('d_spd').hidden = !o7; $('d_lm').className = 'pnl mid' + (o7 ? '' : ' one');   // a lower slot the car has no reading for is left out; the rest widen
     // the printout and the LED count
     var car = st.car || {}, who = st.demo ? 'sim car' : [car.year, car.make, car.model].filter(Boolean).join(' ') || (st.vehicle && st.vehicle.key) || '';
     setHtml($('d_paper'), '<h4>' + esc(['Diagnostic report', who, r.c.read ? r.n + (r.n === 1 ? ' code' : ' codes') : ''].filter(Boolean).join(' · ')) + '</h4>' + (r.list.length ? dCodes(r.list).map(function (x) {
@@ -2318,13 +2323,12 @@
     return s + '<circle class="dh" cx="' + cx + '" cy="' + cy + '" r="7"/></svg>';
   }
   function esc(x) { return String(x).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
-  function codeRows(list, cls) {
-    return list.map(function (x) {
-      return { code: x.code, kind: x.kind, desc: x.desc, hint: x.hint };
-    }).map(function (x) {
+  function codeRows(list, cls) {   // one row per code, all its status badges side by side (dCodes merges the lists)
+    return dCodes(list).map(function (x) {
+      var b = function (st) { return x.kinds.map(function (k) { return '<span class="cst ' + k + '"' + st + '>' + k.toUpperCase() + '</span>'; }).join(''); };
       return cls === 'hh'
-        ? '<div class="hcode"><div class="r1"><span class="ccode mono">' + esc(x.code) + '</span><span class="cst ' + x.kind + '" style="padding:4px 8px">' + x.kind.toUpperCase() + '</span></div><div class="cdesc">' + esc(x.desc) + '</div>' + (x.hint ? '<span class="chint">' + esc(x.hint) + '</span>' : '') + '</div>'
-        : '<div class="crow"><span class="ccode mono">' + esc(x.code) + '</span><span class="cst ' + x.kind + '">' + x.kind.toUpperCase() + '</span><span class="cdesc">' + esc(x.desc) + (x.hint ? '<span class="chint">' + esc(x.hint) + '</span>' : '') + '</span></div>';
+        ? '<div class="hcode"><div class="r1"><span class="ccode mono">' + esc(x.code) + '</span><span class="csts">' + b(' style="padding:4px 8px"') + '</span></div><div class="cdesc">' + esc(x.desc) + '</div>' + (x.hint ? '<span class="chint">' + esc(x.hint) + '</span>' : '') + '</div>'
+        : '<div class="crow"><span class="ccode mono">' + esc(x.code) + '</span><span class="csts">' + b('') + '</span><span class="cdesc">' + esc(x.desc) + (x.hint ? '<span class="chint">' + esc(x.hint) + '</span>' : '') + '</span></div>';
     }).join('');
   }
   function codeList(c) {

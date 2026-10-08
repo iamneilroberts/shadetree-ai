@@ -1515,6 +1515,7 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
     assert.deepStrictEqual([slot(6), slot(7)], [['dm dark', 'Fuel level', '2F'], ['dm dark', 'Intake air', '0F']], 'the lower module never repeats a slot: General shows speed and throttle, so it takes the next two (both domes)');
     const lw = await dash(Object.assign({ 'shadetree.scenario': 'charging' }, R), {}, statesFor(30, () => Object.assign(base(), { '0D': 0, '11': 14 })));
     assert.deepStrictEqual([6, 7].map(i => lw.el('d_mq' + i).getAttribute('data-help')), ['0D', '2F'], 'Charging shows throttle, not speed: speed goes below, then the next reading on the list');
+    assert.ok(lw.el('d_thr').hidden === false && lw.el('d_spd').hidden === true && / one/.test(lw.el('d_lm').className), 'one lower reading present: its slot shows, the other is hidden and the first widens');
     const ft = await dash(Object.assign({ 'shadetree.scenario': 'fuel' }, R), {}, statesFor(30, () => Object.assign(base(), { '03': 1, '24': 0.98 })).map(s => Object.assign(s, { fallbacks: { '14': '24' } })));
     ft.timer(); await ft.tick();
     assert.deepStrictEqual([0, 1, 2, 3, 4, 5].map(i => ft.el('d_mq' + i).getAttribute('data-help')), ['06', '07', '08', '09', '24', '10'], 'fuel system status (text) is skipped; narrowband 14 shows as its wideband fallback 24');
@@ -1547,6 +1548,15 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
     const CODES = { read: true, note: null, mil: true, stored: [{ code: 'P0118', desc: 'Coolant sensor circuit high', hint: 'Reads cold' }], pending: [], permanent: [{ code: 'P0118', desc: 'Coolant sensor circuit high', hint: 'Reads cold' }] };
     const cd = await dash(R, {}, statesFor(30, base).map(s => Object.assign(s, { codes: CODES })));
     assert.ok((cd.el('d_paper').innerHTML.match(/<b>P0118<\/b>/g) || []).length === 1 && /STORED · PERMANENT · Coolant sensor circuit high/.test(cd.el('d_paper').innerHTML) && !/draft|unreviewed|unverified/i.test(cd.el('d_paper').innerHTML), 'the printout: code, status, meaning, hint, no caption');
+    // Plain and the Handheld list a code once with all its badges (as the D printout does); the Terminal lists codes per list, with no meanings
+    const pe = makeEnv(statesFor(30, base).map(s => Object.assign(s, { codes: CODES })), 'v0', OVF); for (let k = 0; k < 6; k++) await pe.tick();
+    let rows = ''; walk(pe.el('d_codes_mount'), n => { if (n.id === 'd_codes') rows = n.innerHTML; });
+    const he = makeEnv(statesFor(30, base).map(s => Object.assign(s, { codes: CODES })), 'v5', OVF); for (let k = 0; k < 6; k++) await he.tick();
+    const hrows = he.el('h_codes').innerHTML;
+    assert.ok((rows.match(/<span class="ccode mono">P0118/g) || []).length === 1 && (rows.match(/Coolant sensor circuit high/g) || []).length === 1 && /cst stored">STORED<\/span><span class="cst permanent">PERMANENT</.test(rows), 'Plain: one row, two badges');
+    assert.ok((hrows.match(/<span class="ccode mono">P0118/g) || []).length === 1 && /cst stored[^>]*>STORED<\/span><span class="cst permanent"[^>]*>PERMANENT</.test(hrows), 'Handheld: one card, two badges');
+    // the lower module leaves out a slot the car gives no reading for (this car reports neither lower reading; Charging below reports 0D and 11)
+    assert.ok(cd.el('d_thr').hidden === true && cd.el('d_spd').hidden === true && / one/.test(cd.el('d_lm').className), 'no lower readings: both slots hidden');
     const dd = html.slice(html.indexOf('<div class="dd" id="d_dd">'), html.indexOf('<!-- C: GUIDED TEST -->'));
     assert.ok(dd.length > 1000 && !/draft|unreviewed|unverified|general knowledge/i.test(dd) && /data-help="codes"/.test(dd), 'no disclaimer in the D markup; the codes label has its ?');
     const q = findQ(cd.el('d_codes_mount'), 'codes');
