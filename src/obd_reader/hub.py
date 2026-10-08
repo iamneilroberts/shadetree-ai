@@ -709,7 +709,7 @@ class LiveHub:
         with open(path, "x", encoding="utf-8") as fh:
             json.dump({"kind": "live_run", "demo": self._sim is not None, "adapter": self._adapter,
                        "live_sample": ls.model_dump(mode="json"), "codes": codes, "mode06": m06, "readiness": ready, "freeze_frame": ff,
-                       "vehicle": {"key": key} if key else None, "transcript": tr}, fh, indent=2)
+                       "vehicle": {"key": key} if key else None, "vehicle_key": key, "transcript": tr}, fh, indent=2)  # the key, never the VIN
         with self._data_lock:
             self._saved = (path, seq)
         return path

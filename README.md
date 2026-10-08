@@ -145,6 +145,8 @@ The console is read-only: it can only start and stop sampling and save a run to 
 
 **Moving a saved run to another machine:** press **Save run**, then `shadetree-ai export-run` (from the folder you started the console in) writes `shadetree-share.tgz` with the newest run, its transcript and a `SUMMARY.txt` (protocol, codes, lamp, Mode 06 MIDs, per-channel min/mean/max). Use `--latest 3` for more runs. The transcripts can contain the VIN, so copy it with `scp` and never commit it (the bundle name is gitignored).
 
+**Sending runs to the maintainer:** in **Replay…**, choose **My runs**, then **Download .zip** (the selected run) or **Download all my runs**. The .zip holds the runs, their transcripts, a `SUMMARY.txt` and a `README.txt`. The VIN's serial digits (characters 12-17) are replaced with 000000 everywhere, in the text and in the raw reply bytes, and each run names its car by the masked VIN and vehicle key. A transcript that does not pass the check after masking is left out, and the page and `README.txt` say so. The file is safe to attach to a [GitHub issue](https://github.com/iamneilroberts/shadetree-ai/issues). From a terminal: `shadetree-ai export-run --zip`.
+
 While the console samples, other live tools report the adapter as busy and point to `console_data`.
 
 ## Advanced

@@ -166,8 +166,23 @@ def console_main(args, block: bool = True):
 
 
 def _export_run(args) -> int:
-    from obd_reader.export import ExportError, export_run
+    from obd_reader.export import ExportError, build_zip, export_run, newest_runs
 
+    if args.zip or args.dest.suffix.lower() == ".zip":
+        dest, names = args.dest.with_suffix(".zip"), [p.name for p in newest_runs(args.out_dir, args.latest)]
+        try:
+            if not names:
+                raise ExportError(f"no run files in {args.out_dir / 'runs'} (press Save run in the console first)")
+            data, left_out = build_zip(args.out_dir, names)
+        except (ExportError, ValueError, OSError) as e:
+            print(f"error: {e}", file=sys.stderr)
+            return 1
+        dest.write_bytes(data)
+        print(f"wrote {dest.resolve()} ({len(data)} bytes)")
+        for x in left_out:
+            print(f"left out: {x}")
+        print("the VIN's serial digits are masked (000000), so it is safe to attach to a GitHub issue")
+        return 0
     try:
         dest = export_run(args.out_dir, args.dest, args.latest)
     except ExportError as e:
@@ -257,6 +272,8 @@ def build_parser() -> argparse.ArgumentParser:
     ex.add_argument("--out-dir", type=Path, default=Path("."), help="where runs/ and transcripts/ are")
     ex.add_argument("--dest", type=Path, default=Path("shadetree-share.tgz"), help="bundle to write")
     ex.add_argument("--latest", type=int, default=1, help="how many of the newest runs to include")
+    ex.add_argument("--zip", action="store_true",
+                    help="write a .zip to share instead, with the VIN's serial digits masked (also when --dest ends in .zip)")
     ex.set_defaults(func=_export_run)
     lr = sub.add_parser("label-run", help="add the make, model, year and title the console's replay picker shows (no VIN)")
     lr.add_argument("file", type=Path, help="a saved run .json")

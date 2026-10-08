@@ -455,6 +455,20 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
   pk.sandbox.fetch = () => Promise.resolve({ ok: false, json: () => Promise.resolve({ error: 'not a saved run' }) });
   pk.el('rp_runs').value = 'a.json'; pk.handlers['rp_load:click'](); await new Promise(r => setImmediate(r)); await new Promise(r => setImmediate(r));
   assert.strictEqual(pk.el('rp_err').textContent, 'not a saved run'); assert.strictEqual(pk.el('replayPanel').hidden, false, 'the panel stays open on an error');
+  // Download .zip (My runs only): the selected run or all of them, saved under the server's file name; a left-out count is said
+  assert.strictEqual(pk.el('rp_share').hidden, false, 'My runs offers the download');
+  const zipUrls = [], saved = [], mkEl = pk.sandbox.document.createElement;
+  pk.sandbox.URL = { createObjectURL: () => 'blob:x', revokeObjectURL() {} };
+  pk.sandbox.document.createElement = () => { const n = mkEl(); n.click = () => saved.push(n.download); return n; };
+  pk.sandbox.fetch = (url) => { zipUrls.push(url); return Promise.resolve({ ok: true, blob: () => Promise.resolve('zip'),
+    headers: { get: (k) => ({ 'Content-Disposition': 'attachment; filename="shadetree-runs-2026-10-07.zip"', 'X-Shadetree-Left-Out': '1' })[k] || null } }); };
+  pk.el('rp_runs').value = 'a.json'; pk.handlers['rp_zip:click']();
+  for (let k = 0; k < 3; k++) await new Promise(r => setImmediate(r));
+  pk.handlers['rp_zipall:click'](); for (let k = 0; k < 3; k++) await new Promise(r => setImmediate(r));
+  assert.strictEqual(zipUrls[0], '/api/export.zip?runs=a.json&t=abc');
+  assert.strictEqual(zipUrls[1], '/api/export.zip?runs=' + encodeURIComponent(RUNS.map(r => r.name).join(',')) + '&t=abc', 'all my runs');
+  assert.deepStrictEqual(saved, ['shadetree-runs-2026-10-07.zip', 'shadetree-runs-2026-10-07.zip']);
+  assert(/Saved shadetree-runs-2026-10-07\.zip\. 1 file\(s\) left out/.test(pk.el('rp_zipmsg').textContent), 'a left-out file is said on the page');
 
 
   // 8b) replay picker: source, then Make -> Model -> Year narrowing, then runs newest first

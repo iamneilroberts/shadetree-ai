@@ -94,6 +94,14 @@ Anyone on the same Wi-Fi who has the full link can watch the live data and start
 
 Everything goes in `Documents\Shadetree`: saved runs in `runs`, the adapter's raw conversation in `transcripts`, and what Shadetree learned about each car in `profiles`. **Transcripts can contain your car's VIN** (its serial number): keep this folder private and do not post its files online. To share a run with someone, send it to them directly.
 
+## Send your runs
+
+1. In the Shadetree page, press **Replay...** and choose **My runs**.
+2. Pick a run and press **Download .zip**, or press **Download all my runs**.
+3. Attach the .zip to a new issue at https://github.com/iamneilroberts/shadetree-ai/issues (say what the car is doing), or email it to the maintainer.
+
+The VIN's serial digits are replaced with 000000 in the .zip, so it is safe to post. If a transcript could not be masked safely it is left out, and the page says so.
+
 ## Updating
 
 Close the Shadetree black window, then double-click **Update Shadetree** on the Desktop. It downloads the latest version and installs it over the old one. Run it as often as you like: it keeps your files, the saved adapter port and any number you added to an icon's Target. If the Update icon is missing, run the installer again the way you did the first time.

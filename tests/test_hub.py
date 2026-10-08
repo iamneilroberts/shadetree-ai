@@ -331,6 +331,12 @@ def test_vehicle_is_identified_by_key_only_and_first_run_is_a_new_car(tmp_path):
     assert SIM_VIN not in _json.dumps(hub.state()) and SIM_VIN[-6:] not in _json.dumps(hub.state())
 
 
+def test_saved_run_names_the_vehicle_key_and_never_the_vin(tmp_path):
+    text = _run_once(tmp_path).save_run("bench").read_text()
+    assert _json.loads(text)["vehicle_key"] == vehicle_key(SIM_VIN)
+    assert SIM_VIN not in text and SIM_VIN[:11] + "000000" not in text and SIM_VIN[-6:] not in text
+
+
 def test_profile_is_saved_with_no_vin_in_it_and_second_run_knows_the_car(tmp_path):
     _run_once(tmp_path)
     f = tmp_path / "profiles" / f"{vehicle_key(SIM_VIN)}.json"

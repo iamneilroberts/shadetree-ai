@@ -549,6 +549,8 @@
   #replayPanel select { max-width: 100%; }
   #rp_err { color: var(--bad); flex: 1 1 100%; margin: 0; }
   #rp_err:empty { display: none; }
+  #rp_share { flex: 1 1 100%; margin: 0; color: var(--muted); }
+  #rp_share[hidden] { display: none; }
   button.b:disabled { opacity: .45; cursor: not-allowed; }
   /* shared parts: Panel (card with a title plate), Gauge (dial, bar, seven-segment), PID table (table.rd above) */
   .panel { background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; margin-bottom: 12px; overflow: hidden; min-width: 0; }
@@ -726,6 +728,7 @@
   <label>Run <select class="b" id="rp_runs"></select></label>
   <button class="b primary" id="rp_load">Load</button>
   <label>or a file <input type="file" id="rp_file" accept=".json,application/json"></label>
+  <p id="rp_share" hidden><button class="b" id="rp_zip">Download .zip</button> <button class="b" id="rp_zipall">Download all my runs</button> The VIN's serial digits are masked, so the .zip is safe to attach to a GitHub issue. <span id="rp_zipmsg"></span></p>
   <p id="rp_err"></p>
 </div>
 <div class="rbar" id="rbar" hidden>
@@ -1043,7 +1046,24 @@
     list.forEach(function (r) { var o = el('option', '', runLabel(r)); o.value = r.name; sel.appendChild(o); });
     if (!list.length) sel.appendChild(el('option', '', src === 'examples' ? 'no example runs' : 'no saved runs yet'));
     sel.value = list.length ? list[0].name : '';
+    $('rp_share').hidden = src !== 'mine' || !runsBy.mine.length;
   }
+  /* My runs to a .zip for the maintainer: the server masks the VIN's serial digits (export.build_zip) */
+  function zipRuns(names) {
+    if (!names.length) return;
+    $('rp_zipmsg').textContent = 'Packing\u2026'; replayErr('');
+    fetch(api('/api/export.zip?runs=' + encodeURIComponent(names.join(',')))).then(function (r) {
+      if (!r.ok) return r.json().then(function (j) { $('rp_zipmsg').textContent = ''; replayErr((j && j.error) || 'could not make the .zip'); });
+      var cd = /filename="([^"]+)"/.exec(r.headers.get('Content-Disposition') || ''), name = cd ? cd[1] : 'shadetree-runs.zip', out = Number(r.headers.get('X-Shadetree-Left-Out') || 0);
+      return r.blob().then(function (b) {
+        var a = el('a'), u = URL.createObjectURL(b); a.href = u; a.download = name; a.click();
+        setTimeout(function () { URL.revokeObjectURL(u); }, 10000);
+        $('rp_zipmsg').textContent = 'Saved ' + name + '.' + (out ? ' ' + out + ' file(s) left out because the VIN could not be masked safely (README.txt in the zip says which).' : '');
+      });
+    }).catch(function () { $('rp_zipmsg').textContent = ''; replayErr('could not make the .zip'); });
+  }
+  $('rp_zip').addEventListener('click', function () { var v = $('rp_runs').value; if (v) zipRuns([v]); });
+  $('rp_zipall').addEventListener('click', function () { zipRuns(runsBy.mine.map(function (r) { return r.name; })); });
   function gotRuns(j) {
     runsBy = { examples: (j && j.examples) || [], mine: (j && j.runs) || [] };
     var srcSel = $('rp_src'), mineFirst = runsBy.mine.length > 0;

@@ -1,5 +1,6 @@
 import http.client
 import json
+import re
 import time
 
 import pytest
@@ -450,3 +451,36 @@ def test_start_accepts_each_capture_level_and_absent_means_std(srv, given, level
     if level == "max":
         assert st["tiers"]["fast"] == ["0C", "0D", "04", "11"] and len(st["channels"]) > 16
     assert call(server, "POST", "/api/stop", {})[0] == 200
+
+
+# ---- /api/export.zip: the user's own runs as a .zip with the VIN's serial masked ----
+def get_raw(server, path, token="tok123", host=None, headers=None):
+    c = http.client.HTTPConnection("127.0.0.1", server.port, timeout=10)
+    h = {"Host": host or f"127.0.0.1:{server.port}", **(headers or {})}
+    c.request("GET", path + (f"&t={token}" if token is not None else ""), headers=h)
+    r = c.getresponse()
+    out = r.status, dict(r.getheaders()), r.read()
+    c.close()
+    return out
+
+
+def test_export_zip_needs_the_token_the_host_and_no_foreign_origin(srv_ex):
+    server, _, _ = srv_ex
+    assert get_raw(server, "/api/export.zip?runs=mine.json", token=None)[0] == 401
+    assert get_raw(server, "/api/export.zip?runs=mine.json", host="evil.example")[0] == 403
+    assert get_raw(server, "/api/export.zip?runs=mine.json", headers={"Origin": "http://evil.example"})[0] == 403
+
+
+@pytest.mark.parametrize("runs", ["", "..%2Fsecret.json", "%2Fetc%2Fpasswd", "2026-09-30T21-32-56Z-drive.json", "nope.json"])
+def test_export_zip_takes_only_names_from_my_runs(srv_ex, runs):  # traversal, an absolute path, an Example, unknown
+    server, hub, _ = srv_ex
+    (hub.runs_dir.parent / "secret.json").write_text(json.dumps(_run_obj()))
+    assert get_raw(server, f"/api/export.zip?runs={runs}")[0] == 400
+
+
+def test_export_zip_sends_a_zip_attachment(srv_ex):
+    server, _, _ = srv_ex
+    status, headers, body = get_raw(server, "/api/export.zip?runs=mine.json")
+    assert status == 200 and headers["Content-Type"] == "application/zip" and body[:2] == b"PK"
+    assert re.fullmatch(r'attachment; filename="shadetree-runs-\d{4}-\d{2}-\d{2}\.zip"', headers["Content-Disposition"])
+    assert "X-Shadetree-Left-Out" not in headers

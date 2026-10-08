@@ -9,11 +9,13 @@ import secrets
 import socket
 import threading
 import weakref
+from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib import resources
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
+from obd_reader.export import ExportError, build_zip
 from obd_reader.hub import DEFAULT_PIDS, HubBusy, LiveHub
 from obd_reader.live import LiveLimitError
 from obd_reader.replay_run import MAX_FILE_BYTES, list_runs, load_run, read_run_file
@@ -26,6 +28,7 @@ _HOSTNAME = re.compile(r"(?=.{1,253}$)[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9
 MAX_UPLOAD = MAX_FILE_BYTES  # the replay upload route only
 _LOOPBACK = {"127.0.0.1", "localhost", "::1"}
 _POST_ROUTES = ("/api/start", "/api/stop", "/api/save", "/api/sim", "/api/replay", "/api/replay/control", "/api/focus")
+_GET_ROUTES = ("/", "/api/state", "/api/help", "/api/runs", "/api/scenarios", "/api/export.zip")
 _CSP_JSON = "default-src 'none'"
 _SOURCES = ("examples", "mine")   # replay sources: the public example runs, and the user's own runs/
 
@@ -135,9 +138,11 @@ class ConsoleServer:
                 pass
 
             # ---- plumbing ----
-            def _send(self, status: int, body: bytes, ctype: str, csp: str = _CSP_JSON) -> None:
+            def _send(self, status: int, body: bytes, ctype: str, csp: str = _CSP_JSON, extra=()) -> None:
                 self.send_response(status)
                 self.send_header("Content-Type", ctype)
+                for k, v in extra:
+                    self.send_header(k, v)
                 self.send_header("Content-Length", str(len(body)))
                 self.send_header("Cache-Control", "no-store")
                 self.send_header("X-Content-Type-Options", "nosniff")
@@ -189,11 +194,11 @@ class ConsoleServer:
             # ---- routes ----
             def do_GET(self):
                 path = urlparse(self.path).path
-                if path not in ("/", "/api/state", "/api/help", "/api/runs", "/api/scenarios"):
+                if path not in _GET_ROUTES:
                     if path in _POST_ROUTES:
                         return self._json(405, {"error": "use POST"})
                     return self._json(404, {"error": "not found"})
-                ok, q = self._guard(post=False)
+                ok, q = self._guard(post=path == "/api/export.zip")  # the download also refuses a foreign Origin
                 if not ok:
                     return
                 if path == "/":
@@ -203,6 +208,19 @@ class ConsoleServer:
                     return self._json(200, {"pids": HELP, "mode06": MODE06})
                 if path == "/api/scenarios":
                     return self._json(200, {"scenarios": outer.scenarios})
+                if path == "/api/export.zip":  # the user's own runs only, VIN serial masked (export.build_zip)
+                    names = [n for n in ",".join(q.get("runs") or []).split(",") if n]
+                    try:
+                        data, left_out = build_zip(outer.hub.runs_dir.parent, names)
+                    except (ValueError, FileNotFoundError):
+                        return self._json(400, {"error": "pick one or more of your saved runs"})
+                    except (ExportError, OSError) as e:
+                        return self._json(500, {"error": str(e)})
+                    name = f"shadetree-runs-{datetime.now(timezone.utc):%Y-%m-%d}.zip"
+                    extra = [("Content-Disposition", f'attachment; filename="{name}"')]
+                    if left_out:
+                        extra.append(("X-Shadetree-Left-Out", str(len(left_out))))  # README.txt in the zip names them
+                    return self._send(200, data, "application/zip", extra=extra)
                 if path == "/api/runs":
                     ex = outer.examples_dir
                     return self._json(200, {"runs": list_runs(outer.hub.runs_dir), "examples": list_runs(ex) if ex else []})
@@ -215,7 +233,7 @@ class ConsoleServer:
             def do_POST(self):
                 path = urlparse(self.path).path
                 if path not in _POST_ROUTES:
-                    if path in ("/", "/api/state", "/api/help", "/api/runs", "/api/scenarios"):
+                    if path in _GET_ROUTES:
                         return self._json(405, {"error": "use GET"})
                     return self._json(404, {"error": "not found"})
                 ok, _ = self._guard(post=True)
