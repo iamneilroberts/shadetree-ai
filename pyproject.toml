@@ -16,7 +16,7 @@ dev = ["pytest>=8", "hypothesis>=6.100"]
 where = ["src"]
 
 [tool.setuptools.package-data]
-"obd_reader.web" = ["console.html", "FONTS-OFL.txt"]
+"obd_reader.web" = ["console.html", "FONTS-OFL.txt", "FONTS-APACHE.txt"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

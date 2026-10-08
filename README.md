@@ -174,4 +174,4 @@ Every diagnostic claim cites a reference record ID or is labeled "general knowle
 ## License
 
 MIT (see [LICENSE](LICENSE)). Reference data pulled in later keeps its own per-record license tag; share-alike or non-commercial data stays out of this repo.
-The console page embeds subsets of three fonts under the SIL OFL 1.1 (Stardos Stencil and Share Tech Mono, renamed Cabinet Stencil and Cabinet Mono as the licence requires for modified versions, and Archivo Narrow); notices and licence text: [src/obd_reader/web/FONTS-OFL.txt](src/obd_reader/web/FONTS-OFL.txt).
+The console page embeds subsets of three fonts under the SIL OFL 1.1 (Stardos Stencil and Share Tech Mono, renamed Cabinet Stencil and Cabinet Mono as the licence requires for modified versions, and Archivo Narrow); notices and licence text: [src/obd_reader/web/FONTS-OFL.txt](src/obd_reader/web/FONTS-OFL.txt). The Retro Dashboard's sign also embeds a subset of Yellowtail (Astigmatic, Apache License 2.0), renamed Sign Script; notice and licence text: [src/obd_reader/web/FONTS-APACHE.txt](src/obd_reader/web/FONTS-APACHE.txt).

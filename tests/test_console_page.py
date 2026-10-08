@@ -134,7 +134,8 @@ def test_retained_feature_is_still_on_the_page(feature):
 
 
 def test_page_stays_one_file_under_its_size_budget():
-    assert len(HTML.encode("utf-8")) < 260_000  # 92,165 bytes before stage 1; stage 2 adds the Dashboard and scenarios (about 10 KB) and removes the #vp preview; raised to 150,000 on 2026-10-02 (maintainer) for the UI polish pass; raised to 260,000 for embedded fonts and the 1970s cabinet skin, 2026-10-02, maintainer; raise only on purpose
+    assert len(HTML.encode("utf-8")) < 275_000  # raised for the D cabinet skin, maintainer decision 2026-10-07
+    # history: 92,165 bytes before stage 1; stage 2 adds the Dashboard and scenarios (about 10 KB) and removes the #vp preview; raised to 150,000 on 2026-10-02 (maintainer) for the UI polish pass; raised to 260,000 for embedded fonts and the 1970s cabinet skin, 2026-10-02, maintainer; raise only on purpose
     assert HTML.count("<script>") == 1 and HTML.count("<style>") == 1
 
 
@@ -327,75 +328,12 @@ def test_handheld_alert_repeats_the_notices_inside_the_frame_using_tokens_only()
     assert "background: var(--msg-bg)" in body and "color: var(--amber)" in body  # the --amber on --msg-bg pair is held by TEXT_PAIRS
 
 
-_CAB_MEDIA = (None, "(max-width: 900px)", "(max-width: 600px)", "(min-width: 701px)", "(min-width: 701px) and (prefers-reduced-motion: reduce)",
-              "(min-width: 1101px)", "(max-width: 1100px)", "(max-width: 800px)")  # 2026-10-02: grilles above 1100 px only, the sticker above 800 px only  # the Retro cabinet at every width (changed 2026-10-02: it was desktop only); the knob above 700 px
-
-
-def _cabinet_rules(css):
-    return [r for r in _css_rules(css) if any(".dcab" in s or ".dface" in s for s in r[1])]
-
-
-def test_cabinet_chrome_is_retro_only_at_every_width():
-    rules = _cabinet_rules(_css())
-    assert rules, "the Dashboard cabinet has CSS"
-    assert 'class="dcab"' in HTML and "dcab retro" not in HTML and "retro dcab" not in HTML, "the wrapper never wears the .retro class (it restyles Plain)"
-    assert HTML.count('id="clarity"') == 1, "one Clarity button on the page"
-    assert re.search(r'<div class="dcab"><div class="dface" id="d_face">', HTML) and 'class="plate"' in HTML[HTML.index('class="dcab"'):HTML.index('id="v5"')]
-    for media, sels, body in rules:
-        flat = " ".join(body.split())
-        if not all(s.startswith(':root[data-skin="retro"]') for s in sels):
-            # unscoped base: only hides the decorative chrome, never gives the wrapper or the face a look
-            assert flat in ("display: none;", "display: none"), f"{sels} outside the Retro skin may only be display: none"
-            assert media is None and all(re.search(r"\.dcab \.(plate|screw|knob|ltest)$", s) for s in sels), f"{sels}: only plate, screw, knob and the lamp test are hidden unscoped"
-        else:
-            assert media in _CAB_MEDIA, f"{sels} gives the cabinet a look in an unexpected media query: {media}"
-    scoped = " ".join(" ".join(r[1]) for r in rules if all(s.startswith(':root[data-skin="retro"]') for s in r[1]))
-    for needle in (".dcab::before", ".dcab::after", ".dface", ".dface > .plate", ".screw", ".dcab.max"):   # the Display bench and its rocker are gone: Clarity is in the Options drawer (2026-10-02)
-        assert needle in scoped, f"Retro rule for {needle}"
-    hidden = " ".join(" ".join(r[1]) for r in rules if not all(s.startswith(':root[data-skin="retro"]') for s in r[1]))
-    for needle in (".dcab .plate", ".dcab .screw", ".dcab .knob"):
-        assert needle in hidden, f"{needle} is hidden by default"
-
-
-def _steel(p):
-    """The cabinet body's colours, top to bottom: the hammertone steel gradient's stops (Retro, desktop)."""
-    return [p["--cb-steel-hi"], p["--cb-steel"], p["--cb-steel-lo"]]
-
-
-FACE_OVERRIDES = {  # what sits directly on the cabinet's steel body (not inside its own panel/card) and so needs a steel-safe colour
-    "h3.sec": "text", "#o_note": "text", "#d_table > .note": "text", ".more": "text", "table.rd th": "text", "table.rd td .at": "text",
-}  # the readings table itself is the CRT bay (black): test_retro_readings_table_is_the_crt_bay
-
-
-def _face_override(css, frag):
-    for media, sels, body in _cabinet_rules(css):
-        if media is None and any(s.endswith(frag) and s.startswith(':root[data-skin="retro"] #v0 .dface ') for s in sels):
-            m = re.search(r"(?:color:|box-shadow: inset 3px 0 0)\s*var\((--[\w-]+)\)", body)
-            if m:
-                return m.group(1)
-    return None
-
-
-@pytest.mark.parametrize("theme", ["dark", "light"])
-def test_text_and_marker_directly_on_the_cabinet_steel_are_readable(theme):
-    p, css = _palette("retro", theme), _css()
-    face = _steel(p)
-    for frag, kind in FACE_OVERRIDES.items():
-        tok = _face_override(css, frag)
-        assert tok, f"{frag}: a Retro desktop override gives it a steel-safe colour"
-        need = 4.5 if kind == "text" else 3.0
-        assert all(_contrast(p[tok], f) >= need for f in face), f"{frag}: {tok} {p[tok]} on the face is below {need}:1"
-    if theme == "dark":
-        assert any(_contrast(p["--meter-ink2"], f) < 4.5 for f in face), "sanity: the old light-face ink is unreadable on the dark steel"
-    assert not any(s.endswith(".dface .note") for _, ss, _ in _cabinet_rules(css) for s in ss), "a blanket .dface .note would darken notes inside the dark panels"
-
-
 def test_every_pid_table_row_has_the_same_left_bar_and_scenario_rows_only_recolour_it():
     rules = _css_rules(_css())
     base = [b for m, s, b in rules if m is None and "table.rd tbody td:first-child" in s]
     assert base and "box-shadow: inset 3px 0 0 var(--line)" in base[0], "every row of every PID table gets a 3px neutral left bar, so the edge is even"
     scen = [(m, s, b) for m, s, b in rules if any("tr.scen" in x for x in s)]
-    assert len(scen) >= 2, "the plain marker and the Retro cabinet marker"
+    assert len(scen) >= 1, "the plain marker (the Retro CRT-bay marker went with the old cabinet, 2026-10-07)"
     for m, s, b in scen:
         decl = [d.strip() for d in b.split(";") if d.strip()]
         assert len(decl) == 1 and re.fullmatch(r"box-shadow: inset 3px 0 0 var\(--[\w-]+\)", decl[0]) and "--line" not in decl[0], f"{s}: .scen only recolours the bar"
@@ -426,8 +364,6 @@ def _bar_tok(rules, skin, media_ok, candidates):
 
 _BAR = "table.rd tbody td:first-child"
 _BAR_CONTEXTS = [  # (where, skins, media, a plain row's candidate selectors, a scenario row's extra selectors or None, background)
-    ("Dashboard readings in the CRT bay (Retro, any width)", {"retro"}, {None, "(min-width: 601px)"}, [_BAR, _R + "#v0 .dface " + _BAR, _R + "#d_table.crt " + _BAR],
-     ["#d_table tr.scen td:first-child", _R + "#d_table.crt table.rd tbody tr.scen td:first-child"], "--cb-face"),
     ("Dashboard on the page (Plain)", {"plain"}, {None}, [_BAR], ["#d_table tr.scen td:first-child"], "--bg"),
     ("Handheld table on the device face", {"plain", "retro"}, {None, "(min-width: 601px)"}, [_BAR, ".retro .hh " + _BAR], None, "face"),
 ]
@@ -534,6 +470,8 @@ def test_text_in_the_cabinet_and_the_handheld_reads_on_its_own_card(skin, theme)
                 cab[k] = cab[m.group(1)]
     low = []
     for where, chain, bg in _INK_CASES:
+        if skin == "retro" and chain[:2] == _CAB:
+            continue  # the Retro Dashboard is the D cabinet (2026-10-07): its Plain parts are hidden; test_d_text_reads_on_its_panels covers its text
         q = cab if chain[:2] == _CAB else p
         ink = _effective_ink(rules, skin, chain)
         assert ink, f"{where}: no text colour anywhere in its chain"
@@ -603,91 +541,6 @@ def test_open_menu_leaves_room_to_scroll_the_handheld_nav_above_the_replay_bar()
     assert re.search(r"body:has\(#v5\.is-active\):has\(\.topbar\.menu-open\):has\(\.rbar:not\(\[hidden\]\)\) \.stage \{ padding-bottom: var\(--rbar-h\); \}", narrower[:narrower.index("\n  }")])
 
 
-# ---- 1970s shop-cabinet port (2026-10-02): plate, fonts, black meter faces, CRT table, test selector ----
-def test_cabinet_plate_reads_shadetree_model_br_549():
-    cab = HTML[HTML.index('class="dcab"'):HTML.index('id="v5"')]
-    plate = re.search(r'<div class="plate">(.*?)</div></div>', cab, re.S).group(1)
-    assert "<b>SHADETREE</b>" in plate and "Model BR-549 &middot; Engine Analyzer" in plate and "SER. 0709" in plate
-    assert "7-A" not in HTML, "the old model number is gone everywhere on the page"
-
-
-def test_cabinet_fonts_are_embedded_data_uris_and_the_stencil_set_uses_them():
-    faces = re.findall(r'@font-face \{ font-family: "([^"]+)"; font-style: normal; font-weight: ([\d ]+); src: url\(data:font/woff2;base64,[A-Za-z0-9+/=]{2000,}\) format\("woff2"\); \}', HTML)
-    assert sorted(faces) == [("Archivo Narrow", "400 700"), ("Cabinet Mono", "400"), ("Cabinet Stencil", "400"), ("Cabinet Stencil", "700")]
-    assert HTML.count("@font-face") == 4, "only the weights the cabinet uses"
-    root = _block_all(":root")
-    assert root["--cb-stencil"].startswith('"Cabinet Stencil"') and root["--cb-label"].startswith('"Archivo Narrow"') and root["--cb-mono"].startswith('"Cabinet Mono"')
-    cab = [(s, b) for m, ss, b in _cabinet_rules(_css()) if m is None for s in ss]
-    uses = lambda frag, tok: any(s.endswith(frag) and "var(" + tok + ")" in b for s, b in cab)
-    assert uses("#v0 .dface", "--cb-label"), "labels and body text in Archivo Narrow"
-    assert uses(".plate .np b", "--cb-stencil") and uses(".panel > .ptitle", "--cb-stencil") and uses("#v0 .dface h3.sec", "--cb-stencil"), "plate and legends in the stencil"
-    assert "SIL OFL 1.1" in HTML[:HTML.index(":root {")] and resources.files("obd_reader.web").joinpath("FONTS-OFL.txt").is_file()
-
-
-@pytest.mark.parametrize("theme", ["dark", "light"])
-def test_retro_dashboard_indicators_sit_on_pure_black_in_both_themes(theme):
-    p = _palette("retro", theme)
-    assert _block_all(":root")["--cb-face"] == "#000000"
-    assert p["--g-face"] == "#000000" and p["--g-win"] == "#000000", "dials, LED bar tracks and seven-segment windows are black"
-    css = _css()
-    bezel = [b for m, ss, b in _cabinet_rules(css) if m is None and any(s.endswith("#v0 .dface .gauge .gface") for s in ss)]
-    assert bezel and "linear-gradient(var(--cb-face), var(--cb-face)) padding-box" in bezel[0], "the face inside every bezel is black"
-    assert any(any(s.endswith("#v0 .dface .win") for s in ss) and "background: var(--cb-face)" in b for m, ss, b in _cabinet_rules(css)), "the code-count window too"
-    hh = dict(p); hh.update(_block_all(".retro")); hh.update(_block_all(':root[data-skin="retro"] .stage-pad.retro'))
-    assert hh["--g-face"] == "var(--meter-face)" and hh["--g-win"] == "var(--win-bg)", "the Handheld keeps its own faces and windows"
-
-
-def test_retro_readings_table_is_the_crt_bay():
-    assert '<div id="d_table" class="crt"></div>' in HTML, "the Dashboard table carries the scheme class"
-    rules, css = _css_rules(_css()), _css()
-    crt = [(m, ss, b) for m, ss, b in rules if any(s.startswith(_R + "#d_table.crt") for s in ss)]
-    assert crt and all(m in (None, "(max-width: 600px)") for m, _, _ in crt), "the scheme applies at every width, Retro only"
-    frame = [b for m, ss, b in crt if _R + "#d_table.crt .rwrap" in ss and m is None][0]
-    assert "background: var(--cb-face)" in frame and "border: 9px solid var(--cb-trim)" in frame
-    for theme in ("dark", "light"):
-        p = _palette("retro", theme)
-        for fg, need in (("--crt-fg", 7.0), ("--crt-head-fg", 7.0), ("--crt-muted", 4.5)):
-            assert _contrast(p[fg], p["--cb-face"]) >= need, (theme, fg)
-        assert 1.2 <= _contrast(p["--crt-rule"], p["--cb-face"]) < _contrast(p["--crt-rule-strong"], p["--cb-face"]) < _contrast(p["--cb-needle"], p["--cb-face"]), "rules faint, row bar visible, scenario marker strongest"
-    assert any(any(s.endswith("#d_table.crt table.rd .dash") for s in ss) and "var(--crt-muted)" in b for m, ss, b in crt)
-
-
-def test_rotary_selector_shows_only_on_a_wide_retro_desktop_and_falls_back_to_the_pushbuttons():
-    assert re.search(r'<button class="qbtn" id="d_edit"[^>]*>&#9998;</button>\s*<div class="knob" id="d_knob"></div>', HTML), "the knob sits in the scenario bar"
-    rules = _cabinet_rules(_css())
-    show = [(m, ss, b) for m, ss, b in rules if any(s.endswith(" .knob") for s in ss) and "display: block" in b]
-    hide_tabs = [(m, ss, b) for m, ss, b in rules if any(s.endswith(" .stabs") for s in ss) and "display: none" in b]
-    for found in (show, hide_tabs):
-        assert len(found) == 1 and found[0][0] == "(min-width: 701px)", "only wider than 700 px; at 700 px or less the tabs stay, styled as pushbuttons"
-        sel = found[0][1][0]
-        assert ':has(.knob[data-on="1"])' in sel and ':not(:has(#d_edit[aria-pressed="true"]))' in sel, "never while editing, never with too many scenarios"
-    js = re.search(r"<script>(.*?)</script>", HTML, re.S).group(1)
-    assert "role=\"radiogroup\" aria-label=\"Scenario\"" in js and "role=\"radio\" aria-checked=" in js
-    for k in ("ArrowRight", "ArrowLeft", "ArrowUp", "ArrowDown", "Home", "End"):
-        assert "'" + k + "'" in js, k
-    push = [b for m, ss, b in rules if any(s.endswith("#v0 .dface .stab") for s in ss)]
-    assert push and "border: 4px solid transparent" in push[0] and "var(--cb-cap-1)" in push[0], "the fallback tabs are chrome-bezelled pushbuttons"
-
-
-def test_the_cabinet_has_a_phone_layout_and_the_knob_stays_desktop_only():
-    rules = _cabinet_rules(_css())
-    phone = {s: " ".join(b.split()) for m, ss, b in rules if m == "(max-width: 600px)" for s in ss}
-    P = _R + "#v0 .dface"
-    assert phone[_R + ".dcab"] == "padding: 0 5px;", "thin end cheeks on a phone"
-    assert "width: 5px" in phone[_R + ".dcab::before"]
-    assert phone[P + "::before"] == "display: none;" and P + "::after" in phone, "no handle or kick plate on a phone"
-    assert "repeat(2, minmax(0, 1fr))" in phone[P + " .gauges"], "gauges two across"
-    assert '"top" "face" "val" "note"' in phone[P + " .gauge"], "the reading under the face, not squeezed beside the name"
-    assert "var(--cb-cap-1)" in phone[P + " > .scenbar .ssel"] and "appearance: none" in phone[P + " > .scenbar .ssel"], "the dropdown is a cabinet pushbutton"
-    assert "min-width: 44px" in phone[P + " > .scenbar #d_edit"], "44 px controls (the drawer's controls get theirs from the shared touch-target rule)"
-    assert not re.search(r"min-height:\s*(?:[0-3]?\d|4[0-3])px", " ".join(phone.values())), "nothing shrinks a control below 44 px"
-    tiny = {s: " ".join(b.split()) for m, ss, b in rules if m == "(max-width: 800px)" for s in ss}
-    assert tiny[P + " > .plate .sticker"] == "display: none;", "the sticker gives way on the narrowest phones"
-    knob = [(m, b) for m, ss, b in rules if any(s.endswith(" .knob") for s in ss) and "display: block" in b]
-    assert [m for m, _ in knob] == ["(min-width: 701px)"], "the knob shows only wider than 700 px; at 700 px or less it stays hidden"
-    assert all(m != "(max-width: 600px)" for m, ss, b in rules if any(".knob" in s for s in ss)), "no phone rule touches the knob"
-
-
 @pytest.mark.parametrize("theme", ["dark", "light"])
 def test_the_retro_dashboard_page_is_gunmetal_not_oxblood(theme):
     """Retro Dashboard (2026-10-02): the bar, chips and page ground take a neutral grey from the cabinet's steel; the accent is the lamp amber."""
@@ -703,25 +556,6 @@ def test_the_retro_dashboard_page_is_gunmetal_not_oxblood(theme):
     assert "document.documentElement.setAttribute('data-view', id)" in js, "show() tells the CSS which view is up"
 
 
-def test_the_nameplate_and_the_handle_share_the_cabinet_centreline():
-    """2026-10-02: the sticker left the plate's row (it pushed the plate off centre); the plate sits in the middle of three columns, two equal."""
-    rules = _cabinet_rules(_css())
-    top = {}
-    for m, ss, b in rules:
-        for sel in ss if m is None else ():
-            top[sel] = top.get(sel, "") + " " + " ".join(b.split())   # every unscoped-width rule for the selector, in order
-    P = _R + "#v0 .dface"
-    assert "grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);" in top[P + " > .plate"], "equal grilles either side"
-    assert "grid-column: 2;" in top[P + " > .plate .np"]
-    sticker = top[P + " > .plate .sticker"]
-    assert "position: absolute;" in sticker and "grid-column" not in sticker, "the sticker is out of the flow, not a sibling cell of the plate"
-    assert "left: 50%;" in top[P + "::before"] and "translateX(-50%)" in top[P + "::before"], "the handle is centred on the body"
-    wide = {s: " ".join(b.split()) for m, ss, b in rules if m == "(min-width: 1101px)" for s in ss}
-    assert "padding-inline: 128px;" in wide[P + " > .plate"], "equal margins keep the sticker clear of the right grille"
-    assert "grid-row: 2;" in top[P + " > .sumbar"] and "border: 0;" in top[P + " > .sumbar"], "the summary strip is a slim line under the plate"
-    assert "grid-area: 3 / 1;" in top[P + " > .scenbar"] and "grid-area: 3 / 2;" in top[P + " > .lamps"], "the selector and the lamps side by side, one row"
-
-
 def test_the_retro_dashboard_bar_keeps_44px_touch_targets():
     """The slim bar's own 28 px buttons must not beat the touch rule: a later phone/coarse-pointer rule with the same weight restores 44 px."""
     css = _css()
@@ -729,6 +563,93 @@ def test_the_retro_dashboard_bar_keeps_44px_touch_targets():
     small = css.index(R + " .topbar button.b:not(.tg), " + R + " .topbar select.b { min-height: 28px;")
     touch = css.index("@media (max-width: 600px), (pointer: coarse) { " + R + " .topbar button.b:not(.tg), " + R + " .topbar button.tg, " + R + " .topbar select.b { min-height: 44px; } }")
     assert touch > small, "the touch rule comes after the bar's sizes"
+
+
+# ---- the Retro Dashboard is design D, "Shop tester" (maintainer, 2026-10-07): it replaced the 1970s steel cabinet ------------
+_DD = HTML[HTML.index('<div class="dd" id="d_dd">'):HTML.index("<!-- C: GUIDED TEST -->")]
+
+
+def _d_rules():
+    return [r for r in _css_rules(_css()) if any(".dd" in s or "#d_stat" in s or "#d_knob" in s or ".dcab" in s or "#d_face" in s for s in r[1])]
+
+
+def test_d_cabinet_shows_only_in_retro_and_hides_the_plain_dashboard_there():
+    rules = _d_rules()
+    flat = {s: " ".join(b.split()) for m, ss, b in rules if m is None for s in ss}
+    assert flat[".dcab .dd"] == "display: none;", "Plain never shows the D cabinet"
+    assert flat[_R + ".dcab .dd"] == "display: block;" and flat[_R + "#d_face > :not(.dd)"] == "display: none;", "Retro shows it instead of the Plain parts"
+    assert 'class="dcab"' in HTML and "dcab retro" not in HTML and HTML.count('id="clarity"') == 1
+    assert re.search(r'<div class="dcab"><div class="dface" id="d_face">', HTML) and HTML.index('id="d_face"') < HTML.index('id="d_dd"') < HTML.index('id="v3"'), "the D subtree sits inside the face"
+    for gone in ('class="plate"', "sticker", 'class="screw"', "Calibrated", "SER. 0709", "--cb-steel", "--cb-cheek", "--cb-noise", "#d_table.crt", "r-ptrg", "kchrome"):
+        assert gone not in HTML, f"{gone}: the old cabinet is gone"
+    assert any(s == _R + ".dcab.max" for m, ss, b in rules for s in ss), "Clarity still reaches the code count's digits"
+    assert re.search(r':root\[data-skin="retro"\]\[data-view="v0"\] \.foot \{ display: none; \}', _css()) and '<p class="foot">Values come from one shared sampler' in HTML, "the page footer's caveats: Plain only on the Dashboard"
+
+
+def test_d_text_reads_on_its_panels():
+    p = _block_all(":root")
+    for k in p:
+        while (m := re.fullmatch(r"var\((--[\w-]+)\)", p[k])):
+            p[k] = p[m.group(1)]
+    red = ["--d-r1", "--d-r2", "--d-r3", "--d-p1", "--d-p2", "--d-p3"]
+    pairs = [(f, b) for f in ("--d-white", "--d-ink2", "--d-hot") for b in red]   # silkscreen, small labels, Check engine ON
+    pairs += [(f, b) for f in ("--d-alu-ink", "--d-alu-ink2") for b in ("--d-m1", "--d-m2", "--d-m3", "--d-m4")]   # the aluminium strip
+    pairs += [(f, b) for f in ("--d-face-ink", "--d-face-red") for b in ("--d-face1", "--d-face2")] + [("--d-face-ink", "--d-rface")]   # meter faces
+    pairs += [(f, b) for f in ("--d-paper-ink", "--d-paper-ink2") for b in ("--d-paper1", "--d-paper2")] + [("--d-cap", "--d-gl1")]   # printout, code count
+    pairs += [("--d-white", "--d-crt2"), ("--d-white", "--d-crt3")]   # the CRT's text sits off its bright centre
+    low = [(f, b, round(_contrast(p[f], p[b]), 2)) for f, b in pairs if _contrast(p[f], p[b]) < 4.5]
+    assert low == [], f"D text below 4.5:1: {low}"
+    assert all(_contrast(p[z], p[b]) >= 3.0 for z in ("--d-ok", "--d-watch", "--d-out", "--d-needle") for b in ("--d-face1", "--d-face2")), "bands and needle show on the cream"
+
+
+def test_d_sign_model_plate_and_leads():
+    assert '<div class="dname">Shadetree</div>' in _DD and '<div class="dline">Engine analyzer &middot; Read-only</div>' in _DD
+    assert '<div class="model">BR-549</div>' in _DD and "7-A" not in HTML
+    assert re.search(r'\.dd \.dname \{[^}]*font: 400 42px/1 "Sign Script", cursive;', _css()) and re.search(r"\.dd \.dline \{[^}]*text-transform: uppercase;", _css())
+    for jack in ("OBD", "Batt +", "Batt &minus;", "Scope", "Aux"):
+        assert f'<span class="lb">{jack}</span>' in _DD
+
+
+def test_cabinet_fonts_are_embedded_data_uris_and_credited():
+    faces = re.findall(r'@font-face \{ font-family: "([^"]+)"; font-style: normal; font-weight: ([\d ]+); src: url\(data:font/woff2;base64,[A-Za-z0-9+/=]{2000,}\) format\("woff2"\); \}', HTML)
+    assert sorted(faces) == [("Archivo Narrow", "400 700"), ("Cabinet Mono", "400"), ("Cabinet Stencil", "400"), ("Sign Script", "400")], "the bold stencil left with the old cabinet"
+    assert HTML.count("@font-face") == 4
+    root = _block_all(":root")
+    assert root["--d-lab"] == "var(--cb-label)" and root["--d-mono"] == "var(--cb-mono)" and root["--cb-stencil"].startswith('"Cabinet Stencil"')
+    head = HTML[:HTML.index(":root {")]
+    assert "SIL OFL 1.1" in head and "FONTS-OFL.txt" in head and "Yellowtail" in head and "Apache License 2.0" in head and "FONTS-APACHE.txt" in head
+    web = resources.files("obd_reader.web")
+    assert web.joinpath("FONTS-OFL.txt").is_file() and "Apache License" in web.joinpath("FONTS-APACHE.txt").read_text(encoding="utf-8")
+    assert "Bonislawsky" in web.joinpath("FONTS-APACHE.txt").read_text(encoding="utf-8")
+
+
+def test_d_scope_knob_sits_on_a_plate_under_the_crt_at_every_width():
+    crt, plate, knob = _DD.index('<svg id="d_crt"'), _DD.index('<div class="scp">'), _DD.index('<div id="d_knob"></div>')
+    assert crt < plate < knob < _DD.index('id="d_rects"'), "CRT, then its SCOPE plate with the knob, then the meters"
+    assert not [m for m, ss, b in _d_rules() if any("#d_knob" in s for s in ss) and "display: none" in b], "the knob is never hidden: it is the Retro Dashboard's only scenario selector"
+    js = re.search(r"<script>(.*?)</script>", HTML, re.S).group(1)
+    assert 'role="radiogroup" aria-label="Scenario"' in js and 'role="radio" aria-checked="' in js
+    for k in ("ArrowRight", "ArrowLeft", "ArrowUp", "ArrowDown", "Home", "End"):
+        assert "'" + k + "'" in js, k
+
+
+def test_d_phone_layout_stacks_the_panels():
+    phone = {s: " ".join(b.split()) for m, ss, b in _d_rules() if m == "(max-width: 600px)" for s in ss}
+    assert "grid-template-columns: 1fr;" in phone[".dd .dfc"] and ".dd .dlow" in phone and ".dd .dalu" in phone, "one column on a phone"
+    assert "min-height: 44px; min-width: 44px;" in phone[".dd .pbn"], "44 px controls"
+    assert phone[".dd .cable"] == "display: none;"
+
+
+def test_d_control_strip_presses_the_real_controls():
+    for target in re.findall(r'data-do="(\w+)"', _DD):
+        assert target == "opt" or f'id="{target}"' in HTML[:HTML.index('<main class="stage">')], f"{target}: a real control in the toolbar"
+    assert sorted(set(re.findall(r'data-do="(\w+)"', _DD))) == ["opt", "pause", "replayBtn", "rev", "save", "skinBtn", "themeBtn", "unitsBtn"]
+    nav = re.findall(r'<button class="vbtn[^"]*" data-view="(v\d)"', HTML)
+    assert re.findall(r'data-go="(v\d)"', _DD) == nav, "FUNCTION: one push button per view, in the same order"
+    assert re.findall(r'data-cap="(\w+)"', _DD) == ["min", "std", "max"] and all(f'id="cap_{v}"' in HTML for v in ("min", "std", "max"))
+    assert re.findall(r'data-sim="(\w+)"', _DD) == ["next", "healthy", "rich", "lean"] and all(f'<option value="{v}"' in HTML for v in ("healthy", "rich", "lean"))
+    assert '<button class="ltest" id="d_ltest" type="button"' in _DD, "LAMP TEST keeps its own hold-to-light handlers"
+    assert re.search(r"\.dd \.pbn, \.dd \.ltest \{[^}]*white-space: nowrap;", _css()), "Rev 2500 and the other legends never wrap"
 
 
 # ---- Terminal view (#v7): a fixed CRT screen, its own tokens ------------------------------------------

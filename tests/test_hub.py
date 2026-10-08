@@ -798,16 +798,16 @@ def test_capture_min_reads_only_the_core_pids_and_the_supported_focus_pids_every
     sent, orig = [], sim.write
     sim.write = lambda data: (sent.append(data.decode("ascii").rstrip("\r")), orig(data))[1]
     hub, _, _ = make(tmp_path, sim=sim)
-    hub.set_focus(["14", "3D", "2E", "0C"])  # 14: not in this car's bitmap (and no fallback); 0C: already core
+    hub.set_focus(["14", "3D", "2E", "0C"])  # 14: not in this car's bitmap, read as its wideband fallback 24 (2026-10-07); 0C: already core
     hub.start(DEFAULT_PIDS, hz=10, seconds=30, capture="min")
     assert wait_for(lambda: hub.state()["seq"] >= 4)
     st = hub.state()
-    assert st["extras"] == ["3D", "2E"] and set(st["channels"]) == set(DEFAULT_PIDS) | {"3D", "2E"}
+    assert st["extras"] == ["24", "3D", "2E"] and set(st["channels"]) == set(DEFAULT_PIDS) | {"24", "3D", "2E"} and st["fallbacks"] == {"14": "24"}
     assert wait_for(lambda: hub.state()["stats"]["2E"]["n"] >= 3), "focus PIDs are read every sweep, not rotated"
     hub.set_focus([])  # the old focus-only PIDs are dropped on the next sweep
     assert wait_for(lambda: hub.state()["extras"] == [])
     hub.stop()
-    rotating = {"01" + p for p in EXTRA_PIDS if p not in DEFAULT_PIDS} - {"013D", "012E"}
+    rotating = {"01" + p for p in EXTRA_PIDS if p not in DEFAULT_PIDS} - {"013D", "012E", "0124"}
     assert not rotating & set(sent), "no rotating extras"
 
 
@@ -965,11 +965,11 @@ def test_a_scenario_chosen_mid_run_gets_its_supported_pids_read_and_never_one_th
     hub.start(DEFAULT_PIDS, hz=10, seconds=30)
     assert wait_for(lambda: hub.state()["seq"] >= 3)
     assert "3D" not in hub.state()["extras"]  # not one of the default extras on this car
-    hub.set_focus(["14", "3d", "2E", "0C"])  # 14: not in this car's bitmap; 0C: already a core channel
+    hub.set_focus(["14", "3d", "2E", "0C"])  # 14: not in this car's bitmap (read as its fallback 24); 0C: already a core channel
     assert wait_for(lambda: hub.state()["channels"].get("3D", {}).get("samples"))
     st = hub.state()
     hub.stop()
-    assert st["focus"] == ["14", "3D", "2E", "0C"] and st["extras"][:2] == ["3D", "2E"] and len(DEFAULT_PIDS) + len(st["extras"]) <= 16
+    assert st["focus"] == ["14", "3D", "2E", "0C"] and st["extras"][:3] == ["24", "3D", "2E"] and len(DEFAULT_PIDS) + len(st["extras"]) <= 16
     assert "14" not in st["supported"] and "3D" in st["supported"] and "14" not in st["channels"]
     assert "0114" not in sent, "a PID the car does not list is never asked for"
 
@@ -1080,6 +1080,24 @@ def test_a_car_without_0f_10_or_05_gets_the_multi_sensor_fallbacks_and_never_the
     st = hub2.state()
     hub2.stop()
     assert st["extras"][0] == "67" and st["fallbacks"] == {"05": "67"}
+
+
+def test_a_car_without_narrowband_upstream_o2_reads_its_wideband_lambda_in_place(tmp_path):
+    from obd_reader.hub import fallback_for
+    assert fallback_for("14", {"24", "34"}) == "24" and fallback_for("14", {"34"}) == "34" and fallback_for("18", {"38"}) == "38"
+    assert fallback_for("14", {"14", "24"}) == "14", "a car with the narrowband sensor keeps it"
+    assert fallback_for("05", {"67"}) == "67" and fallback_for("0C", set()) == "0C"
+    sim = SimPort("healthy")  # the demo car: no 14 or 18, wideband 24 and 28 advertised
+    sent, orig = [], sim.write
+    sim.write = lambda data: (sent.append(data.decode("ascii").rstrip("\r")), orig(data))[1]
+    hub, _, _ = make(tmp_path, sim=sim)
+    hub.start(DEFAULT_PIDS, hz=10, seconds=30)
+    assert wait_for(lambda: hub.state()["seq"] >= 2)
+    hub.set_focus(["06", "14", "18"])  # the Fuel trims scenario asks for the upstream O2 sensors
+    assert wait_for(lambda: hub.state()["fallbacks"] == {"14": "24", "18": "28"})
+    assert wait_for(lambda: hub.state()["channels"].get("24", {}).get("samples"))
+    hub.stop()
+    assert "0114" not in sent and "0118" not in sent
 
 
 class _LateBitmapSim(SimPort):

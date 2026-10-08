@@ -78,7 +78,7 @@ function makeEnv(states, viewId = 'v0', help = null, runs = [], store = {}, page
 // the parts the page re-parents, with the parents and order the markup gives them (checked against the markup: a stale list fails here)
 const TREE = [['body', ['topbar', 'menuStatus', 'msg', 'rbar']], ['topbar', ['menuBtn', 'viewNav', 'optBtn', 'optDrawer']], ['optDrawer', ['clarity']],
               ['menuStatus', ['chipConn', 'chipCar', 'chipLamp', 'chipCodes', 'chipLive', 'liveOff', 'chipRate', 'chipAge', 'chipAuto', 'ctl']],
-              ['ctl', ['simctl', 'unitsBtn', 'themeBtn', 'skinBtn', 'replayBtn', 'capLvl', 'pause', 'save']], ['v0', ['d_sum']], ['d_face', ['d_scenbar']]];
+              ['ctl', ['simctl', 'unitsBtn', 'themeBtn', 'skinBtn', 'replayBtn', 'capLvl', 'pause', 'save']], ['v0', ['d_sum']], ['d_face', ['d_scenbar', 'd_lamps']]];
 {
   const at = (id) => { const i = html.indexOf('id="' + id + '"'); assert.ok(i > 0, id); return i; };
   const close = (id, tag) => html.indexOf('</' + tag + '>', at(id));
@@ -1095,7 +1095,7 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
     assert.ok(!flat(E4.e.el('d_table')).includes('No readings yet'), 'and only when the run is empty');
   }
 
-  // Retro cabinet: the rotary test selector lists the same scenarios as the tabs, escaped, and its keys drive the one shared scenario
+  // Retro cabinet (D): the TEST SELECTOR knob on the SCOPE plate lists the same scenarios as the tabs, escaped, and its keys drive the one shared scenario
   {
     const evil = { id: 'x<b>', name: '<img src=x onerror=1> leak', gauges: [{ pid: '0C', form: 'dial' }] };
     const kn = makeEnv(statesFor(3, idle), 'v0', OVF, [], {}, { scenarios: [evil] }); await kn.tick(); await kn.tick();
@@ -1103,7 +1103,6 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
     assert.strictEqual((k.innerHTML.match(/role="radio"/g) || []).length, 6, 'one radio per scenario: five built in, one from the server');
     assert.ok(/role="radiogroup" aria-label="Scenario"/.test(k.innerHTML), 'a labelled radio group');
     assert.ok(k.innerHTML.includes('&lt;img src=x onerror=1&gt; leak') && !k.innerHTML.includes('<img'), 'scenario names are escaped in the knob');
-    assert.strictEqual(k.getAttribute('data-on'), '1', 'six positions fit round the dial');
     const on = () => kn.el('d_tabs').children.filter(b => /is-active/.test(b.className)).map(b => b.getAttribute('data-scen'));
     const key = (name) => { let pd = false; k.on.keydown({ key: name, preventDefault() { pd = true; } }); return pd; };
     assert.ok(key('ArrowRight')); assert.deepStrictEqual(on(), ['fuel'], 'ArrowRight picks the next scenario, the same state the tabs show');
@@ -1114,7 +1113,7 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
     assert.ok(!key('a') && !key('Tab'), 'other keys pass through');
     const many = [1, 2, 3].map(i => ({ id: 's' + i, name: 'Extra ' + i, gauges: [{ pid: '0C', form: 'dial' }] }));
     const k8 = makeEnv(statesFor(3, idle), 'v0', OVF, [], {}, { scenarios: many }); await k8.tick(); await k8.tick();
-    assert.strictEqual(k8.el('d_knob').getAttribute('data-on'), '0', 'eight scenarios do not fit the dial: the pushbuttons stay');
+    assert.strictEqual((k8.el('d_knob').innerHTML.match(/role="radio"/g) || []).length, 8, 'eight scenarios: every one is a knob position (the knob is the only selector in D)');
   }
 
   // Phone Menu: a real button toggles a menu-open class on the topbar (CSS collapses the tabs, chips and controls behind it at phone width); a view pick closes it
@@ -1479,35 +1478,59 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
     assert.ok(/no freeze frame stored/.test(H(ffRoot(await rd({ freeze_frame: { read: true, note: null, dtc: null, pids: {} }, codes: C })))), 'answered with no frame');
   }
 
-  {   // Readiness on the Retro Dashboard: one line, shut by default, the list on request (per session); a state that is not a pass is named and warns
-    const mon = (o) => Object.assign({ misfire: { supported: true, complete: true }, fuel_system: { supported: true, complete: true }, egr: { supported: false, complete: null } }, o);
-    const find = (e, cls) => { let r = null; walk(e.el('d_ready_mount'), n => { if (n.className.split(' ')[0] === cls || n.className === cls) r = n; }); return r; };
-    const line = async (readiness, sess = {}) => {
-      const e = makeEnv(statesFor(3, base).map(x => Object.assign(x, { readiness })), 'v0', OVF, [], { 'shadetree.skin': 'retro' }, { session: sess });
-      for (let k = 0; k < 3; k++) await e.tick();
-      return { e, sum: find(e, 'rsum'), btn: find(e, 'qbtn'), root: e.el('d_ready_mount').children[1] };
-    };
-    const ok = await line({ read: true, note: null, mil: false, dtc_count: 0, monitors: mon({}) });
-    assert.deepStrictEqual([ok.sum.textContent, ok.sum.className], ['2 of 2 monitors complete · check engine off', 'rsum'], 'all complete: a quiet line');
-    assert.ok(ok.root.className.split(' ').includes('shut') && ok.btn.getAttribute('aria-expanded') === 'false' && ok.btn.getAttribute('aria-controls') === 'd_rbody', 'shut by default');
-    assert.ok(/Misfire/.test(ok.root.children[1].innerHTML), 'the list is still there, only hidden');
-    const inc = await line({ read: true, note: null, mil: false, dtc_count: 0, monitors: mon({ evap: { supported: true, complete: false }, catalyst: { supported: true, complete: false }, o2_sensor: { supported: true, complete: null } }) });
-    assert.deepStrictEqual([inc.sum.textContent, inc.sum.className], ['2 incomplete · 1 unknown · 2 of 5 monitors complete · check engine off', 'rsum warn'], 'incomplete and unknown: named, warning colour');
-    const mil = await line({ read: true, note: null, mil: true, dtc_count: 1, monitors: mon({}) });
-    assert.ok(/check engine ON$/.test(mil.sum.textContent) && mil.sum.className === 'rsum warn', 'check engine on warns');
-    const nr = await line({ read: false, note: null });
-    assert.deepStrictEqual([nr.sum.textContent, nr.sum.className], ['not read', 'rsum warn'], 'not read');
-    const rec = await line({ read: false, note: 'not in this recording' });
-    assert.strictEqual(rec.sum.textContent, 'not read: not in this recording');
-    const na = await line({ read: false, note: 'the car did not answer the readiness request (Mode 01 PID 01)' });
-    assert.deepStrictEqual([na.sum.textContent, na.sum.className], ['no answer', 'rsum warn'], 'no answer is not a pass');
-    const sess = {}, t = await line({ read: true, note: null, mil: false, dtc_count: 0, monitors: mon({}) }, sess);
-    t.btn.on.click(); await t.e.tick();
-    assert.ok(!t.root.className.split(' ').includes('shut') && t.btn.getAttribute('aria-expanded') === 'true' && sess['shadetree.readiness'] === 'open', 'the button opens the list, for this session');
-    assert.strictEqual(t.btn.getAttribute('aria-label'), 'Readiness monitors: hide the list');
-    t.btn.on.click(); await t.e.tick(); assert.ok(t.root.className.split(' ').includes('shut') && sess['shadetree.readiness'] === 'shut', 'and shuts it');
-    const again = await line({ read: true, note: null, mil: false, dtc_count: 0, monitors: mon({}) }, { 'shadetree.readiness': 'open' });
-    assert.ok(!again.root.className.split(' ').includes('shut'), 'remembered within the session');
+  {   // Retro Dashboard (design D, 2026-10-07): the knob picks the scenario and the CRT's sweep; the meters fill from the scenario; the parade needs Mode 06; the draft note is in the codes ? only
+    const R = { 'shadetree.skin': 'retro' };
+    const misfire = { read: true, note: null, mids: ['A2', 'A3', 'A4', 'A5'], results: [['A2', 3], ['A3', 20], ['A4', 0], ['A5', 7]].map(([mid, value]) => ({ mid, tid: '0C', uasid: '24', value, minimum: 0, maximum: 65535, within_limits: true }))
+      .concat([{ mid: 'A3', tid: '0B', uasid: '24', value: 99, minimum: 0, maximum: 65535, within_limits: true }]) };
+    const de = await dash(R, {}, statesFor(30, base).map(s => Object.assign(s, { supported: Object.keys(base()) })));
+    const key = (name) => de.el('d_knob').on.keydown({ key: name, preventDefault() {} });
+    const focusPosts = () => de.posts.filter(p => /^\/api\/focus\?/.test(p.url)).map(p => p.body.pids.join(' '));
+    assert.ok(/^General · 700 rpm · LOAD 28$/.test(de.el('d_crt_t').textContent), de.el('d_crt_t').textContent);
+    assert.ok(/RPM/.test(de.el('d_crt').innerHTML) && /<polyline class="dsh"/.test(de.el('d_crt').innerHTML), 'General: rpm solid, load dashed');
+    // meters: the scenario's first six PIDs in order (General: 0C 0D 05 04 11 0B), a PID not in the run dark, its ? kept; throttle and speed in the lower module
+    const slot = (i) => [de.el('d_m' + i).className, de.el('d_mn' + i).textContent, de.el('d_mq' + i).getAttribute('data-help')];
+    assert.deepStrictEqual([0, 1, 2, 3, 4, 5].map(i => slot(i)), [['dm', 'Engine speed', '0C'], ['dm dark', 'Speed', '0D'], ['dm', 'Coolant', '05'], ['dm', 'Engine load', '04'], ['dm rnd dark', 'Throttle', '11'], ['dm rnd', 'MAP', '0B']]);
+    assert.ok(/<path class="ndl"/.test(de.el('d_mf0').innerHTML) && de.el('d_mf1').innerHTML === '' && /700<small>rpm<\/small>/.test(de.el('d_mv0').innerHTML), 'a lit meter has a needle and its value, a dark one nothing');
+    assert.ok(/<path class="bd ok"/.test(de.el('d_mf2').innerHTML) && /class="pl"/.test(de.el('d_mp2').innerHTML), 'coolant: the watch range as bands, the OK pilot lit');
+    assert.deepStrictEqual([slot(6), slot(7)], [['dm dark', 'Fuel level', '2F'], ['dm rnd dark', 'Intake air', '0F']], 'the lower module never repeats a slot: General shows speed and throttle, so it takes the next two');
+    const lw = await dash(Object.assign({ 'shadetree.scenario': 'charging' }, R), {}, statesFor(30, () => Object.assign(base(), { '0D': 0, '11': 14 })));
+    assert.deepStrictEqual([6, 7].map(i => lw.el('d_mq' + i).getAttribute('data-help')), ['0D', '2F'], 'Charging shows throttle, not speed: speed goes below, then the next reading on the list');
+    const ft = await dash(Object.assign({ 'shadetree.scenario': 'fuel' }, R), {}, statesFor(30, () => Object.assign(base(), { '03': 1, '24': 0.98 })).map(s => Object.assign(s, { fallbacks: { '14': '24' } })));
+    ft.timer(); await ft.tick();
+    assert.deepStrictEqual([0, 1, 2, 3, 4, 5].map(i => ft.el('d_mq' + i).getAttribute('data-help')), ['06', '07', '08', '09', '24', '10'], 'fuel system status (text) is skipped; narrowband 14 shows as its wideband fallback 24');
+    assert.ok(ft.el('d_mn4').textContent === 'Lambda B1' && /<path class="ndl"/.test(ft.el('d_mf4').innerHTML) && ft.el('d_mv4').innerHTML !== '', 'the lambda meter has a scale and a needle');
+    // the knob turns: the same scenario state as the tabs, the hub is asked for the new PIDs, and the CRT follows
+    key('ArrowRight'); await de.tick();
+    assert.deepStrictEqual(de.el('d_tabs').children.filter(b => /is-active/.test(b.className)).map(b => b.getAttribute('data-scen')), ['fuel']);
+    assert.strictEqual(focusPosts().slice(-1)[0], '06 07 08 09 03 14 10 0C', 'the knob sends the scenario PIDs as a tab does');
+    assert.ok(/^Fuel trims · STFT B1 \+2\.0 %$/.test(de.el('d_crt_t').textContent) && /class="zero"/.test(de.el('d_crt').innerHTML) && /LTFT B2 \+1\.0/.test(de.el('d_crt').innerHTML), de.el('d_crt_t').textContent);
+    assert.deepStrictEqual([0, 1, 2, 3].map(i => de.el('d_mq' + i).getAttribute('data-help')), ['06', '07', '08', '09'], 'the meters follow the knob');
+    key('End'); await de.tick();
+    assert.ok(/^Charging · 14\.2 V$/.test(de.el('d_crt_t').textContent), de.el('d_crt_t').textContent);
+    assert.ok(de.el('d_m4').className.includes('dark') && de.el('d_mn4').textContent === '' && de.el('d_mq4').hidden, 'four gauges in Charging: the round slots stay dark and empty');
+    // Idle / misfire: the parade only with Mode 06 misfire counts (TID 0C, by cylinder), else the rpm strip alone
+    key('ArrowLeft'); await de.tick();
+    assert.ok(/^Idle\/misfire · 700 rpm$/.test(de.el('d_crt_t').textContent) && !/class="cb/.test(de.el('d_crt').innerHTML) && !de.el('d_crt_a').hidden, 'no Mode 06: rpm only');
+    const mf = await dash(Object.assign({ 'shadetree.scenario': 'idle' }, R), {}, statesFor(30, base).map(s => Object.assign(s, { mode06: misfire })));
+    const bars = mf.el('d_crt').innerHTML.match(/<rect class="cb[^"]*"/g) || [];
+    assert.ok(bars.length === 4 && bars[1] === '<rect class="cb hi"' && /MISFIRES/.test(mf.el('d_crt').innerHTML), 'one bar per reported cylinder, the worst marked');
+    assert.ok(/CYL 2: 20$/.test(mf.el('d_crt_t').textContent) && mf.el('d_crt_a').hidden, mf.el('d_crt_t').textContent);
+    const lg = await dash(Object.assign({ 'shadetree.scenario': 'idle' }, R), {}, statesFor(30, base).map(s => Object.assign(s, { mode06: { read: true, layout: 'legacy', mids: ['0C'], results: [{ tid: '0C', component: '01', value: 9, limit: 10, limit_type: 'max' }] } })));
+    assert.ok(!/class="cb/.test(lg.el('d_crt').innerHTML), 'legacy Mode 06 rows carry no cylinder: no parade');
+    // the codes: the AI-drafted note is in the codes ? popup (both skins), never on the Retro screen; Plain keeps its footnote
+    const CODES = { read: true, note: null, mil: true, stored: [{ code: 'P0118', desc: 'Coolant sensor circuit high', hint: 'Reads cold' }], pending: [], permanent: [{ code: 'P0118', desc: 'Coolant sensor circuit high', hint: 'Reads cold' }] };
+    const cd = await dash(R, {}, statesFor(30, base).map(s => Object.assign(s, { codes: CODES })));
+    assert.ok((cd.el('d_paper').innerHTML.match(/<b>P0118<\/b>/g) || []).length === 1 && /STORED · PERMANENT · Coolant sensor circuit high/.test(cd.el('d_paper').innerHTML) && !/draft|unreviewed|unverified/i.test(cd.el('d_paper').innerHTML), 'the printout: code, status, meaning, hint, no caption');
+    const dd = html.slice(html.indexOf('<div class="dd" id="d_dd">'), html.indexOf('<!-- C: GUIDED TEST -->'));
+    assert.ok(dd.length > 1000 && !/draft|unreviewed|unverified|general knowledge/i.test(dd) && /data-help="codes"/.test(dd), 'no disclaimer in the D markup; the codes label has its ?');
+    const q = findQ(cd.el('d_codes_mount'), 'codes');
+    cd.docHandlers.click({ target: q });
+    assert.ok(cd.el('helpPanel').className === 'open' && /plain-words drafts written with AI and not yet reviewed/.test(flat(cd.el('helpPanel'))) && /not yet reviewed/.test(flat(cd.el('helpPanel'))) && !/now /.test(flat(cd.el('helpPanel'))), flat(cd.el('helpPanel')));
+    let foot = null; walk(cd.el('d_codes_mount'), n => { if (n.className === 'cfoot') foot = n; });
+    assert.strictEqual(foot.textContent, 'Meanings are plain-words drafts, unreviewed. Hints: general knowledge, unverified.', 'Plain keeps its footnote');
+    // readiness lamps: the supported monitors, blue complete and amber not yet
+    const rd = await dash(R, {}, statesFor(30, base).map(s => Object.assign(s, { readiness: { read: true, note: null, mil: false, dtc_count: 0, monitors: { misfire: { supported: true, complete: true }, evap: { supported: true, complete: false }, egr: { supported: false, complete: null } } } })));
+    assert.deepStrictEqual([rd.el('d_rdys').textContent, (rd.el('d_rdy').innerHTML.match(/class="pl[^"]*"/g) || []).join()], ['1 of 2 complete', 'class="pl",class="pl a"']);
   }
 
   {   // choosing a scenario asks the hub for its PIDs (hex ids only); a PID the car does not list, or the recording does not hold, is named, not left blank
@@ -1558,13 +1581,13 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
     e.handlers['skinBtn:click'](); await e.tick(); assert.strictEqual(where(), 'optDrawer topbar topbar topbar', 'and Retro moves them again');
     const re = makeEnv(statesFor(1, idle), 'v0', OVF, [], { 'shadetree.skin': 'retro' }, { views: [], session: { 'shadetree.options': 'open' } }); await re.tick();
     assert.ok(re.el('optDrawer').hidden === false, 'a reload in the same tab keeps it open');
-    // the summary strip: in Retro under the nameplate (before the selector), in Plain above the cabinet as before; the same node, never a copy
-    assert.ok(e.el('d_sum').parentNode === e.el('d_face') && e.el('d_sum').nextSibling === e.el('d_scenbar'), 'Retro: the strip is inside the cabinet');
+    // the summary and the lamps: in Retro the cabinet's status strip (summary, then lamps), in Plain back where they were; the same nodes, never copies
+    assert.ok(e.el('d_sum').parentNode === e.el('d_stat') && e.el('d_sum').nextSibling === e.el('d_lamps') && e.el('d_lamps').parentNode === e.el('d_stat'), 'Retro: the strip is inside the cabinet');
     e.handlers['skinBtn:click'](); await e.tick();
-    assert.ok(e.el('d_sum').parentNode === e.el('v0') && !e.el('d_face').children.includes(e.el('d_sum')), 'Plain: back above the cabinet');
+    assert.ok(e.el('d_sum').parentNode === e.el('v0') && !e.el('d_stat').children.includes(e.el('d_sum')) && e.el('d_lamps').parentNode === e.el('d_face') && e.el('d_lamps').nextSibling === null, 'Plain: back above the cabinet, the lamps back in the face');
     assert.ok(/SIMULATED|NOT SAMPLING/.test(e.el('chipLive').innerHTML) && e.el('d_sum').innerHTML.length > 0, 'and it still renders');
     e.handlers['skinBtn:click'](); await e.tick();
-    vbtns[2].on.click(); await e.tick(); assert.strictEqual(e.el('d_sum').parentNode, e.el('d_face'), 'Retro on another view: the strip stays in the cabinet (the Dashboard is hidden anyway)');
+    vbtns[2].on.click(); await e.tick(); assert.strictEqual(e.el('d_sum').parentNode, e.el('d_stat'), 'Retro on another view: the strip stays in the cabinet (the Dashboard is hidden anyway)');
     const pl = makeEnv(statesFor(1, idle), 'v0', OVF, [], { 'shadetree.skin': 'plain' }); await pl.tick();
     assert.ok(pl.el('ctl').parentNode.id === 'menuStatus' && pl.el('optDrawer').hidden === true, 'Plain Dashboard: the toolbar as before');
     // the switches: role and state, both state names, a fixed name

@@ -37,8 +37,20 @@ EXTRA_PIDS = ["04", "11", "0D", "0E", "43", "44", "0F", "10", "5C", "46", "33", 
               "14", "18", "3C", "3D", "3E", "3F", "2C", "2D", "2E", "23", "47", "49", "4A", "62", "63", "8E", "55", "56",
               "57", "58", "03", "1C", "51", "1F", "30", "31", "21", "A6", "66", "67", "68", "45", "13"]
 # A car that lacks coolant (05), intake air (0F), MAF (10) or MAP (0B) may report the same reading as sensor 1 of the
-# multi-sensor PIDs: a core, focus or extra PID the car's bitmap does not list is replaced by its fallback here.
-FALLBACK_PIDS = {"05": "67", "0F": "68", "10": "66", "0B": "87"}
+# multi-sensor PIDs, and one without the narrowband upstream O2 sensors (14, 18) may have wideband ones (lambda: 24/28,
+# or the current-type 34/38): a core, focus or extra PID the car's bitmap does not list is replaced by its fallback here,
+# of several the first the car lists.
+FALLBACK_PIDS = {"05": "67", "0F": "68", "10": "66", "0B": "87", "14": ("24", "34"), "18": ("28", "38")}
+
+
+def fallback_for(pid: str, supported) -> str:
+    """The PID read in place of `pid`: itself when the car lists it or it has no fallback, else its first fallback the car
+    lists (the first one when the car lists none, which the caller then drops as unsupported)."""
+    if pid not in FALLBACK_PIDS or pid in supported:
+        return pid
+    alts = FALLBACK_PIDS[pid]
+    alts = (alts,) if isinstance(alts, str) else alts
+    return next((a for a in alts if a in supported), alts[0])
 _EXTRAS_PER_SWEEP = 4
 # Capture level max (was "Capture all supported"): every decodable Mode 01 PID the car reports, in two tiers. The fast tier is read every
 # sweep (the run's rate, 2.5 Hz from the page); the rest rotate, enough per sweep for about SLOW_HZ each, at most
@@ -417,7 +429,7 @@ class LiveHub:
         keeps its samples (it goes stale on the page). focus_only (capture level min): no EXTRA_PIDS; a live run's channels are decoder-table PIDs, at most 59 < 64."""
         with self._data_lock:
             ok = lambda p: p in self._supported and p in PIDS and p not in core and p not in self._lie  # noqa: E731
-            fb = lambda p: FALLBACK_PIDS[p] if p in FALLBACK_PIDS and p not in self._supported else p  # noqa: E731
+            fb = lambda p: fallback_for(p, self._supported)  # noqa: E731
             lead = [fb(p) for p in core if fb(p) != p] + [fb(p) for p in self._focus]
             cap = MAX_PIDS - len([p for p in core if p not in self._unsupported])  # a dropped core PID's slot is free
             extras = list(dict.fromkeys([p for p in lead if ok(p)] + ([] if focus_only else [fb(p) for p in EXTRA_PIDS if ok(fb(p))])))[:cap]

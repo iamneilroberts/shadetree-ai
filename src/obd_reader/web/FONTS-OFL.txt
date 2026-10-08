@@ -1,11 +1,12 @@
 Fonts embedded in console.html (Retro skin, Dashboard cabinet) as base64 woff2 subsets
 (Basic Latin plus a few symbols, hinting removed). All three are under the SIL Open Font
-License, Version 1.1, copied below.
+License, Version 1.1, copied below. The D cabinet's sign font (Yellowtail) is under the
+Apache License 2.0: see FONTS-APACHE.txt.
 
 Archivo Narrow (weights 400 to 700, variable)
 Copyright 2019 The Archivo Narrow Project Authors (https://github.com/Omnibus-Type/ArchivoNarrow)
 
-Stardos Stencil (400, 700): embedded as "Cabinet Stencil", a modified (subset) version,
+Stardos Stencil (400): embedded as "Cabinet Stencil", a modified (subset) version,
 renamed because the licence reserves the original names.
 Copyright (c) 2011 by vernon adams (vern@newtypography.co.uk),
 with Reserved Font Names "Stardos" and "Stardos Stencil".
