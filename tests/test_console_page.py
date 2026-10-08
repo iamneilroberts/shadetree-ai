@@ -599,6 +599,10 @@ def test_d_text_reads_on_its_panels():
     pairs += [("--d-white", "--d-crt2"), ("--d-white", "--d-crt3")]   # the CRT's text sits off its bright centre
     low = [(f, b, round(_contrast(p[f], p[b]), 2)) for f, b in pairs if _contrast(p[f], p[b]) < 4.5]
     assert low == [], f"D text below 4.5:1: {low}"
+    paper = ("--d-paper1", "--d-paper2")
+    ink = [(f, b, round(_contrast(p[f], p[b]), 2)) for f in ("--d-paper-ink", "--d-paper-ink2") for b in paper if _contrast(p[f], p[b]) < 7.0]
+    red = [(b, round(_contrast(p["--d-paper-red"], p[b]), 2)) for b in paper if _contrast(p["--d-paper-red"], p[b]) < 4.5]
+    assert ink == [] and red == [], f"printout ink below 7:1 or status red below 4.5:1: {ink} {red}"
     assert all(_contrast(p[z], p[b]) >= 3.0 for z in ("--d-ok", "--d-watch", "--d-out", "--d-needle") for b in ("--d-face1", "--d-face2")), "bands and needle show on the cream"
 
 
@@ -707,5 +711,5 @@ def test_every_code_status_badge_reads_on_its_own_colour_and_permanent_has_one(t
 def test_d_printout_is_continuous_feed_paper_with_the_freeze_frame_on_it():
     assert 'class="ptab">Trouble codes</span>' in _DD and 'id="d_ff"' not in _DD, "red tab above the paper; no freeze-frame block in the readiness panel"
     assert ".dd .paper::before, .dd .paper::after" in HTML and "radial-gradient(circle, var(--d-seam)" in HTML and "clip-path: polygon" in HTML, "feed holes both sides, torn edge"
-    assert ".dd .paper h4" in HTML and "1px dashed var(--d-paper-rule)" in HTML and "Diagnostic report" in HTML and "'<div class=\"pft\">FREEZE FRAME'" in HTML
+    assert ".dd .paper h4" in HTML and "1px dashed var(--d-paper-rule)" in HTML and "Diagnostic report" in HTML and "'<div class=\"pft\"><h5>FREEZE FRAME'" in HTML
     assert not re.search(r"plain-words|unreviewed|READ AT RUN START", HTML.split("function renderD()")[1].split("function ", 1)[0], re.I), "no draft or disclaimer text on the printout"

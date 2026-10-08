@@ -1547,10 +1547,12 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
     // the codes: the AI-drafted note is in the codes ? popup (both skins), never on the Retro screen; Plain keeps its footnote
     const CODES = { read: true, note: null, mil: true, stored: [{ code: 'P0118', desc: 'Coolant sensor circuit high', hint: 'Reads cold' }], pending: [], permanent: [{ code: 'P0118', desc: 'Coolant sensor circuit high', hint: 'Reads cold' }] };
     const cd = await dash(R, {}, statesFor(30, base).map(s => Object.assign(s, { codes: CODES })));
-    assert.ok((cd.el('d_paper').innerHTML.match(/<b>P0118<\/b>/g) || []).length === 1 && /STORED · PERMANENT · Coolant sensor circuit high/.test(cd.el('d_paper').innerHTML) && !/draft|unreviewed|unverified/i.test(cd.el('d_paper').innerHTML), 'the printout: code, status, meaning, hint, no caption');
+    assert.ok((cd.el('d_paper').innerHTML.match(/<b>P0118<\/b>/g) || []).length === 1 && /<span class="s">STORED · PERMANENT<\/span><span class="t">Coolant sensor circuit high<\/span>/.test(cd.el('d_paper').innerHTML) && !/draft|unreviewed|unverified/i.test(cd.el('d_paper').innerHTML), 'the printout: code, status, meaning, hint, no caption');
     const FFR = { read: true, note: null, dtc: 'P0118', pids: { '05': { name: 'coolant_temp', unit: 'C', value: 38, label: null } } };
     const ffe = await dash(R, {}, statesFor(30, base).map(s => Object.assign(s, { codes: CODES, freeze_frame: FFR })));
-    assert.ok(/<div class="pft">FREEZE FRAME at P0118: [^<]*38/.test(ffe.el('d_paper').innerHTML) && !/draft|unreviewed|unverified/i.test(ffe.el('d_paper').innerHTML), 'the freeze frame is on the printout, as its foot line');
+    assert.ok(/<h5>FREEZE FRAME · P0118<\/h5>/.test(ffe.el('d_paper').innerHTML) && !/draft|unreviewed|unverified/i.test(ffe.el('d_paper').innerHTML), 'the freeze frame heading is on the printout');
+    const ffr = ffe.el('d_paper').innerHTML.match(/<div class="fr"><span>[^<]+<\/span><i><\/i><span>[^<]*<\/span><\/div>/g) || [];
+    assert.ok(ffr.length === 1 && /<span>[^<]*oolant[^<]*<\/span><i><\/i><span>[^<]*38[^<]*<\/span>/.test(ffr[0]), 'the freeze frame is one row per reading: label, leader, value');
     // Plain and the Handheld list a code once with all its badges (as the D printout does); the Terminal lists codes per list, with no meanings
     const pe = makeEnv(statesFor(30, base).map(s => Object.assign(s, { codes: CODES })), 'v0', OVF); for (let k = 0; k < 6; k++) await pe.tick();
     let rows = ''; walk(pe.el('d_codes_mount'), n => { if (n.id === 'd_codes') rows = n.innerHTML; });
