@@ -167,6 +167,28 @@ HELP["67"] = {**HELP["05"], "title": "Coolant temperature, sensor 1",
               "measures": "Engine coolant temperature from sensor 1 (PID 67, the multi-sensor layout of PID 05)."}
 HELP["68"] = {**HELP["0F"], "title": "Intake air temperature, sensor 1",
               "measures": "Temperature of the air going into the engine, bank 1 sensor 1 (PID 68, the multi-sensor layout of PID 0F)."}
+HELP["87"] = {**HELP["0B"], "title": "Manifold pressure (MAP), sensor A",
+              "measures": "Air pressure inside the intake manifold from sensor A (PID 87, the multi-sensor layout of PID 0B). "
+                          "Low means strong vacuum; near outside pressure means the throttle is wide open or the engine is off."}
+for _i in range(8):  # wide-range (current-type) O2 sensors, numbered as PIDs 14-1B: two banks of up to four sensors
+    _b, _s = _i // 4 + 1, _i % 4 + 1
+    HELP[f"{0x34 + _i:02X}"] = _e(f"Wide-range O2 sensor, bank {_b} sensor {_s} (lambda)",
+                                  f"What the wide-range oxygen sensor at bank {_b} sensor {_s} reads, as lambda: 1.00 is the ideal mix, "
+                                  "below 1 rich, above 1 lean. Sensor 1 is before the catalyst.",
+                                  _O2_LAMBDA_USE, "Hovers near 1.00 at warm idle.")
+HELP["77"] = _e("Charge air cooler temperature, bank 1 sensor 1",
+                "Temperature of the air leaving the intercooler (charge air cooler) of a turbocharged engine, on its way into the engine.",
+                ["It should rise under boost and fall back toward outside temperature when cruising gently.",
+                 "Far above outside temperature in steady driving points to a blocked intercooler or a sensor fault."],
+                "Within about 10-30 °C (18-54 °F) of outside air once moving [general knowledge, unverified].")
+HELP["45"] = _e("Relative throttle position", "How far the throttle is open compared with its learned closed position, so idle reads near 0.",
+                ["It should read near 0 at idle and rise smoothly with the pedal.",
+                 "The gap between it and throttle position is the learned closed-throttle offset."],
+                "Near 0-5 % at idle [general knowledge, unverified].")
+HELP["13"] = _e("O2 sensors present", "Which oxygen sensors the car has, as a bit mask: bits 0-3 are bank 1 sensors 1-4, bits 4-7 bank 2.",
+                ["It never changes while driving: it says which O2 readings to expect.",
+                 "A V engine usually lists two sensors per bank: one before and one after the catalyst."],
+                "A fixed number for the car, such as 3 (one bank, two sensors) or 51 (two banks, two sensors each).")
 
 MODE06 = {
     "o2_sensor": _e("Oxygen sensor monitor", "Tests how quickly and how far the oxygen sensors switch.",

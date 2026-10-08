@@ -33,12 +33,12 @@ MAX_RUN_S = 1800.0
 DEFAULT_PIDS = ["0C", "05", "06", "07", "08", "09", "0B", "42"]
 # Readings added to a run, in order of usefulness, for whichever of them the car says it supports.
 # The core channels are read every sweep; these rotate _EXTRAS_PER_SWEEP at a time so the fast ones stay fast.
-EXTRA_PIDS = ["04", "11", "0D", "0E", "43", "44", "0F", "10", "5C", "46", "33", "2F", "24", "28", "15", "19", "14",
-              "18", "3C", "3D", "3E", "3F", "2C", "2D", "2E", "23", "47", "49", "4A", "62", "63", "8E", "55", "56", "57",
-              "58", "03", "1C", "51", "1F", "30", "31", "21", "A6", "66", "67", "68"]
-# A car that lacks coolant (05), intake air (0F) or MAF (10) may report the same reading as sensor 1 of the
+EXTRA_PIDS = ["04", "11", "0D", "0E", "43", "44", "0F", "10", "5C", "46", "33", "2F", "24", "28", "34", "38", "15", "19",
+              "14", "18", "3C", "3D", "3E", "3F", "2C", "2D", "2E", "23", "47", "49", "4A", "62", "63", "8E", "55", "56",
+              "57", "58", "03", "1C", "51", "1F", "30", "31", "21", "A6", "66", "67", "68", "45", "13"]
+# A car that lacks coolant (05), intake air (0F), MAF (10) or MAP (0B) may report the same reading as sensor 1 of the
 # multi-sensor PIDs: a core, focus or extra PID the car's bitmap does not list is replaced by its fallback here.
-FALLBACK_PIDS = {"05": "67", "0F": "68", "10": "66"}
+FALLBACK_PIDS = {"05": "67", "0F": "68", "10": "66", "0B": "87"}
 _EXTRAS_PER_SWEEP = 4
 # Capture level max (was "Capture all supported"): every decodable Mode 01 PID the car reports, in two tiers. The fast tier is read every
 # sweep (the run's rate, 2.5 Hz from the page); the rest rotate, enough per sweep for about SLOW_HZ each, at most
@@ -51,6 +51,9 @@ SLOW_MAX_PER_SWEEP = 4
 CAPTURE_MODES = ("min", "std", "max", "all")
 _SILENT_SWEEPS = 3
 _UNSUPPORTED_SWEEPS = 3  # a PID that gets no value in this many sweeps in a row while others answer is dropped
+_SUPPORT_RETRY_S = 5.0   # no support bitmap at the start (car not awake yet): ask 0100 again this often once PIDs answer
+_RV_EVERY_S = 30.0       # the adapter's supply voltage (ATRV) is read at connect and this often during a run
+_RV_RE = re.compile(r"(\d{1,2}(?:\.\d{1,2})?) ?V?")
 _SPEEDS = (0.5, 1.0, 2.0, 4.0, 8.0)
 _REPLAY_TICK = 0.05
 _REPLAY_WINDOW_S = 60.0
@@ -94,7 +97,7 @@ class LiveHub:
         self._ptimes: dict[str, list] = {}   # a replay: every sample time per channel, for the last-seen age at the replay clock
         self._sweep_t: deque = deque(maxlen=12)
         self._t0 = self._last_at = self._deadline = None
-        self._adapter: dict = {"chip": None, "ati": None, "protocol": None}
+        self._adapter: dict = {"chip": None, "ati": None, "protocol": None, "voltage": None, "voltage_t": None}
         self._codes: dict = {"read": False, "note": None}
         self._ready: dict = {"read": False, "note": None}   # Mode 01 PID 01: lamp, code count, monitors (read with the codes)
         self._ff: dict = {"read": False, "note": None}      # Mode 02 frame 0 (read after the codes, only with a stored code)
@@ -318,13 +321,16 @@ class LiveHub:
                 self._adapter.update(chip=a.chip, ati=a.ati)
                 t0 = self._clock()
                 self._t0, self._deadline = t0, t0 + seconds
+                self._read_rv(t, 0.0)
+                next_rv, next_bitmap = _RV_EVERY_S, 0.0
                 silent, period = 0, 1.0 / hz
                 fv = self._focus_ver
                 plan = self._capture_plan(t, hz) if level == "max" else None
                 if plan:
                     active, extras, per = plan
                 else:
-                    active, extras, per = list(pids), self._discover_extras(t, pids, level == "min"), MAX_PIDS if level == "min" else _EXTRAS_PER_SWEEP
+                    extras, per = self._discover_extras(t, pids, level == "min"), MAX_PIDS if level == "min" else _EXTRAS_PER_SWEEP
+                    active = [p for p in pids if p not in self._unsupported]  # the car's bitmap leaves out the rest
                 misses, rot = dict.fromkeys(active, 0), 0
                 while not self._stop.is_set():
                     now = self._clock() - t0
@@ -338,6 +344,9 @@ class LiveHub:
                     got = self._sweep(t, active + batch, now)
                     if self._stop.is_set():  # Stop pressed (possibly mid-sweep): end now, no "silent bus" message
                         break
+                    if now >= next_rv:
+                        self._read_rv(t, now)
+                        next_rv = now + _RV_EVERY_S
                     if got:
                         silent = 0
                         for p in list(active):
@@ -346,6 +355,16 @@ class LiveHub:
                                 active.remove(p)
                                 with self._data_lock:
                                     self._unsupported.append(p)
+                        if not plan and not self._supported and now >= next_bitmap:
+                            # the car answers now but gave no bitmap at the start: ask again (one 0100 until it answers)
+                            next_bitmap = now + _SUPPORT_RETRY_S
+                            found = self._discover_supported(t, retry=False)
+                            if found:
+                                with self._data_lock:
+                                    self._supported = found
+                                self._drop_unadvertised(pids)
+                                active = [p for p in active if p not in self._unsupported]
+                                fv = -1  # re-plan the extras and fallbacks from the real bitmap
                         if self._adapter["protocol"] is None:
                             dp = (t.send("ATDP") or [None])[0]
                             self._adapter["protocol"] = dp.removeprefix("AUTO, ") if dp else None
@@ -380,12 +399,18 @@ class LiveHub:
 
     def _discover_extras(self, t, core: list[str], focus_only: bool = False) -> list[str]:
         """Ask the car which Mode 01 PIDs it supports and pick the extra readings it can give, up to the PID cap."""
-        if MAX_PIDS - len(core) <= 0:
-            return []
         supported = self._discover_supported(t)
         with self._data_lock:
             self._supported = supported
+        self._drop_unadvertised(core)
         return self._plan_extras(core, focus_only)
+
+    def _drop_unadvertised(self, core: list[str]) -> None:
+        """Once the car's bitmap is known, a core PID it does not list is reported unsupported at once (not after three
+        silent sweeps) and its slot goes to an extra; a fallback PID, if it has one, leads the extras in its place."""
+        with self._data_lock:
+            if self._supported:
+                self._unsupported += [p for p in core if p not in self._supported and p not in self._unsupported]
 
     def _plan_extras(self, core: list[str], focus_only: bool = False) -> list[str]:
         """The scenario's supported PIDs first, then EXTRA_PIDS in order, up to the PID cap. A channel no longer read
@@ -394,7 +419,8 @@ class LiveHub:
             ok = lambda p: p in self._supported and p in PIDS and p not in core and p not in self._lie  # noqa: E731
             fb = lambda p: FALLBACK_PIDS[p] if p in FALLBACK_PIDS and p not in self._supported else p  # noqa: E731
             lead = [fb(p) for p in core if fb(p) != p] + [fb(p) for p in self._focus]
-            extras = list(dict.fromkeys([p for p in lead if ok(p)] + ([] if focus_only else [fb(p) for p in EXTRA_PIDS if ok(fb(p))])))[:MAX_PIDS - len(core)]
+            cap = MAX_PIDS - len([p for p in core if p not in self._unsupported])  # a dropped core PID's slot is free
+            extras = list(dict.fromkeys([p for p in lead if ok(p)] + ([] if focus_only else [fb(p) for p in EXTRA_PIDS if ok(fb(p))])))[:cap]
             self._extras = extras
             self._fallbacks = {p: fb(p) for p in [*core, *self._focus] if fb(p) != p and fb(p) in extras}
             for p in extras:
@@ -492,14 +518,25 @@ class LiveHub:
         if not self._key or self.seq == 0:
             return
         prior = self._prior
+        # a run that never got a bitmap (the car was not awake) keeps what an earlier run learned
+        kept = not self._supported and prior is not None and bool(prior.get("supported_pids"))
         profile = {"schema": 1, "key": self._key, "updated": datetime.now(timezone.utc).isoformat(timespec="seconds"),
                    "runs": (prior["runs"] if prior else 0) + 1, "protocol": self._adapter["protocol"],
-                   "supported_pids": sorted(self._supported), "unsupported": sorted(set(self._unsupported)),
-                   "extras": list(self._extras), **(self._name or {})}
+                   "supported_pids": list(prior["supported_pids"]) if kept else sorted(self._supported),
+                   "unsupported": sorted(set(self._unsupported)),
+                   "extras": list(prior.get("extras", [])) if kept else list(self._extras), **(self._name or {})}
         try:
             self._profiles.save(self._key, profile)
         except OSError as e:
             self.message = self.message or f"could not save the car profile: {e}"
+
+    def _read_rv(self, t, now: float) -> None:
+        """The adapter's supply voltage (ATRV: pin 16, the battery as the port sees it) and the run time it was read.
+        A reply that is not a voltage (an old clone's "?") keeps the last reading."""
+        m = _RV_RE.fullmatch(next((ln.strip().upper() for ln in t.send("ATRV") if ln.strip()), ""))
+        if m:
+            with self._data_lock:
+                self._adapter.update(voltage=float(m.group(1)), voltage_t=round(now, 3))
 
     def _read_mode06(self, t) -> None:
         """On-board test results, once per run: the CAN layout, or the one-limit legacy layout (`layout: "legacy"`,

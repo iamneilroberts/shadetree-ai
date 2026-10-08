@@ -1080,3 +1080,78 @@ def test_a_car_without_0f_10_or_05_gets_the_multi_sensor_fallbacks_and_never_the
     st = hub2.state()
     hub2.stop()
     assert st["extras"][0] == "67" and st["fallbacks"] == {"05": "67"}
+
+
+class _LateBitmapSim(SimPort):
+    """A car that is not awake when the run starts: its first `late` support requests (0100) fail, then it answers."""
+    def __init__(self, late: int, *a, **kw):
+        super().__init__(*a, **kw)
+        self.late, self.sent = late, []
+
+    def write(self, data: bytes) -> None:
+        cmd = data.decode("ascii").rstrip("\r")
+        self.sent.append(cmd)
+        super().write(data)
+        if cmd == "0100" and self.late > 0:
+            self.late -= 1
+            self._pending = ("CAN ERROR" if self.late % 2 else "NO DATA") + "\r"
+
+
+def test_a_car_that_wakes_up_after_start_gets_its_bitmap_asked_again_then_extras_and_a_profile(tmp_path, monkeypatch):
+    import obd_reader.hub as hubmod
+    monkeypatch.setattr(hubmod, "_SUPPORT_RETRY_S", 0.05)
+    sim = _LateBitmapSim(3, "rich")
+    hub, _, _ = make(tmp_path, sim=sim)
+    hub.start(DEFAULT_PIDS, hz=10, seconds=30)
+    assert wait_for(lambda: hub.state()["supported"] and hub.state()["extras"])
+    assert wait_for(lambda: all(hub.state()["channels"][p]["samples"] for p in hub.state()["extras"]))
+    hub.stop()
+    assert sim.sent.count("0100") == 4  # three failures, then one answer: no more asking once it is known
+    saved = _json.loads((tmp_path / "profiles" / f"{vehicle_key(SIM_VIN)}.json").read_text())
+    assert "0C" in saved["supported_pids"] and saved["extras"]
+
+
+def test_a_run_with_no_bitmap_never_saves_an_empty_supported_set_over_a_good_one(tmp_path):
+    from obd_reader.profiles import ProfileStore
+    good = {"schema": 1, "key": vehicle_key(SIM_VIN), "updated": "", "runs": 2, "protocol": None,
+            "supported_pids": ["04", "0C"], "unsupported": [], "extras": ["04"]}
+    ProfileStore(tmp_path).save(vehicle_key(SIM_VIN), good)
+    hub, _, _ = make(tmp_path, sim=_LateBitmapSim(10**6, "rich"))  # the bitmap never answers
+    hub.start(DEFAULT_PIDS, hz=10, seconds=30)
+    assert wait_for(lambda: hub.state()["vehicle"] is not None and hub.state()["seq"] >= 4)
+    hub.stop()
+    saved = _json.loads((tmp_path / "profiles" / f"{vehicle_key(SIM_VIN)}.json").read_text())
+    assert saved["runs"] == 3 and saved["supported_pids"] == ["04", "0C"] and saved["extras"] == ["04"]
+
+
+def test_core_pids_the_bitmap_leaves_out_are_dropped_at_once_and_their_slots_go_to_extras(tmp_path, monkeypatch):
+    # a single-bank car with no 0B, whose only MAP is 87 (the multi-sensor layout): 08, 09 and 0B are never asked
+    import obd_reader.simulator as simulator
+    monkeypatch.setattr(simulator, "PCM_PIDS", simulator.PCM_PIDS - {"08", "09", "0B"} | {"87"})
+    monkeypatch.setattr(simulator, "SUPPORTED", simulator.SUPPORTED - {"08", "09", "0B"} | {"87"})
+    monkeypatch.setitem(simulator.ENCODERS, "87", ("map", lambda v: b"\x01" + round(v * 32).to_bytes(2, "big") + b"\x00\x00"))
+    sim = _LateBitmapSim(0, "rich")
+    hub, _, _ = make(tmp_path, sim=sim)
+    hub.start(DEFAULT_PIDS, hz=10, seconds=30)
+    assert wait_for(lambda: hub.state()["seq"] >= 1)
+    st = hub.state()
+    assert st["unsupported"] == ["08", "09", "0B"] and st["fallbacks"] == {"0B": "87"}
+    assert st["extras"][0] == "87" and len(st["extras"]) == 16 - 5  # three freed slots
+    assert wait_for(lambda: hub.state()["channels"]["87"]["samples"])
+    hub.stop()
+    assert not {"0108", "0109", "010B"} & set(sim.sent)
+
+
+def test_atrv_is_read_at_connect_and_every_so_often_and_kept_in_state_and_the_saved_run(tmp_path, monkeypatch):
+    import obd_reader.hub as hubmod
+    monkeypatch.setattr(hubmod, "_RV_EVERY_S", 0.3)
+    sim = _sim_with({"ATRV": "12.6V\r"})
+    hub, _, _ = make(tmp_path, sim=sim)
+    hub.start(DEFAULT_PIDS, hz=10, seconds=30)
+    assert wait_for(lambda: hub.state()["adapter"]["voltage"] == 12.6)
+    assert hub.state()["adapter"]["voltage_t"] == 0.0  # at connect
+    assert wait_for(lambda: sim.sent.count("ATRV") >= 3)
+    assert hub.state()["adapter"]["voltage_t"] > 0
+    hub.stop()
+    run = _json.loads(hub.save_run("bench").read_text())
+    assert run["adapter"]["voltage"] == 12.6 and run["adapter"]["voltage_t"] > 0

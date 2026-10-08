@@ -1655,6 +1655,10 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
     lv.sandbox.document.createRange = () => ({ selectNodeContents(n) { this.node = n; } });
     lv.handlers['t_copy:click'](); assert.ok(picked === scr && /Ctrl\+C/.test(lv.el('t_note').textContent), 'no clipboard: the screen text is selected instead');
     assert.deepStrictEqual(lv.posts.filter(p => !/\/api\/focus/.test(p.url)), [], 'the Terminal posts nothing (the page-wide focus request aside)');
+    // no PID 42: the battery line is the adapter's supply voltage (ATRV)
+    const rv = makeEnv(statesFor(2, () => ({ '0C': 700 })).map(st => Object.assign(st, { demo: false, adapter: { chip: 'STN2120', ati: 'ELM327 v1.4b', protocol: 'P', voltage: 12.6, voltage_t: 0 } })), 'v7', OVF);
+    for (let k = 0; k < 2; k++) await rv.tick();
+    assert.ok(/^battery: {4}12\.6 V \(adapter supply, ATRV\)$/m.test(txt(rv)), 'no PID 42: ATRV\n' + txt(rv));
     // stopped: not read is not "reading", and the readings are not current
     const sp = makeEnv(statesFor(6, base).map(real).map((st, i) => (i > 3 ? Object.assign(st, { status: 'stopped' }) : st)), 'v7', OVF); for (let k = 0; k < 6; k++) await sp.tick();
     t = txt(sp); assert.ok(/^mode 06: {4}not read$/m.test(t) && /^status: {5}STOPPED$/m.test(t) && /^warning: {4}readings not current: STOPPED$/m.test(t), 'stopped\n' + t);

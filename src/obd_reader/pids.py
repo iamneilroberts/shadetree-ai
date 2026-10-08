@@ -87,6 +87,12 @@ _DEFS = [
     PidDef("23", "fuel_rail_gauge_pressure", "kPa", 2, lambda d: _u16(d) * 10),
     PidDef("24", "o2_b1s1_lambda", "ratio", 4, lambda d: round(_u16(d) * 2 / 65536, 3)),
     PidDef("28", "o2_b2s1_lambda", "ratio", 4, lambda d: round(_u16(d) * 2 / 65536, 3)),
+    # wide-range (current-type) O2 sensors: AB equivalence ratio, CD current (not exposed); sensor numbering as 14-1B
+    *[
+        PidDef(f"{0x34 + i:02X}", f"o2_b{i // 4 + 1}s{i % 4 + 1}_lambda_wr", "ratio", 4,
+               lambda d: round(_u16(d) * 2 / 65536, 3))
+        for i in range(8)
+    ],
     PidDef("2C", "commanded_egr", "%", 1, _pct255),
     PidDef("2D", "egr_error", "%", 1, lambda d: round(d[0] * 100 / 128 - 100, 1)),
     PidDef("2E", "commanded_evap_purge", "%", 1, _pct255),
@@ -118,6 +124,8 @@ _DEFS = [
     PidDef("66", "maf_sensor_a", "g/s", 3, _sensor1(lambda d: round(_u16(d) / 32, 2))),
     PidDef("67", "coolant_temp_sensor_1", "C", 2, _sensor1(_temp)),
     PidDef("68", "intake_air_temp_sensor_1", "C", 2, _sensor1(_temp)),
+    PidDef("77", "charge_air_cooler_temp_b1s1", "C", 2, _sensor1(_temp)),
+    PidDef("87", "intake_manifold_pressure_sensor_a", "kPa", 3, _sensor1(lambda d: round(_u16(d) / 32, 2))),
     PidDef("8E", "engine_friction_torque", "%", 1, _torque_pct),
     PidDef("A6", "odometer", "km", 4, lambda d: _u32(d) / 10),
 ]

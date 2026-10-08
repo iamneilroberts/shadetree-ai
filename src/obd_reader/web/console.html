@@ -1959,8 +1959,8 @@
     kv('vehicle', !v ? nr : v.key ? v.key + (rp ? ' (replay)' : v.known ? ' (seen ' + v.runs + (v.runs === 1 ? ' time)' : ' times)') : ' (new)') : v.note || nr, v && v.key ? '' : 't-w');
     kv('protocol', ad.protocol || nr, ad.protocol ? '' : 't-w');
     kv('adapter', rp ? nr : ad.ati ? ad.ati + ' / ' + (ad.chip || 'not STN') : nr, rp || !ad.ati ? 't-w' : '');
-    var bv = latest('42');
-    kv('battery', bv === null || bv === undefined ? nr : fmtStat('42', bv) + ' V (control module, PID 42)', bv === null || bv === undefined ? 't-w' : 't-n');
+    var bv = latest('42'), rv = ad.voltage;   // no PID 42: the adapter's supply voltage (ATRV, pin 16)
+    kv('battery', bv != null ? fmtStat('42', bv) + ' V (control module, PID 42)' : typeof rv === 'number' ? rv.toFixed(1) + ' V (adapter supply, ATRV)' : nr, bv != null || typeof rv === 'number' ? 't-n' : 't-w');
     kv('ecu names', nr, 't-w'); kv('cal ids', nr, 't-w');
     ['stored', 'pending', 'permanent'].forEach(function (k) {
       var l = cd[k] || [], t = !cd.read ? why(cd) : miss.indexOf(k) >= 0 ? 'no answer' : l.length ? l.map(function (d) { return d.code; }).join(', ') : 'none';

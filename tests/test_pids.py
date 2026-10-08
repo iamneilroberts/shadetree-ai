@@ -76,3 +76,15 @@ def test_multi_sensor_pids_read_sensor_1_and_honour_the_support_byte():
     assert decode_pid("68", bytes.fromhex("01" "41")).unit == "C"                    # sensor 1 needs only two bytes
     for pid, data in (("66", "02" "0190" "0320"), ("67", "02" "00" "80"), ("68", "08" "00" "41")):
         assert decode_pid(pid, bytes.fromhex(data)) is None, pid                     # only another sensor present
+
+
+def test_map_87_wide_range_o2_34_to_3b_and_charge_air_cooler_77_decode_sensor_1():
+    # synthetic replies in the J1979 layout [general knowledge, unverified]: support byte, then each sensor
+    assert decode_pid("87", bytes.fromhex("03" "0400" "0C80")).value == 32.0          # 1024 / 32 kPa, sensor A
+    assert decode_pid("77", bytes.fromhex("01" "5A" "000000")).value == 50
+    for pid in ("87", "77"):
+        assert decode_pid(pid, bytes.fromhex("02" "0400" "0400")) is None              # only sensor B present
+    for i in range(8):
+        v = decode_pid(f"{0x34 + i:02X}", bytes.fromhex("8000" "8000"))              # ratio 1.000, current 0 mA
+        assert v.value == 1.0 and v.unit == "ratio"
+    assert PIDS["34"].name == "o2_b1s1_lambda_wr" and PIDS["38"].name == "o2_b2s1_lambda_wr"
