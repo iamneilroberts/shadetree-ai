@@ -595,7 +595,7 @@ def test_d_text_reads_on_its_panels():
     pairs = [(f, b) for f in ("--d-white", "--d-ink2", "--d-hot") for b in red]   # silkscreen, small labels, Check engine ON
     pairs += [(f, b) for f in ("--d-alu-ink", "--d-alu-ink2") for b in ("--d-m1", "--d-m2", "--d-m3", "--d-m4")]   # the aluminium strip
     pairs += [(f, b) for f in ("--d-face-ink", "--d-face-red") for b in ("--d-face1", "--d-face2")] + [("--d-face-ink", "--d-rface")]   # meter faces
-    pairs += [(f, b) for f in ("--d-paper-ink", "--d-paper-ink2") for b in ("--d-paper1", "--d-paper2")] + [("--d-cap", "--d-gl1")]   # printout, code count
+    pairs += [(f, b) for f in ("--d-paper-ink", "--d-paper-ink2") for b in ("--d-paper1", "--d-paper2")] + [("--d-cap", "--d-gl1"), ("--d-tab-ink", "--d-tab")]   # printout, code count, the red tab
     pairs += [("--d-white", "--d-crt2"), ("--d-white", "--d-crt3")]   # the CRT's text sits off its bright centre
     low = [(f, b, round(_contrast(p[f], p[b]), 2)) for f, b in pairs if _contrast(p[f], p[b]) < 4.5]
     assert low == [], f"D text below 4.5:1: {low}"
@@ -702,3 +702,10 @@ def test_every_code_status_badge_reads_on_its_own_colour_and_permanent_has_one(t
         assert re.search(r"#v0 \.cst\.%s\s*\{\s*background:\s*var\(%s\);\s*color:\s*var\(%s\)" % (kind, bg, fg), HTML), f"{kind} badge rule"
         assert _contrast(p[fg], p[bg]) >= 4.5, (theme, kind, round(_contrast(p[fg], p[bg]), 2))
     assert len({p["--led-r"], p["--led-y"], p["--led-p"]}) == 3
+
+
+def test_d_printout_is_continuous_feed_paper_with_the_freeze_frame_on_it():
+    assert 'class="ptab">Trouble codes</span>' in _DD and 'id="d_ff"' not in _DD, "red tab above the paper; no freeze-frame block in the readiness panel"
+    assert ".dd .paper::before, .dd .paper::after" in HTML and "radial-gradient(circle, var(--d-seam)" in HTML and "clip-path: polygon" in HTML, "feed holes both sides, torn edge"
+    assert ".dd .paper h4" in HTML and "1px dashed var(--d-paper-rule)" in HTML and "Diagnostic report" in HTML and "'<div class=\"pft\">FREEZE FRAME'" in HTML
+    assert not re.search(r"plain-words|unreviewed|READ AT RUN START", HTML.split("function renderD()")[1].split("function ", 1)[0], re.I), "no draft or disclaimer text on the printout"

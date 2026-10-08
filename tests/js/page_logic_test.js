@@ -1548,6 +1548,9 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
     const CODES = { read: true, note: null, mil: true, stored: [{ code: 'P0118', desc: 'Coolant sensor circuit high', hint: 'Reads cold' }], pending: [], permanent: [{ code: 'P0118', desc: 'Coolant sensor circuit high', hint: 'Reads cold' }] };
     const cd = await dash(R, {}, statesFor(30, base).map(s => Object.assign(s, { codes: CODES })));
     assert.ok((cd.el('d_paper').innerHTML.match(/<b>P0118<\/b>/g) || []).length === 1 && /STORED · PERMANENT · Coolant sensor circuit high/.test(cd.el('d_paper').innerHTML) && !/draft|unreviewed|unverified/i.test(cd.el('d_paper').innerHTML), 'the printout: code, status, meaning, hint, no caption');
+    const FFR = { read: true, note: null, dtc: 'P0118', pids: { '05': { name: 'coolant_temp', unit: 'C', value: 38, label: null } } };
+    const ffe = await dash(R, {}, statesFor(30, base).map(s => Object.assign(s, { codes: CODES, freeze_frame: FFR })));
+    assert.ok(/<div class="pft">FREEZE FRAME at P0118: [^<]*38/.test(ffe.el('d_paper').innerHTML) && !/draft|unreviewed|unverified/i.test(ffe.el('d_paper').innerHTML), 'the freeze frame is on the printout, as its foot line');
     // Plain and the Handheld list a code once with all its badges (as the D printout does); the Terminal lists codes per list, with no meanings
     const pe = makeEnv(statesFor(30, base).map(s => Object.assign(s, { codes: CODES })), 'v0', OVF); for (let k = 0; k < 6; k++) await pe.tick();
     let rows = ''; walk(pe.el('d_codes_mount'), n => { if (n.id === 'd_codes') rows = n.innerHTML; });
