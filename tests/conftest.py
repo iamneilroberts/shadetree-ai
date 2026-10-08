@@ -24,20 +24,28 @@ def spy():
 
 
 class ScriptedPort:
-    """Answers `01PP` from a table of raw data hex; anything else gets OK, unknown PIDs NO DATA."""
+    """Answers `01PP` from a table of raw data hex; anything else gets OK, unknown PIDs NO DATA.
+    Like a real adapter it honours ATH1: replies then carry one ECU's CAN id and PCI byte ("7E8 04 41 0C 1A F8")."""
 
     def __init__(self, pid_data: dict[str, str]):
         self.pid_data = pid_data
         self.writes: list[str] = []
         self._pending = ""
+        self.headers = False
 
     def write(self, data: bytes) -> None:
         cmd = data.decode("ascii").rstrip("\r")
         self.writes.append(cmd)
         if cmd.startswith("01") and len(cmd) == 4:
             pid = cmd[2:]
-            self._pending = (f"41 {pid} {self.pid_data[pid]}\r" if pid in self.pid_data else "NO DATA\r")
+            msg = f"41 {pid} {self.pid_data[pid]}" if pid in self.pid_data else None
+            if msg and self.headers:
+                b = bytes.fromhex(msg.replace(" ", ""))
+                msg = f"7E8 {len(b):02X} " + " ".join(f"{x:02X}" for x in b)
+            self._pending = f"{msg}\r" if msg else "NO DATA\r"
         else:
+            if cmd in ("ATH0", "ATH1", "ATZ"):
+                self.headers = cmd == "ATH1"
             self._pending = "OK\r"
 
     def read_until_prompt(self, timeout: float) -> str:

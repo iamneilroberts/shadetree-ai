@@ -1,4 +1,4 @@
-"""ELM/STN response parsing for headers-off (ATH0) output, spaces on (ATS1 default)."""
+"""ELM/STN response parsing for headers-off (ATH0) output (parse_frames: headers on), spaces on (ATS1 default)."""
 import re
 
 ERROR_MARKERS = (
@@ -45,6 +45,53 @@ def parse_all(lines: list[str], sid: int) -> list[bytes]:
             if candidate[:1] == bytes([sid]):
                 out.append(candidate)
         i += 1
+    return out
+
+
+def parse_frames(lines: list[str], sid: int) -> list[tuple[str, bytes]]:
+    """The headers-on (ATH1) counterpart of parse_all: (source address, payload) per responding ECU.
+
+    CAN 11-bit "7E8 06 41 0C 1A F8", 29-bit "18 DA F1 10 06 41 0C 1A F8": the id ("7E8", "18DAF110"), the ISO-TP PCI
+    byte, then data; bytes past a single frame's length are padding. First and consecutive frames are joined per id,
+    so interleaved ECUs stay apart, and a frame out of sequence drops that ECU's message. Legacy (J1850, ISO 9141,
+    KWP) "48 6B 10 41 0C 1A F8 <check byte>": priority, target, source ("10"), then the message; the trailing check
+    byte is kept (decoders read fixed lengths). Errors give [] as in parse_all; a line that fits no layout is skipped.
+    Unverified on hardware for Mode 01."""
+    lines = _clean(lines)
+    if not lines or any(m in ln for ln in lines for m in ERROR_MARKERS):
+        return []
+    out: list[tuple[str, bytes]] = []
+    pend: dict[str, list] = {}  # id -> [total length, data so far, next sequence number]
+    for ln in lines:
+        toks = ln.split()
+        if not all(re.fullmatch(r"[0-9A-F]{2,3}", t) for t in toks) or any(len(t) == 3 for t in toks[1:]):
+            continue
+        if len(toks[0]) == 3 or toks[:3] == ["18", "DA", "F1"]:  # CAN
+            k = 1 if len(toks[0]) == 3 else 4
+            addr, data = "".join(toks[:k]), bytes.fromhex("".join(toks[k:]))
+            if not data:
+                continue
+            kind, low = data[0] >> 4, data[0] & 0xF
+            if kind == 0 and 0 < low < len(data):
+                msg = data[1 : 1 + low]
+            elif kind == 1 and len(data) >= 2:
+                pend[addr] = [(low << 8) | data[1], data[2:], 1]
+                continue
+            elif kind == 2 and addr in pend and pend[addr][2] == low:
+                p = pend[addr]
+                p[1], p[2] = p[1] + data[1:], (p[2] + 1) & 0xF
+                if len(p[1]) < p[0]:
+                    continue
+                msg = pend.pop(addr)[1][: p[0]]
+            else:
+                pend.pop(addr, None)
+                continue
+        elif len(toks) >= 4 and len(toks[0]) == 2:  # legacy: 3 header bytes
+            addr, msg = toks[2], bytes.fromhex("".join(toks[3:]))
+        else:
+            continue
+        if msg[:1] == bytes([sid]):
+            out.append((addr, msg))
     return out
 
 

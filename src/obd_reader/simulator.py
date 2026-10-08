@@ -17,6 +17,7 @@ import random
 import time
 from typing import Callable
 
+from obd_reader.elm import parse_all
 from obd_reader.vin import with_check_digit
 
 SIM_VIN = with_check_digit("9SXSMUL1?T0000001")  # made up, built in code so the repo's VIN guard never sees a literal
@@ -86,6 +87,8 @@ PCM_PIDS = {"01", "03", "04", "06", "07", "08", "09", "0B", "0C", "0D", "0E", "1
             "4A", "51", "55", "56", "57", "58", "62", "63", "66", "67", "68", "6C", "8E", "9D", "9E", "9F", "A3", "A6"}
 ECU2_PIDS = {"01", "04", "05", "0C", "0D", "11", "1F", "21", "30", "31", "33", "41", "42", "45", "47", "49", "4A"}
 SUPPORTED = PCM_PIDS | ECU2_PIDS
+# with headers on (ATH1) each reply carries its ECU's 29-bit CAN id, as on the Ridgeline (CAN 29/500)
+PCM_ID, ECU2_ID = "18 DA F1 10", "18 DA F1 18"
 
 # (stored, pending) codes as 2-byte DTCs; a stored code commands the lamp, so it is also a permanent code
 _CODES = {
@@ -107,6 +110,17 @@ _FROZEN = {
 IDLE_RPM, REV_RPM = 723.0, 2500.0
 
 
+def _can_frames(can_id: str, msg: bytes) -> list[str]:
+    """One message as headers-on CAN lines: a single frame (PCI = length), or ISO-TP first + consecutive frames."""
+    hx = lambda b: " ".join(f"{x:02X}" for x in b)  # noqa: E731
+    if len(msg) <= 7:
+        return [f"{can_id} {len(msg):02X} {hx(msg)}"]
+    out = [f"{can_id} {0x10 | len(msg) >> 8:02X} {len(msg) & 0xFF:02X} {hx(msg[:6])}"]
+    for n, i in enumerate(range(6, len(msg), 7), start=1):
+        out.append(f"{can_id} {0x20 | n & 0xF:02X} {hx(msg[i:i + 7])}")
+    return out
+
+
 def _dtc_reply(sid: int, codes: list[int]) -> str:
     return " ".join(f"{b:02X}" for b in [sid, len(codes)] + [x for c in codes for x in (c >> 8, c & 0xFF)])
 
@@ -119,6 +133,7 @@ class SimPort:
         if bus is not None and bus not in BUSES:
             raise ValueError(f"bus must be one of {tuple(BUSES)}")
         self.scenario, self.rev = scenario, False
+        self.headers = False  # ATH1: replies carry the answering ECU's CAN id
         self._clock, self._rng = clock, random.Random(seed)
         self._t0 = self._last = clock()
         self._rpm = IDLE_RPM
@@ -205,10 +220,12 @@ class SimPort:
         cmd = data.decode("ascii").rstrip("\r")
         if cmd == "010C":
             self._advance()  # one model step per sweep
-        if cmd.startswith("01") and len(cmd) == 4 and int(cmd[2:], 16) % 0x20 == 0:
+        bitmap = cmd.startswith("01") and len(cmd) == 4 and int(cmd[2:], 16) % 0x20 == 0
+        if bitmap:
             base = int(cmd[2:], 16)
             lines = [self._bitmap("41", base, {int(p, 16) for p in ecu}) for ecu in (PCM_PIDS, ECU2_PIDS)]
             self._pending = "\r".join(ln for ln in lines if ln) + "\r" if any(lines) else "NO DATA\r"
+            ids = [i for i, ln in zip((PCM_ID, ECU2_ID), lines) if ln]
         elif cmd.startswith("01") and len(cmd) == 4 and cmd != "0101":
             pid = cmd[2:]
             if pid in ENCODERS and pid in SUPPORTED:
@@ -247,8 +264,20 @@ class SimPort:
             self._pending = ("A6" if self.bus == "can" else "A2") + "\r"
         elif cmd in ("ATMA", "STMA"):
             self._monitoring, self._mon_last, self._pending = True, self._clock(), ""
+        elif cmd in ("ATH1", "ATH0", "ATZ"):
+            self.headers = cmd == "ATH1"
+            self._pending = "OK\r"
         else:
             self._pending = "OK\r"
+        if self.headers and not cmd.startswith(("AT", "ST")):
+            # the same messages, each framed under the id of the ECU that answers it: a bitmap from each ECU that
+            # advertises something on that page, a data PID from the engine ECU unless only the second ECU has it
+            msgs = parse_all(self._pending.split("\r"), int(cmd[:2], 16) + 0x40)
+            if not bitmap:
+                only2 = cmd.startswith("01") and cmd[2:] not in PCM_PIDS and cmd[2:] in ECU2_PIDS
+                ids = [ECU2_ID if only2 else PCM_ID] * len(msgs)
+            if msgs:
+                self._pending = "\r".join(ln for i, m in zip(ids, msgs) for ln in _can_frames(i, m)) + "\r"
 
     def read_until_prompt(self, timeout: float) -> str:
         out, self._pending = self._pending, ""

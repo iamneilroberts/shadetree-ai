@@ -29,14 +29,16 @@ def identify(transport: Transport) -> Adapter:
     )
 
 
-def fallback_search(transport) -> str | None:
+def fallback_search(transport, parse=None) -> str | None:
     """After automatic search found nothing: pin each protocol in turn and ask `0100`. Returns the ATSP value
-    that answered (left pinned), or None with the adapter back on automatic search."""
+    that answered (left pinned), or None with the adapter back on automatic search. `parse` reads a reply into
+    its Mode 01 payloads (default elm.parse_all, headers off)."""
     from obd_reader.elm import parse_all  # local: elm has no adapter dependency, keep it that way
 
+    parse = parse or (lambda lines: parse_all(lines, 0x41))
     for p in FALLBACK_PROTOCOLS:
         transport.send(f"ATSP{p}")
-        if parse_all(transport.send("0100"), 0x41):
+        if parse(transport.send("0100")):
             return p
     transport.send("ATSP0")
     return None

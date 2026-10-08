@@ -20,6 +20,8 @@ _CODE = re.compile(r"[PCBU][0-9A-F]{4}")
 _VIN_RUN = re.compile(r"[A-HJ-NPR-Z0-9]{17}")   # any 17 VIN characters in a row, checked on the upper-cased label
 _MON = re.compile(r"[a-z0-9_]{1,40}")
 _STAMP = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}Z")
+_ADDR = re.compile(r"[0-9A-F]{2}|[0-9A-F]{3}|[0-9A-F]{8}")  # an ECU address: legacy source, CAN 11-bit or 29-bit id
+MAX_ECUS = 32
 META_TEXT = {"make": 40, "model": 40, "title": 80}
 MIN_YEAR, MAX_YEAR = 1996, 2100
 
@@ -38,6 +40,8 @@ class Run:
     demo: bool = False  # recorded from the simulator, not a car
     readiness: dict | None = None
     freeze_frame: dict | None = None
+    ecus: list = field(default_factory=list)          # ECU addresses that answered Mode 01 (headers on)
+    channel_ecus: dict = field(default_factory=dict)  # channel -> the ECU it was read from
 
     def index_after(self, pos: float) -> int:
         return bisect.bisect_right(self.times, pos)
@@ -185,6 +189,17 @@ def _vehicle(v) -> dict | None:
     return None
 
 
+def _ecus(obj, names: dict) -> tuple[list, dict]:
+    """The run's ECU addresses and which one each channel was read from; anything malformed is left out
+    (runs from before headers-on sampling have neither)."""
+    seen = obj.get("ecus")
+    addrs = [e.get("addr") for e in seen[:MAX_ECUS] if isinstance(e, dict)] if isinstance(seen, list) else []
+    addrs = list(dict.fromkeys(a for a in addrs if isinstance(a, str) and _ADDR.fullmatch(a)))
+    ch = obj.get("channel_ecus")
+    chan = {p: a for p, a in ch.items() if p in names and isinstance(a, str) and _ADDR.fullmatch(a)} if isinstance(ch, dict) else {}
+    return addrs, chan
+
+
 def load_run(obj) -> Run:
     if not isinstance(obj, dict) or obj.get("kind") != "live_run":
         raise ValueError("not a saved run (kind must be live_run)")
@@ -219,12 +234,14 @@ def load_run(obj) -> Run:
         rate = float(rate) if isinstance(rate, (int, float)) and not isinstance(rate, bool) and math.isfinite(rate) and rate > 0 else 0.0
     except OverflowError:
         rate = 0.0
+    ecus, chan = _ecus(obj, names)
     return Run(duration=max(sweeps[-1][0], 0.1),
                rate_hz=rate,
                protocol=proto if isinstance(proto, str) and len(proto) <= MAX_TEXT else None,
                names=names, sweeps=sweeps, codes=_codes(obj.get("codes")), mode06=_mode06(obj.get("mode06")),
                vehicle=_vehicle(obj.get("vehicle")), times=[t for t, _ in sweeps], demo=obj.get("demo") is True,
-               readiness=_readiness(obj.get("readiness")), freeze_frame=_freeze(obj.get("freeze_frame")))
+               readiness=_readiness(obj.get("readiness")), freeze_frame=_freeze(obj.get("freeze_frame")),
+               ecus=ecus, channel_ecus=chan)
 
 
 def clean_meta(m) -> dict:

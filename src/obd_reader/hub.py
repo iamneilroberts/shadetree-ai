@@ -15,7 +15,9 @@ from typing import Callable
 from obd_reader.adapter import fallback_search, identify
 from obd_reader.dtc_text import describe
 from obd_reader.elm import classify, decode_dtc_list, decode_supported, is_legacy, parse_all, parse_vin_legacy
-from obd_reader.live import MAX_HZ, MAX_PIDS, MIN_HZ, LiveLimitError, read_pid_value, summarize, validate_pids
+from obd_reader.live import (
+    MAX_HZ, MAX_PIDS, MIN_HZ, EcuChoice, LiveLimitError, ecu_role, read_pid_value, summarize, validate_pids,
+)
 from obd_reader.mode06 import read_all as read_mode06, read_all_legacy as read_mode06_legacy
 from obd_reader.pids import PIDS, pid_label
 from obd_reader.profiles import ProfileStore
@@ -130,6 +132,10 @@ class LiveHub:
         self._saved: tuple[Path, int] | None = None  # (file, seq) of the last save of this run
         self._transcript: str | None = None  # this run's raw transcript, relative to home
         self._replay: dict | None = None     # while a saved run is loaded: name, run, pos, speed, playing, ended, i
+        self._ecu = EcuChoice()              # the sampler's per-PID ECU choice (headers on)
+        self._hdr = False                    # headers are on (the adapter said OK to ATH1): Mode 01 replies name their ECU
+        self._chan_ecu: dict[str, str] = {}  # what viewers see: channel -> the ECU it is read from
+        self._ecu_list: list[str] = []       # and every ECU address that answered Mode 01
 
     @property
     def running(self) -> bool:
@@ -211,6 +217,7 @@ class LiveHub:
                 self._ready = run.readiness or {"read": False, "note": "not in this recording"}
                 self._ff = run.freeze_frame or {"read": False, "note": "not in this recording"}
                 self._vehicle = run.vehicle
+                self._chan_ecu, self._ecu_list = dict(run.channel_ecus), list(run.ecus)
                 self._ch = {p: deque(maxlen=self._max) for p in run.names}
                 for t, vals in run.sweeps:
                     for p, v in vals.items():
@@ -331,6 +338,7 @@ class LiveHub:
                     self._transcript = t.transcript_path.relative_to(self._s.config.home).as_posix()
                 a = identify(t)
                 self._adapter.update(chip=a.chip, ati=a.ati)
+                self._set_headers(t, True)
                 t0 = self._clock()
                 self._t0, self._deadline = t0, t0 + seconds
                 self._read_rv(t, 0.0)
@@ -380,6 +388,9 @@ class LiveHub:
                         if self._adapter["protocol"] is None:
                             dp = (t.send("ATDP") or [None])[0]
                             self._adapter["protocol"] = dp.removeprefix("AUTO, ") if dp else None
+                            hdr = self._hdr  # the once-per-run reads decode headers-off replies
+                            if hdr:
+                                self._set_headers(t, False)
                             prior = self._read_identity(t)  # first: the car's make picks which code meanings apply
                             lie, cap = self._apply_quirks()
                             for p in (prior["unsupported"] if prior else []) + lie:
@@ -395,6 +406,8 @@ class LiveHub:
                                 self._read_freeze_frame(t)
                             if not self._stop.is_set():
                                 self._read_mode06(t)
+                            if hdr and not self._stop.is_set():
+                                self._set_headers(t, True)
                     else:
                         silent += 1
                         if silent >= _SILENT_SWEEPS:
@@ -408,6 +421,21 @@ class LiveHub:
             self._autosave_run()
             if self.status != "error":
                 self.status = "stopped"
+
+    def _set_headers(self, t, on: bool) -> None:
+        """ATH1 while sampling Mode 01, so each reply names its ECU; ATH0 for the once-per-run reads (VIN, codes, freeze
+        frame, Mode 06), whose decoders read headers-off replies. Headers count as on only when the adapter answers OK:
+        an old transcript replayed answers "?" to ATH1 and keeps the headers-off decode."""
+        ok = any(ln.strip().upper() == "OK" for ln in t.send("ATH1" if on else "ATH0"))
+        self._hdr = on and ok
+
+    def _mode01(self, lines: list[str]) -> list[bytes]:
+        """Every ECU's Mode 01 payloads in a reply, read the way headers are set."""
+        return [p for _, p in self._ecu.payloads(lines)] if self._hdr else parse_all(lines, 0x41)
+
+    def _publish_ecus(self) -> None:
+        with self._data_lock:
+            self._chan_ecu, self._ecu_list = dict(self._ecu.by_pid), list(self._ecu.seen)
 
     def _discover_extras(self, t, core: list[str], focus_only: bool = False) -> list[str]:
         """Ask the car which Mode 01 PIDs it supports and pick the extra readings it can give, up to the PID cap."""
@@ -462,7 +490,7 @@ class LiveHub:
         base = 0x00
         while base <= 0xC0 and not self._stop.is_set():
             found: set[str] = set()
-            for p in parse_all(t.send(f"01{base:02X}"), 0x41):
+            for p in self._mode01(t.send(f"01{base:02X}")):  # the union of every ECU's bitmap
                 if len(p) >= 6 and p[1] == base:
                     found.update(decode_supported(base, p[2:6]))
             if not found:
@@ -473,8 +501,9 @@ class LiveHub:
             base += 0x20
         if not supported and retry and self._sim is None and self._s.config.protocol == "0" and not self._stop.is_set():
             # automatic search can miss a bus that answers when pinned (a J1850 VPW truck did)
-            if fallback_search(t):
+            if fallback_search(t, parse=self._mode01):
                 return self._discover_supported(t, retry=False)
+        self._publish_ecus()
         return supported
 
     @staticmethod
@@ -650,11 +679,12 @@ class LiveHub:
         for p in pids:
             if self._stop.is_set():  # a slow link must not delay Stop by a whole sweep
                 return False
-            v = read_pid_value(t, p)
+            v = read_pid_value(t, p, self._ecu if self._hdr else None)
             if v is not None:
                 rows.append((p, v))
             else:
                 self._missed.add(p)
+        self._publish_ecus()
         if not rows:
             return False
         with self._data_lock:
@@ -699,13 +729,14 @@ class LiveHub:
             # only sweeps up to `seq`: anything newer is not complete yet
             channels = {
                 p: {"name": self._meta(p)[0], "unit": self._meta(p)[1], "labels": self._meta(p)[2],
-                    "samples": [[s, tt, v] for s, tt, v in d if after < s <= seq]}
+                    "samples": [[s, tt, v] for s, tt, v in d if after < s <= seq], "ecu": self._chan_ecu.get(p)}
                 for p, d in self._ch.items()
             }
             stats = {p: {"n": n, "min": lo, "max": hi, "avg": round(mean, 4), "std": round((m2 / (n - 1)) ** 0.5, 4) if n > 1 else 0.0,
                          "min_t": tlo, "max_t": thi, "age": tlast}
                      for p, (n, mean, m2, lo, hi, tlo, thi, tlast) in self._stats.items()}
             ptimes = self._ptimes
+            ecus = [{"addr": a, "role": ecu_role(a)} for a in self._ecu_list]
             rp = self._replay
             replay = None if rp is None else {"name": rp["name"], "duration": rp["run"].duration, "pos": round(rp["pos"], 3),
                                               "speed": rp["speed"], "playing": rp["playing"], "ended": rp["ended"], "demo": rp["run"].demo}
@@ -728,6 +759,7 @@ class LiveHub:
             "adapter": adapter, "codes": codes, "unsupported": unsupported,
             "extras": extras, "tiers": tiers, "capture": capture, "mode06": m06, "readiness": ready, "freeze_frame": ff, "vehicle": vehicle, "replay": replay,
             "supported": supported, "focus": focus, "fallbacks": fallbacks, "quirks": quirks, "car": self._car(key, name),
+            "ecus": ecus,  # every ECU address that answered Mode 01 (headers on), with a role guessed from the address
             "channels": channels, "stats": stats,
         }
 
@@ -798,13 +830,15 @@ class LiveHub:
                       for p, d in self._full.items()}
             codes, m06, key, tr, name = dict(self._codes), dict(self._m06), self._key, self._transcript, self._name
             ready, ff = dict(self._ready), dict(self._ff)
+            chan_ecu = {p: a for p, a in self._chan_ecu.items() if p in self._full}
+            ecus = [{"addr": a, "role": ecu_role(a)} for a in self._ecu_list]
         ls = LiveSample(duration_s=self.state()["now"], rate_hz=self.hz or 0.0, series=series)
         rdir = Path(self._s.config.home) / "runs"
         rdir.mkdir(parents=True, exist_ok=True)
         path = rdir / f"{datetime.now(timezone.utc):%Y-%m-%dT%H-%M-%SZ}-{label}.json"
         with open(path, "x", encoding="utf-8") as fh:
             json.dump({"kind": "live_run", "demo": self._sim is not None, "adapter": self._adapter,
-                       "live_sample": ls.model_dump(mode="json"), "codes": codes, "mode06": m06, "readiness": ready, "freeze_frame": ff,
+                       "live_sample": ls.model_dump(mode="json"), "ecus": ecus, "channel_ecus": chan_ecu, "codes": codes, "mode06": m06, "readiness": ready, "freeze_frame": ff,
                        "vehicle": {"key": key} if key else None, "vehicle_key": key, "transcript": tr,  # the key, never the VIN
                        **({"meta": {**name, "title": "auto-saved" if label == "auto" else label}} if name else {})}, fh, indent=2)
         with self._data_lock:

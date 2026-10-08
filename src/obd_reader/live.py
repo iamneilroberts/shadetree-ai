@@ -3,7 +3,7 @@ import re
 import time
 from typing import Callable
 
-from obd_reader.elm import parse_all
+from obd_reader.elm import parse_all, parse_frames
 from obd_reader.pids import PIDS
 from obd_reader.snapshot import LiveSample, Series
 from obd_reader.transport import Transport
@@ -37,13 +37,50 @@ def validate_pids(pids: list[str]) -> list[str]:
     return out
 
 
-def read_pid_value(transport: Transport, pid: str) -> float | int | None:
-    """One Mode 01 request for an already-validated PID; None if no ECU answered it."""
+ENGINE_ECUS = ("7E8", "18DAF110", "10")  # the engine ECU's source address: CAN 11-bit, CAN 29-bit, legacy buses
+
+
+def ecu_role(addr: str) -> str:
+    """A guess from the address alone: the engine ECU, or some other module."""
+    return "engine" if addr in ENGINE_ECUS else "module"
+
+
+class EcuChoice:
+    """Which ECU each PID is read from when headers are on (ATH1). Several ECUs answer a functional Mode 01 request,
+    in an order that changes from request to request, so the first reply mixes modules. A PID is read from the engine
+    ECU when it answers it, else from the lowest other address that does; the first choice is kept for the run."""
+
+    def __init__(self) -> None:
+        self.by_pid: dict[str, str] = {}
+        self.seen: list[str] = []  # every address that answered a Mode 01 request, lowest first
+
+    def payloads(self, lines: list[str], sid: int = 0x41) -> list[tuple[str, bytes]]:
+        frames = parse_frames(lines, sid)
+        self.seen = sorted(set(self.seen) | {a for a, _ in frames}, key=lambda a: int(a, 16))
+        return frames
+
+    def pick(self, pid: str, frames: list[tuple[str, bytes]]) -> bytes | None:
+        got: dict[str, bytes] = {}
+        for a, p in frames:
+            got.setdefault(a, p)
+        if pid not in self.by_pid:
+            if not got:
+                return None
+            self.by_pid[pid] = next((a for a in ENGINE_ECUS if a in got), None) or min(got, key=lambda a: int(a, 16))
+        return got.get(self.by_pid[pid])
+
+
+def read_pid_value(transport: Transport, pid: str, ecus: EcuChoice | None = None) -> float | int | None:
+    """One Mode 01 request for an already-validated PID; None if no ECU answered it. With `ecus` the reply is read
+    headers-on and the value comes from the PID's chosen ECU; without, headers-off and the first responder's."""
     d = PIDS[pid]
-    for payload in parse_all(transport.send(f"01{pid}"), 0x41):
-        if len(payload) >= 2 + d.nbytes and payload[1] == int(pid, 16):
-            return d.decode(payload[2 : 2 + d.nbytes])
-    return None
+    lines = transport.send(f"01{pid}")
+    ok = lambda p: len(p) >= 2 + d.nbytes and p[1] == int(pid, 16)  # noqa: E731
+    if ecus is None:
+        payload = next((p for p in parse_all(lines, 0x41) if ok(p)), None)
+    else:
+        payload = ecus.pick(pid, [(a, p) for a, p in ecus.payloads(lines) if ok(p)])
+    return None if payload is None else d.decode(payload[2 : 2 + d.nbytes])
 
 
 def sample(
