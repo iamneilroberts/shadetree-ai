@@ -49,6 +49,44 @@ def _scan(args) -> int:
     return 0
 
 
+def _listen(args) -> int:
+    from obd_reader.bus_capture import summarize_file
+
+    if args.summarize:
+        md = summarize_file(args.summarize)
+        print(md.read_text(encoding="utf-8"), end="")
+        return 0
+    from obd_reader.capture import _LABEL_RE
+    from obd_reader.listen import Keys, listen
+    from obd_reader.session import Config, Session
+
+    if not _LABEL_RE.fullmatch(args.label):
+        raise ValueError("label must be 1-40 chars of [a-z0-9-]")
+    if args.seconds is not None and not 0 < args.seconds <= 900:
+        raise ValueError("--seconds must be in (0, 900]")
+    if args.port == "sim":
+        from obd_reader.simulator import SimPort
+
+        session = Session(Config(port="sim", home=args.out_dir, timeout=1.0), port_factory=lambda: SimPort("healthy", bus="can"))
+    else:
+        session = Session(Config(port=args.port, baud=args.baud, timeout=args.timeout, home=args.out_dir))
+    # captures that exist before this run, so Ctrl-C never names an older one
+    pattern = f"*-{args.label}.jsonl"
+    before = set((Path(args.out_dir) / "captures").glob(pattern))
+    try:
+        with Keys() as keys:
+            path = listen(session, label=args.label, protocol=args.protocol or "0", seconds=args.seconds,
+                          out=lambda s: print(s, flush=True), keys=keys)
+    except KeyboardInterrupt:
+        new = sorted(set((Path(args.out_dir) / "captures").glob(pattern)) - before)
+        print(f"stopped: the partial capture is {new[-1]}" if new else "stopped before the capture began")
+        return 130
+    md = summarize_file(path)
+    print(md.read_text(encoding="utf-8"), end="")
+    print(f"capture (raw bus data, may hold the VIN, keep local): {path}\nsummary (no payload bytes): {md}")
+    return 0
+
+
 def _probe(args) -> int:
     from obd_reader.capture import _LABEL_RE
     from obd_reader.probe import write_probe
@@ -251,6 +289,18 @@ def build_parser() -> argparse.ArgumentParser:
     pr.add_argument("--out-dir", type=Path, default=Path("."), help="probes/ (and, live, snapshots/ and transcripts/) go here")
     pr.add_argument("--propose-quirks", action="store_true", help="also print the proposed quirks JSON (nothing is written)")
     pr.set_defaults(func=_probe)
+
+    ls = sub.add_parser("listen", help="listen-only bus capture with a guided action script; writes captures/<id>.jsonl (raw bus data, keep local)")
+    src = ls.add_mutually_exclusive_group(required=True)
+    src.add_argument("--port", help="serial device or pyserial URL, or 'sim' for the simulator")
+    src.add_argument("--summarize", type=Path, metavar="CAPTURE", help="print and save the summary of a capture (no adapter)")
+    ls.add_argument("--protocol", default=None, help="ATSP value; default 0 = automatic search")
+    ls.add_argument("--baud", type=int, default=115200)
+    ls.add_argument("--timeout", type=float, default=10.0, help="seconds to wait per command")
+    ls.add_argument("--seconds", type=float, default=None, help="plain listen for N seconds (max 900) instead of the guided script")
+    ls.add_argument("--label", default="listen", help="short name for the capture, [a-z0-9-]")
+    ls.add_argument("--out-dir", type=Path, default=Path("."), help="captures/ (and snapshots/, transcripts/) go here")
+    ls.set_defaults(func=_listen)
 
     qk = sub.add_parser("quirks", help="per-car hints (quirks/ committed, quirks-local/ private)")
     qsub = qk.add_subparsers(dest="qcmd", required=True)

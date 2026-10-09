@@ -68,7 +68,7 @@ def test_the_allowlist_only_contains_vins_and_explains_each_one():
 
 
 def test_capture_directories_are_gitignored():
-    for path in ("snapshots/x.json", "transcripts/x.jsonl", "runs/x.json", "probes/x.json", "quirks-local/x.json", ".env"):
+    for path in ("snapshots/x.json", "transcripts/x.jsonl", "runs/x.json", "probes/x.json", "captures/x.jsonl", "quirks-local/x.json", ".env"):
         r = subprocess.run(["git", "check-ignore", "-q", path], cwd=ROOT)
         assert r.returncode == 0, f"{path} must stay gitignored"
 

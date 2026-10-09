@@ -10,6 +10,7 @@ runs/
 !/examples/runs/
 profiles/
 probes/
+captures/
 quirks-local/
 cache/
 !tests/fixtures/**
