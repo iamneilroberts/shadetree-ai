@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Callable, Iterator
 
 from obd_reader import __version__
-from obd_reader.bus_capture import CaptureWriter
+from obd_reader.bus_capture import CaptureWriter, id_tokens_for, split_frame
 from obd_reader.scanner import scan
 from obd_reader.session import Session
 from obd_reader.transport import MonitorEvent
@@ -85,15 +85,21 @@ class Keys:
             self._restore()
 
 
-def run_capture(events: Iterator[MonitorEvent], writer: CaptureWriter, script, keys, out: Callable[[str], None], start: float) -> str:
+def run_capture(events: Iterator[MonitorEvent], writer: CaptureWriter, script, keys, out: Callable[[str], None], start: float,
+                *, protocol: str = "") -> str:
     """Write the monitor's events and the script's step records; `start` is the transport time the capture counts from."""
     idx, in_window, deadline, t, ids, last_status = 0, False, 0.0, 0.0, set(), 0.0
+    last_frames, id_n = 0, id_tokens_for(protocol)
     reason = "finished" if not script else "time_limit"
 
     def begin(i: int, at: float) -> float:
         writer.step(at, script[i].id, "start")
         out(f"[{i + 1}/{len(script)}] {script[i].prompt} ({script[i].window_s:g} s)")
         return at + script[i].window_s
+
+    def rest_cue(i: int) -> None:
+        nxt = f", next: {script[i + 1].prompt}" if i + 1 < len(script) else ""
+        out(f"  rest {REST_S:g} s{nxt}")
 
     def stop(at: float, why: str) -> None:
         if in_window:  # a window still open when the capture stops gets its end record
@@ -113,10 +119,12 @@ def run_capture(events: Iterator[MonitorEvent], writer: CaptureWriter, script, k
                 if key == "s" and in_window:
                     writer.step(t, script[idx].id, "skipped")
                     in_window, deadline = False, t + REST_S
+                    rest_cue(idx)
                 while t >= deadline:
                     if in_window:
                         writer.step(deadline, script[idx].id, "end")
                         in_window, deadline = False, deadline + REST_S
+                        rest_cue(idx)
                     else:
                         idx += 1
                         if idx >= len(script):
@@ -127,12 +135,15 @@ def run_capture(events: Iterator[MonitorEvent], writer: CaptureWriter, script, k
                     break
             if ev.kind == "frame":
                 writer.frame(t, ev.text)
-                ids.add(ev.text.split(" ", 1)[0])
+                parts = split_frame(ev.text, id_n)
+                if parts:
+                    ids.add(parts[0])
             elif ev.kind == "gap":
                 writer.gap(t, ev.text, ev.seconds)
             if t - last_status >= 5.0:
-                last_status = t
-                out(f"  {t:5.0f} s · {writer.frames} frames · {len(ids)} ids · {writer.gaps} gaps")
+                rate = (writer.frames - last_frames) / (t - last_status)
+                last_status, last_frames = t, writer.frames
+                out(f"  {t:5.0f} s · {rate:.1f} frames/s · {len(ids)} ids · {writer.gaps} gaps")
         stop(t, reason)  # inside the try: the end record exists even if closing the stream raises
     except KeyboardInterrupt:
         stop(t, "interrupted")
@@ -173,7 +184,7 @@ def listen(session: Session, *, label: str, protocol: str, seconds: float | None
                           monitor_command=mon, setup=setup,
                           script=[{"id": s.id, "prompt": s.prompt, "window_s": s.window_s} for s in script], rest_s=REST_S)
             out(f"listening ({mon}, {'CAN' if can else 'protocol ' + dpn}): s skips a step, q stops")
-            run_capture(events, writer, script, keys, out, t.now)
+            run_capture(events, writer, script, keys, out, t.now, protocol=dpn)
         finally:
             writer.close()
     return path

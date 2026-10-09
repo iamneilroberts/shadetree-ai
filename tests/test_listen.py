@@ -182,3 +182,26 @@ def test_listen_refuses_to_monitor_when_no_protocol_is_detected(tmp_path):
         listen(session, label="t", protocol="0", seconds=1.0, out=lambda s: None, keys=FakeKeys())
     assert "ATDPN" in sent and not {"ATCSM1", "ATMA", "STMA"} & set(sent)
     assert not (tmp_path / "captures").exists() or list((tmp_path / "captures").iterdir()) == []
+
+
+def test_a_rest_cue_names_the_next_step_after_a_window_ends(tmp_path):
+    ev, _ = feed([x / 2 for x in range(0, 40)])
+    _, _, out = capture(tmp_path, ev)
+    assert "  rest 5 s, next: Do B" in out and "  rest 5 s" in out
+
+
+def test_the_status_line_reports_a_frame_rate_not_a_total(tmp_path):
+    extra = [MonitorEvent("frame", float(x), "0C9 01") for x in range(1, 11)]
+    ev, _ = feed([float(x) for x in range(0, 11)], extra=extra)
+    _, _, out = capture(tmp_path, ev, script=())
+    assert any("5 s · 0.8 frames/s · 1 ids" in ln for ln in out)
+
+
+def test_ids_are_counted_by_the_protocols_header_length(tmp_path):
+    extra = [MonitorEvent("frame", 1.0, "88 FE 10 01 02"), MonitorEvent("frame", 2.0, "8A FE 40 01 02"),
+             MonitorEvent("frame", 3.0, "88 FE 10 03 04"), MonitorEvent("frame", 4.0, "zz")]
+    ev, _ = feed([float(x) for x in range(0, 7)], extra=extra)
+    out, w = [], CaptureWriter(tmp_path / "j.jsonl")
+    run_capture(ev, w, (), FakeKeys(), out.append, 0.0, protocol="A2")
+    w.close()
+    assert any("· 2 ids ·" in ln for ln in out)
