@@ -22,6 +22,8 @@ from obd_reader.vin import with_check_digit
 SIM_VIN = with_check_digit("9SXSMUL1?T0000001")  # made up, built in code so the repo's VIN guard never sees a literal
 
 SCENARIOS = ("healthy", "rich", "lean")
+# made-up broadcast traffic for `listen --port sim` (ids, rates and payloads are invented; no VIN)
+BUSES = {"can": (("0C9", 0.02), ("1F5", 0.05), ("3B4", 0.2)), "j1850": (("88 FE 10", 0.1), ("8A FE 40", 0.5))}
 
 
 def _clamp(n: int, lo: int, hi: int) -> int:
@@ -110,15 +112,20 @@ def _dtc_reply(sid: int, codes: list[int]) -> str:
 
 
 class SimPort:
-    def __init__(self, scenario: str = "rich", clock: Callable[[], float] = time.monotonic, seed: int = 7):
+    def __init__(self, scenario: str = "rich", clock: Callable[[], float] = time.monotonic, seed: int = 7,
+                 bus: str | None = None, sleep: Callable[[float], None] = time.sleep):
         if scenario not in SCENARIOS:
             raise ValueError(f"scenario must be one of {SCENARIOS}")
+        if bus is not None and bus not in BUSES:
+            raise ValueError(f"bus must be one of {tuple(BUSES)}")
         self.scenario, self.rev = scenario, False
         self._clock, self._rng = clock, random.Random(seed)
         self._t0 = self._last = clock()
         self._rpm = IDLE_RPM
         self._values: dict[str, float] = {}
         self._pending = ""
+        self.bus, self._sleep = bus, sleep
+        self._monitoring, self._mon_last = False, 0.0
         self._advance()
 
     def set_scenario(self, name: str) -> None:
@@ -236,12 +243,46 @@ class SimPort:
             self._pending = "?\r"
         elif cmd == "ATDP":
             self._pending = "SIMULATED (no car)\r"
+        elif cmd == "ATDPN" and self.bus:  # opt-in, so existing simulator runs keep their protocol answers
+            self._pending = ("A6" if self.bus == "can" else "A2") + "\r"
+        elif cmd in ("ATMA", "STMA"):
+            self._monitoring, self._mon_last, self._pending = True, self._clock(), ""
         else:
             self._pending = "OK\r"
 
     def read_until_prompt(self, timeout: float) -> str:
         out, self._pending = self._pending, ""
         return out
+
+    def read_available(self, timeout: float) -> str:
+        if not self._monitoring:
+            return ""
+        lines = self._broadcast()
+        if not lines:
+            self._sleep(min(timeout, 0.02))
+            lines = self._broadcast()
+        return "".join(ln + "\r" for ln in lines)
+
+    def interrupt(self) -> None:
+        if self._monitoring:
+            self._monitoring, self._pending = False, "STOPPED\r"
+
+    def _broadcast(self) -> list[str]:
+        now, lines = self._clock(), []
+        for key, period in BUSES[self.bus or "can"]:
+            first, last = int((self._mon_last - self._t0) / period + 1e-9), int((now - self._t0) / period + 1e-9)
+            lines += [self._frame(key, k) for k in range(first + 1, last + 1)]
+        self._mon_last = now
+        return lines
+
+    def _frame(self, key: str, k: int) -> str:
+        rpm = int(self._rpm * 4) & 0xFFFF
+        data = {"0C9": [rpm >> 8, rpm & 0xFF, k & 0x0F, 0, 0, 0, 0, 0], "1F5": [0] * 7 + [k & 0x0F], "3B4": [0x20, 0, 0, 0],
+                "88 FE 10": [0x0B, rpm >> 8, rpm & 0xFF], "8A FE 40": [0x01, 0x00]}[key]
+        if self.bus == "j1850":
+            head = [int(x, 16) for x in key.split()]
+            data = data + [sum(head + data) & 0xFF]
+        return key + " " + " ".join(f"{b:02X}" for b in data)
 
     def close(self) -> None:
         pass

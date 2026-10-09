@@ -1,8 +1,11 @@
+from collections import Counter
+
 import pytest
 
 from obd_reader.pids import decode_pid
 from obd_reader.simulator import SCENARIOS, SimPort
 from obd_reader.transport import Transport
+from obd_reader.vin import find_vins
 
 from conftest import FakeClock
 
@@ -173,3 +176,47 @@ def test_each_fault_freeze_frame_tells_the_same_story_as_its_codes():
     assert code == "P0118" and ff["03"] == 1 and ff["05"] == -40 and ff["06"] == 0 and abs(ff["07"]) < 5
     code, ff = frame("lean")  # vacuum leak: closed loop, warm, high positive trims
     assert code == "P0171" and ff["03"] == 2 and ff["05"] > 80 and ff["06"] > 0 and ff["07"] > 10
+
+
+@pytest.mark.parametrize("bus,dpn", [("can", "A6"), ("j1850", "A2")])
+def test_atdpn_names_the_simulated_bus(bus, dpn):
+    sim = SimPort("healthy", bus=bus)
+    sim.write(b"ATDPN\r")
+    assert sim.read_until_prompt(1) == dpn + "\r"
+
+
+def test_an_unknown_bus_is_refused():
+    with pytest.raises(ValueError):
+        SimPort("healthy", bus="flexray")
+
+
+def test_can_monitor_streams_made_up_frames_at_their_rates_and_stops():
+    clk = FakeClock()
+    sim = SimPort("healthy", clock=clk.now, sleep=clk.sleep, bus="can")
+    assert sim.read_available(0.1) == ""  # nothing before a monitor command
+    sim.write(b"ATMA\r")
+    clk.sleep(1.0)
+    lines = [ln for ln in sim.read_available(0.1).split("\r") if ln]
+    ids = Counter(ln.split()[0] for ln in lines)
+    assert ids["0C9"] == 50 and ids["1F5"] == 20 and ids["3B4"] == 5
+    assert all(len(tok) in (2, 3) and int(tok, 16) >= 0 for ln in lines for tok in ln.split())
+    assert find_vins(" ".join(lines)) == []
+    sim.interrupt()
+    assert sim.read_until_prompt(1) == "STOPPED\r" and sim.read_available(0.1) == ""
+
+
+def test_j1850_frames_have_a_three_byte_header_and_a_sum_byte():
+    clk = FakeClock()
+    sim = SimPort("healthy", clock=clk.now, sleep=clk.sleep, bus="j1850")
+    sim.write(b"ATMA\r")
+    clk.sleep(1.0)
+    lines = [ln.split() for ln in sim.read_available(0.1).split("\r") if ln]
+    assert Counter(" ".join(t[:3]) for t in lines) == {"88 FE 10": 10, "8A FE 40": 2}
+    assert all(int(t[-1], 16) == sum(int(x, 16) for x in t[:-1]) & 0xFF for t in lines)
+
+
+def test_a_transport_monitors_the_simulator():
+    clk = FakeClock()
+    t = Transport(SimPort("healthy", clock=clk.now, sleep=clk.sleep, bus="can"), clock=clk.now)
+    frames = [e for e in t.monitor("ATMA", 1.0, can=True) if e.kind == "frame"]
+    assert 70 <= len(frames) <= 80
