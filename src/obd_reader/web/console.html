@@ -1544,13 +1544,13 @@
   var LAMPW = { na: 'not available', stale: 'not current', neutral: 'not assessed', ok: 'normal' };
   function lamp(id, pid, b, low, high) {   // amber watch, red out, else off
     var a = assess(pid), bad = a.s === 'watch' || a.s === 'out', w = watchFor(pid), under = bad && w.ok[0] !== null && a.m < w.ok[0];
-    return { id: id, on: bad, cls: a.s === 'out' ? 'red' : 'amb', b: b, e: bad ? (under ? low : high) + ' ' + fmt(cv(pid, a.m), dpFor(pid, pid === '05' ? 0 : 1)) + ' ' + unitOf(pid) + ': ' + WORD[a.s] : LAMPW[a.s] };
+    return { id: id, on: bad, cls: a.s === 'out' ? 'red' : 'amb', b: b, e: bad ? (under ? low : high) + ' ' + fmt(cv(pid, a.m), dpFor(pid, (FBQ[pid] || pid) === '05' ? 0 : 1)) + ' ' + unitOf(pid) + ': ' + WORD[a.s] : LAMPW[a.s] };
   }
   function lampModel() {
     var r = retroCommon(), st = state || {}, src = source(), run = src.sampling;
     return [
       { id: 'mil', on: r.mil, cls: 'red', b: 'Check engine (MIL)', e: r.mil ? 'ON' : r.c.mil === false ? 'off' : (r.c.unanswered || []).indexOf('mil') >= 0 ? 'no answer' : 'unknown' },
-      lamp('ltft1', '07', 'LTFT bank 1', 'RICH', 'LEAN'), lamp('ltft2', '09', 'LTFT bank 2', 'RICH', 'LEAN'), lamp('ect', '05', 'Coolant', 'cold', 'hot'),
+      lamp('ltft1', '07', 'LTFT bank 1', 'RICH', 'LEAN'), lamp('ltft2', '09', 'LTFT bank 2', 'RICH', 'LEAN'), lamp('ect', dFb('05'), 'Coolant', 'cold', 'hot'),
       { id: 'samp', on: run, cls: 'grn', b: 'Sampling', e: run ? (st.demo ? 'simulated · ' : '') + (st.hz_measured ? st.hz_measured.toFixed(1) + ' Hz' : 'starting')
         : src.phase === 'lost' ? 'connection lost' : st.replay ? 'off: replay ' + src.phase : 'not sampling' }
     ];

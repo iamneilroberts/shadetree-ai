@@ -1609,6 +1609,8 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
       const gn = (g) => g.children.find(c => c.className === 'gnote').textContent;
       const ok = await dash({}, {}, fb(95)), hot = await dash({}, {}, fb(115));
       assert.ok(card(ok, '67') && !card(ok, '05') && /dial|bar/.test(card(ok, '67').getAttribute('data-key')), 'coolant sensor A fills the coolant slot on its scale');
+      const ect = (e) => e.parts().lampModel().find(x => x.id === 'ect');
+      assert.ok(ect(ok).e === 'normal' && !ect(ok).on && ect(hot).on && ect(hot).cls === 'red' && /^hot 115 /.test(ect(hot).e), 'the coolant lamp reads the fallback too: ' + ect(hot).e);
       assert.strictEqual(gn(card(ok, '67')), '10 s: normal'); assert.ok(/ out/.test(card(hot, '67').className) && gn(card(hot, '67')) === '10 s: out of range', 'judged with the coolant watch');
       assert.ok(/^Not supported by this car: /.test(missOf(ok, 'd_panel').textContent) && !/\(05\)/.test(missOf(ok, 'd_panel').textContent), 'a slot a fallback fills is not named as missing: ' + missOf(ok, 'd_panel').textContent);
       const ft = await dash({ 'shadetree.scenario': 'fuel' }, {}, statesFor(30, () => Object.assign(base(), { '03': 1, '24': 0.98 })).map(s => Object.assign(s, { fallbacks: { '14': '24' } })));
