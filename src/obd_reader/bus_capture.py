@@ -1,7 +1,7 @@
 """Bus capture files (captures/<id>.jsonl, local and gitignored: payloads may hold the VIN) and their payload-free summary."""
 import json
 import re
-from collections import Counter, defaultdict
+from collections import Counter
 from pathlib import Path
 from typing import Iterator
 
@@ -70,49 +70,64 @@ def split_frame(raw: str, id_tokens: int) -> tuple[str, list[str]] | None:
     return (" ".join(toks[:n]), toks[n:]) if len(toks) > n else None
 
 
+class _IdStats:
+    """Running totals for one message id, so a capture never has to fit in memory."""
+
+    def __init__(self, first: list[str]):
+        self.n, self.first, self.prev = 0, first, None
+        self.lengths, self.changed, self.per_step = Counter(), set(), Counter()
+
+
 def summarize(path: Path) -> str:
     path = Path(path)
-    recs = list(read_records(path))
-    head = next((r for r in recs if r.get("type") == "header"), {})
-    end = next((r for r in recs if r.get("type") == "end"), None)
-    n_id = id_tokens_for(head.get("protocol", ""))
+    head, end, last_t, n_gaps, gap_s = {}, None, 0.0, 0, 0.0
     windows, opened = [], {}
-    for r in recs:
-        if r.get("type") == "step":
+    for r in read_records(path):  # pass 1: header, end, step windows, gaps, duration
+        last_t = max(last_t, r.get("t", 0.0))
+        kind = r.get("type")
+        if kind == "header" and not head:
+            head = r
+        elif kind == "end" and end is None:
+            end = r
+        elif kind == "gap":
+            n_gaps, gap_s = n_gaps + 1, gap_s + r["seconds"]
+        elif kind == "step":
             if r["phase"] == "start":
                 opened[r["step"]] = r["t"]
             elif r["step"] in opened:
                 windows.append((r["step"], opened.pop(r["step"]), r["t"]))
-    frames, other, last_t = defaultdict(list), 0, 0.0
-    for r in recs:
-        last_t = max(last_t, r.get("t", 0.0))
-        if r.get("type") == "frame":
-            sf = split_frame(r["raw"], n_id)
-            if sf:
-                frames[sf[0]].append((r["t"], sf[1]))
-            else:
-                other += 1
-    gaps = [r for r in recs if r.get("type") == "gap"]
+    n_id = id_tokens_for(head.get("protocol", ""))
+    stats, other = {}, 0
+    for r in read_records(path):  # pass 2: frames into per-id totals
+        if r.get("type") != "frame":
+            continue
+        sf = split_frame(r["raw"], n_id)
+        if not sf:
+            other += 1
+            continue
+        fid, d = sf
+        st = stats.get(fid)
+        if st is None:
+            st = stats[fid] = _IdStats(d)
+        st.n += 1
+        st.lengths[len(d)] += 1
+        st.changed.update(i for i, byte in enumerate(d) if i >= len(st.first) or byte != st.first[i])
+        if st.prev is not None and d != st.prev:
+            st.per_step.update(s for s, a, b in windows if a <= r["t"] <= b)
+        st.prev = d
     out = [f"# Bus capture {path.stem}", "",
            f"- protocol: {head.get('protocol_name') or head.get('protocol') or 'unknown'}; monitor: {head.get('monitor_command', '?')}",
            f"- vehicle key: {head.get('vehicle_key') or 'not read'}",
            f"- ended: {end['reason'] if end else 'no end record (the run stopped early)'}; {last_t:.1f} s",
-           f"- frames: {sum(len(v) for v in frames.values())}; other lines: {other}; gaps: {len(gaps)} ({sum(g['seconds'] for g in gaps):.1f} s)", ""]
-    if not frames:
+           f"- frames: {sum(st.n for st in stats.values())}; other lines: {other}; gaps: {n_gaps} ({gap_s:.1f} s)", ""]
+    if not stats:
         return "\n".join(out + ["No frames were received: the bus was silent at this port, or the adapter did not pass them on.", ""])
     out += ["| ID | frames | Hz | bytes | changing bytes | most change in |", "|---|---|---|---|---|---|"]
-    for fid in sorted(frames):
-        seq = frames[fid]
-        length = Counter(len(d) for _, d in seq).most_common(1)[0][0]
-        first = seq[0][1]
-        changing = sum(1 for i in range(max(len(d) for _, d in seq)) if any(i < len(d) and (i >= len(first) or d[i] != first[i]) for _, d in seq))
-        per_step = Counter()
-        for (_, prev), (t, cur) in zip(seq, seq[1:]):
-            if cur != prev:
-                per_step.update(s for s, a, b in windows if a <= t <= b)
-        top = ", ".join(s for s, _ in per_step.most_common(3)) or "—"
-        hz = len(seq) / last_t if last_t > 0 else 0.0
-        out.append(f"| {fid} | {len(seq)} | {hz:.1f} | {length} | {changing} | {top} |")
+    for fid in sorted(stats):
+        st = stats[fid]
+        top = ", ".join(s for s, _ in st.per_step.most_common(3)) or "\u2014"
+        hz = st.n / last_t if last_t > 0 else 0.0
+        out.append(f"| {fid} | {st.n} | {hz:.1f} | {st.lengths.most_common(1)[0][0]} | {len(st.changed)} | {top} |")
     return "\n".join(out + [""])
 
 

@@ -82,3 +82,15 @@ def test_summarize_file_writes_the_md_next_to_the_capture(tmp_path):
     md_path = summarize_file(p)
     assert md_path == p.with_suffix(".md") and "| 0C9 |" in md_path.read_text(encoding="utf-8")
     assert summarize_file(p) == md_path  # re-running overwrites
+
+
+def test_a_larger_capture_summarizes_from_running_totals(tmp_path):
+    steps = [(0.0, "idle", "start"), (10.0, "idle", "end"), (10.0, "rev", "start"), (20.0, "rev", "end")]
+    frames = [(i / 100, f"100 00 {(i // 100) % 2:02X} 11") for i in range(2000)]  # byte 2 flips every second
+    frames += [(i / 50, f"200 AA {i % 256:02X}") for i in range(1000)]  # a counter
+    frames += [(i / 10, "300 01 02 03") for i in range(200)]  # never changes
+    md = summarize(write(tmp_path, sorted(frames), steps=steps, gaps=[(5.0, "BUFFER FULL", 0.5)], end_t=20.0))
+    assert "| 100 | 2000 | 100.0 | 3 | 1 | idle, rev |" in md
+    assert "| 200 | 1000 | 50.0 | 2 | 1 | idle, rev |" in md
+    assert "| 300 | 200 | 10.0 | 3 | 0 | — |" in md
+    assert "gaps: 1 (0.5 s)" in md
