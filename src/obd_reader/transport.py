@@ -1,14 +1,32 @@
 """The only module allowed to import `serial`. Every write goes through the gate."""
 import json
+import math
 import time
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Protocol
+from typing import Callable, Iterator, Protocol
 
-from obd_reader.allowlist import RAW_ON, ForbiddenCommand, check_command
+from obd_reader.allowlist import MONITOR_COMMANDS, RAW_ON, ForbiddenCommand, check_command
 
 
 class AdapterNotReady(RuntimeError):
     """The adapter never returned its '>' prompt, so it may still be busy; nothing more is sent."""
+
+
+class SilentModeUnsupported(RuntimeError):
+    """The adapter did not accept ATCSM1, so it might ACK frames on a CAN bus; nothing was monitored."""
+
+
+MAX_MONITOR_S = 900.0
+ADAPTER_STOPS = frozenset({"BUFFER FULL", "CAN ERROR", "BUS ERROR", "STOPPED", "?"})  # the adapter's reasons for leaving a monitor
+
+
+@dataclass(frozen=True)
+class MonitorEvent:
+    kind: str  # "frame" (text = the raw line), "gap" (text = what stopped the stream) or "idle" (a read with nothing in it)
+    t: float  # seconds since the transport opened
+    text: str = ""
+    seconds: float = 0.0  # gap: until frames resumed, or the monitor ended
 
 
 class Port(Protocol):
@@ -43,19 +61,100 @@ class Transport:
         self._clock = clock
         self._t0 = clock()
         self._default_timeout = default_timeout
+        self._raw = False  # ATCAF0 on (inside monitor() only)
 
     @property
     def transcript_path(self) -> Path | None:
         return self._recorder.path if self._recorder is not None else None
 
+    @property
+    def now(self) -> float:
+        return self._clock() - self._t0
+
     def send(self, cmd: str, timeout: float | None = None) -> list[str]:
         canon = check_command(cmd)  # raises before anything touches the port
+        if canon in MONITOR_COMMANDS:
+            raise ForbiddenCommand(f"{canon} streams until stopped: only Transport.monitor() sends it")
+        if self._raw and canon[:2] not in ("AT", "ST"):
+            raise ForbiddenCommand(f"raw CAN mode (ATCAF0) is on: {canon!r} is refused")
+        return self._exchange(canon, timeout)
+
+    def _exchange(self, canon: str, timeout: float | None = None) -> list[str]:
         self._port.write(canon.encode("ascii") + b"\r")
         raw = self._port.read_until_prompt(self._default_timeout if timeout is None else timeout)
         lines = [ln.strip() for ln in raw.replace("\r", "\n").split("\n") if ln.strip()]
         if self._recorder is not None:
             self._recorder.record(self._clock() - self._t0, canon, lines)
         return lines
+
+    def monitor(self, cmd: str, seconds: float, *, can: bool) -> Iterator[MonitorEvent]:
+        """Listen only: stream every bus frame for up to `seconds`. Nothing is transmitted between the monitor
+        command and the returning prompt; closing the iterator stops the adapter and restores ATCAF1."""
+        canon = check_command(cmd)
+        if canon not in MONITOR_COMMANDS:
+            raise ForbiddenCommand(f"not a monitor command: {cmd!r}")
+        if not (isinstance(seconds, (int, float)) and math.isfinite(seconds) and 0 < seconds <= MAX_MONITOR_S):
+            raise ValueError(f"seconds must be in (0, {MAX_MONITOR_S:g}]")
+        if not (hasattr(self._port, "read_available") and hasattr(self._port, "interrupt")):
+            raise ValueError("this port cannot monitor (no streaming read)")
+        if can:
+            reply = self.send("ATCSM1")
+            if "OK" not in reply:
+                raise SilentModeUnsupported(f"the adapter answered {reply!r} to ATCSM1 (silent CAN monitoring); nothing was monitored")
+        return self._stream(canon, seconds, can)
+
+    def _stream(self, canon: str, seconds: float, can: bool) -> Iterator[MonitorEvent]:
+        port, prompt = self._port, True
+        try:
+            if can:
+                self._raw = True  # the port treats ATCAF0 as on once written, so restore even if it is refused
+                self._exchange(RAW_ON)
+            end = self._clock() + seconds
+            self._start(canon)
+            prompt = False
+            buf, gap = "", None
+            while self._clock() < end:
+                chunk = port.read_available(0.1)
+                now = self.now
+                if not chunk:
+                    yield MonitorEvent("idle", now)
+                    continue
+                if ">" in chunk:
+                    chunk, prompt = chunk.split(">", 1)[0], True  # back at the prompt: the stream ended
+                *lines, buf = (buf + chunk).replace("\r", "\n").split("\n")
+                if prompt:
+                    lines, buf = lines + [buf], ""
+                for ln in (x.strip() for x in lines):
+                    if not ln:
+                        continue
+                    if ln in ADAPTER_STOPS:
+                        gap = gap or (now, ln)
+                        continue
+                    if gap:
+                        yield MonitorEvent("gap", gap[0], gap[1], now - gap[0])
+                        gap = None
+                    yield MonitorEvent("frame", now, ln)
+                if prompt:
+                    gap = gap or (now, "prompt")
+                    if self._clock() < end:
+                        self._start(canon)
+                        prompt = False
+            if gap:
+                yield MonitorEvent("gap", gap[0], gap[1], self.now - gap[0])
+        finally:
+            if not prompt:
+                port.interrupt()
+                port.read_until_prompt(self._default_timeout)  # drains "STOPPED" and the prompt
+            if self._raw:
+                for _ in range(2):  # a stray CR can restart the monitor and swallow the first ATCAF1
+                    if "OK" in self._exchange("ATCAF1"):
+                        self._raw = False
+                        break
+
+    def _start(self, canon: str) -> None:
+        self._port.write(canon.encode("ascii") + b"\r")  # no read_until_prompt: the reply is the stream
+        if self._recorder is not None:
+            self._recorder.record(self.now, canon, ["(monitor stream: see the capture file)"])
 
     def close(self) -> None:
         self._port.close()
