@@ -62,6 +62,7 @@ class Transport:
         self._t0 = clock()
         self._default_timeout = default_timeout
         self._raw = False  # ATCAF0 on (inside monitor() only)
+        self._monitoring = False  # a stream is open: any send() would transmit mid-listen or eat its prompt
 
     @property
     def transcript_path(self) -> Path | None:
@@ -77,6 +78,8 @@ class Transport:
             raise ForbiddenCommand(f"{canon} streams until stopped: only Transport.monitor() sends it")
         if self._raw and canon[:2] not in ("AT", "ST"):
             raise ForbiddenCommand(f"raw CAN mode (ATCAF0) is on: {canon!r} is refused")
+        if self._monitoring:
+            raise ForbiddenCommand(f"a monitor stream is open: {canon!r} is refused until it is closed")
         return self._exchange(canon, timeout)
 
     def _exchange(self, canon: str, timeout: float | None = None) -> list[str]:
@@ -106,6 +109,7 @@ class Transport:
     def _stream(self, canon: str, seconds: float, can: bool) -> Iterator[MonitorEvent]:
         port, prompt = self._port, True
         try:
+            self._monitoring = True
             if can:
                 self._raw = True  # the port treats ATCAF0 as on once written, so restore even if it is refused
                 self._exchange(RAW_ON)
@@ -145,11 +149,14 @@ class Transport:
             if not prompt:
                 port.interrupt()
                 port.read_until_prompt(self._default_timeout)  # drains "STOPPED" and the prompt
-            if self._raw:
-                for _ in range(2):  # a stray CR can restart the monitor and swallow the first ATCAF1
-                    if "OK" in self._exchange("ATCAF1"):
-                        self._raw = False
-                        break
+            try:
+                if self._raw:
+                    for _ in range(2):  # a stray CR can restart the monitor and swallow the first ATCAF1
+                        if "OK" in self._exchange("ATCAF1"):
+                            self._raw = False
+                            break
+            finally:
+                self._monitoring = False
 
     def _start(self, canon: str) -> None:
         self._port.write(canon.encode("ascii") + b"\r")  # no read_until_prompt: the reply is the stream

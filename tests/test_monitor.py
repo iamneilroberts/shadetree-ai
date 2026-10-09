@@ -81,7 +81,8 @@ def test_raw_mode_refuses_obd_commands_only_while_monitoring():
     next(it)
     with pytest.raises(ForbiddenCommand, match="raw CAN mode"):
         t.send("0104")
-    assert t.send("ATRV") == ["OK"]  # AT commands still pass
+    with pytest.raises(ForbiddenCommand, match="monitor stream"):
+        t.send("ATRV")  # while a stream is open every command is refused
     it.close()
     assert port.interrupts == 1 and port.writes[-1] == "ATCAF1"
     assert t.send("0104") == ["OK"]
@@ -164,3 +165,17 @@ def test_a_failed_atcaf1_is_sent_twice_and_raw_mode_stays_refusing():
     assert port.writes[-2:] == ["ATCAF1", "ATCAF1"]
     with pytest.raises(ForbiddenCommand, match="raw CAN mode"):
         t.send("0104")
+
+
+def test_j1850_stream_refuses_every_command_and_sends_nothing():
+    clk = FakeClock()
+    port = StreamPort(["88 FE 10\r"], clock=clk)
+    t = Transport(port, clock=clk.now)
+    it = t.monitor("ATMA", 5, can=False)
+    next(it)
+    n = list(port.writes)
+    with pytest.raises(ForbiddenCommand):
+        t.send("0100")
+    assert port.writes == n
+    it.close()
+    assert t.send("0100") == ["OK"]
