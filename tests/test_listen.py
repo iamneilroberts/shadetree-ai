@@ -3,10 +3,12 @@ import json
 
 import pytest
 
+import obd_reader.listen as listen_mod
+
 from obd_reader.bus_capture import CaptureWriter, read_records
 from obd_reader.listen import REST_S, SCRIPT, Keys, Step, listen, run_capture, script_seconds
 from obd_reader.session import Config, Session
-from obd_reader.simulator import SimPort
+from obd_reader.simulator import SIM_VIN, SimPort
 from obd_reader.transport import MonitorEvent
 from obd_reader.vehicle import vehicle_key
 from obd_reader.vin import find_vins
@@ -143,7 +145,14 @@ def test_the_script_is_the_specified_one():
     assert script_seconds(SCRIPT) == 30 + 13 * 10 + 14 * 5
 
 
-def test_listen_on_the_simulator_scans_sets_up_and_captures(tmp_path):
+def test_listen_on_the_simulator_scans_sets_up_and_captures(tmp_path, monkeypatch):
+    real_scan = listen_mod.scan
+
+    def scan_with_vin(*a, **k):  # the sim's SIMULATED protocol skips the VIN path, so give the snapshot one
+        snap = real_scan(*a, **k)
+        snap.vehicle.vin = SIM_VIN
+        return snap
+    monkeypatch.setattr(listen_mod, "scan", scan_with_vin)
     session = Session(Config(port="sim", home=tmp_path, timeout=1.0), port_factory=lambda: SimPort("healthy", bus="can"))
     out = []
     path = listen(session, label="t", protocol="0", seconds=1.0, out=out.append, keys=FakeKeys())
@@ -151,9 +160,25 @@ def test_listen_on_the_simulator_scans_sets_up_and_captures(tmp_path):
     head, end = recs[0], recs[-1]
     assert path.parent == tmp_path / "captures" and path.suffix == ".jsonl"
     assert head["type"] == "header" and head["monitor_command"] == "ATMA" and head["can"] is True and head["protocol"] == "A6"
-    saved = json.loads((tmp_path / "snapshots" / f"{head['snapshot_id']}.json").read_text())
-    # None on the simulator: its SIMULATED protocol makes scan() skip the VIN path
-    assert head["vehicle_key"] == vehicle_key(saved["vehicle"]["vin"]) and head["script"] == []
+    assert head["vehicle_key"] == vehicle_key(SIM_VIN) and head["vehicle_key"] is not None and head["script"] == []
     assert [s["tx"] for s in head["setup"]] == ["ATH1", "ATS1", "ATAL"]
     assert (tmp_path / "snapshots" / f"{head['snapshot_id']}.json").exists()
     assert find_vins(json.dumps(head)) == [] and end["reason"] == "finished" and end["frames"] > 20
+
+
+def test_listen_refuses_to_monitor_when_no_protocol_is_detected(tmp_path):
+    sent = []
+
+    class NoBus(SimPort):
+        def write(self, data):
+            sent.append(data.decode("ascii", "replace").strip())
+            if sent[-1] == "ATDPN":
+                self._pending = "A0\r"
+            else:
+                super().write(data)
+
+    session = Session(Config(port="sim", home=tmp_path, timeout=1.0), port_factory=lambda: NoBus("healthy", bus="can"))
+    with pytest.raises(RuntimeError, match="no protocol detected"):
+        listen(session, label="t", protocol="0", seconds=1.0, out=lambda s: None, keys=FakeKeys())
+    assert "ATDPN" in sent and not {"ATCSM1", "ATMA", "STMA"} & set(sent)
+    assert not (tmp_path / "captures").exists() or list((tmp_path / "captures").iterdir()) == []

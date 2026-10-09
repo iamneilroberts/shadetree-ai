@@ -156,7 +156,10 @@ def listen(session: Session, *, label: str, protocol: str, seconds: float | None
         snap = scan(t, snapshot_id=sid, captured_at=now, kind="live", protocol=protocol, transcript=transcript, mode06=True)
         session.store.save(snap)
         dpn = (t.send("ATDPN") or [""])[0].strip().upper()
-        can = dpn.lstrip("A") in ("6", "7", "8", "9")
+        num = dpn.lstrip("A")
+        if not (len(num) == 1 and num in "123456789"):  # fail closed: never monitor on an undetermined bus
+            raise RuntimeError(f"no protocol detected (ATDPN answered {dpn!r}): is the engine running?")
+        can = num in ("6", "7", "8", "9")
         setup = [{"tx": c, "rx": t.send(c)} for c in ("ATH1", "ATS1", "ATAL")]
         adapter = snap.source.adapter
         mon = "STMA" if adapter.genuine_stn else "ATMA"
