@@ -38,8 +38,11 @@ def test_ctrl_c_reports_the_partial_capture(tmp_path, capsys, monkeypatch):
 
     def interrupted(events, writer, *a, **k):
         def boom():
-            yield next(iter(events))
-            raise KeyboardInterrupt
+            try:
+                yield next(iter(events))
+                raise KeyboardInterrupt
+            finally:
+                events.close()
         return real(boom(), writer, *a, **k)
 
     monkeypatch.setattr(lmod, "run_capture", interrupted)
