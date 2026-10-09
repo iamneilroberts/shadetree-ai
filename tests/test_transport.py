@@ -67,7 +67,7 @@ def test_forbidden_command_is_not_recorded(tmp_path):
     assert path.read_text() == ""
 
 
-@pytest.mark.parametrize("data", [b"04\r", b"0100\r04\r", b"0100", b"ATCAF0\r", b"\xff\r", b""])
+@pytest.mark.parametrize("data", [b"04\r", b"0100\r04\r", b"0100", b"ATCAF 0\r", b"\xff\r", b""])
 def test_serial_port_write_is_gated_even_when_used_directly(data):
     port = SerialPort("loop://")
     with pytest.raises(ForbiddenCommand):

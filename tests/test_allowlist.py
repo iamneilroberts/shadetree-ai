@@ -13,6 +13,7 @@ ALLOWED = [
     "ATAT1", "ATSH7DF", "ATSH7E0", "ATCRA7E8", "ATCRA", "STI", "STDI",
     "0600", "0601", "06 20", "050101", "05 02 01",
     "  at i ",
+    "ATMA", "STMA", "AT CSM 1", "ATAL",
 ]
 
 FORBIDDEN = [
@@ -20,10 +21,11 @@ FORBIDDEN = [
     "04", "0400", "08", "0800", "0B", "0C", "0E",
     "10", "1901", "22F190", "2F", "3101",
     # ELM/STN commands that write, persist, or flood
-    "ATPP", "ATPP0CSV01", "ATPPS", "ATMA", "ATCF", "ATCM", "STPX", "STPXH7DF", "STSAVE",
+    "ATPP", "ATPP0CSV01", "ATPPS", "ATCF", "ATCM", "STPX", "STPXH7DF", "STSAVE",
     # CAN auto-formatting off makes the first hex byte the ISO-TP PCI byte, so
     # "0104" would go out as a Mode 04 (clear DTCs) frame. Never allow it.
     "ATCAF0", "ATCAF 0",
+    "ATCSM0", "ATCSM", "ATMA1", "STMAX",
     # wrong argument length
     "010", "01000", "0200", "020C", "0300", "0A00",
     "05", "0500", "05000000", "06", "060000",
@@ -96,7 +98,9 @@ def test_fuzz_near_miss_strings(s):
         return
     assert canon.isascii() and "\r" not in canon and "\n" not in canon
     if canon[:2] in ("AT", "ST"):
-        assert not canon.startswith(("ATPP", "ATMA", "STPX"))
+        assert not canon.startswith(("ATPP", "STPX", "ATCAF0", "ATCSM0"))
+        if canon.startswith(("ATMA", "STMA")):
+            assert canon in ("ATMA", "STMA")
     else:
         assert int(canon[:2], 16) in ALLOWED_MODES
 
@@ -108,3 +112,12 @@ def test_fuzz_arbitrary_unicode_never_yields_non_ascii(s):
     except ForbiddenCommand:
         return
     assert canon.isascii()
+
+
+def test_monitor_commands_and_raw_mode_constants():
+    from obd_reader.allowlist import MONITOR_COMMANDS, RAW_ON
+
+    assert MONITOR_COMMANDS == frozenset({"ATMA", "STMA"})
+    assert all(check_command(c) == c for c in MONITOR_COMMANDS)
+    with pytest.raises(ForbiddenCommand):
+        check_command(RAW_ON)  # only Transport.monitor() sends it

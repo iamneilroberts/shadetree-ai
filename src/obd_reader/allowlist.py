@@ -4,11 +4,17 @@
 the transport writes. Anything else raises ForbiddenCommand.
 
 Not enabled yet (see docs/design.md §13): UDS 0x19 / 0x22, STIX-style STN
-commands (unverified on hardware), ATPPS, ATCAF0.
+commands (unverified on hardware), ATPPS.
+
+ATCAF0 (raw CAN frames) is not on the list: only Transport.monitor() sends it,
+inside a listen-only monitor, and while it is on every non-AT/ST command is
+refused (CAF0 + 0104 would put a raw clear-codes frame on the bus).
 """
 import re
 
 ALLOWED_MODES = frozenset({0x01, 0x02, 0x03, 0x05, 0x06, 0x07, 0x09, 0x0A})
+MONITOR_COMMANDS = frozenset({"ATMA", "STMA"})  # stream until stopped: Transport.send refuses them, only Transport.monitor() starts one
+RAW_ON = "ATCAF0"
 
 
 class ForbiddenCommand(ValueError):
@@ -33,12 +39,15 @@ _PATTERNS = tuple(
         r"ATE[01]", r"ATL[01]", r"ATS[01]", r"ATH[01]",
         r"ATDPN?", r"ATRV", r"ATI", r"AT@1",
         r"ATCAF1", r"ATAT[012]",  # ATCAF0 is refused: see test_allowlist.py (CAF0 + 0104)
+        r"ATCSM1", r"ATAL",  # silent CAN monitoring on (ATCSM0 refused); allow long messages
+        r"ATMA",  # listen-only bus monitor (approved by the maintainer 2026-10-08)
         r"ATSPA?[0-9]", r"ATTPA?[0-9]",  # protocols A-C (J1939, user CAN) are refused
         rf"ATST{_H}{{2}}",
         rf"ATSH(?:{_H}{{3}}|{_H}{{6}}|{_H}{{8}})",
         rf"ATCRA(?:{_H}{{3}}|{_H}{{8}})?",
         # STN identify (read-only)
         r"STI", r"STDI",
+        r"STMA",  # STN monitor all (listen only)
     )
 )
 

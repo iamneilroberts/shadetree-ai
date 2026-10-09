@@ -4,7 +4,7 @@ import time
 from pathlib import Path
 from typing import Callable, Protocol
 
-from obd_reader.allowlist import ForbiddenCommand, check_command
+from obd_reader.allowlist import RAW_ON, ForbiddenCommand, check_command
 
 
 class AdapterNotReady(RuntimeError):
@@ -72,6 +72,7 @@ class SerialPort:
         self._ser = serial.serial_for_url(url, baudrate=baudrate, timeout=0.1)
         self._prompt_seen = True  # nothing outstanding yet
         self.recovery_s = 2.0     # how long to wait for a missing prompt before refusing to write
+        self._raw = False  # ATCAF0 sent and not undone: only AT/ST commands may follow
 
     def _wait_for_prompt(self) -> None:
         """The last reply timed out without '>': the ELM may still be busy, and a new byte
@@ -85,16 +86,23 @@ class SerialPort:
 
     def write(self, data: bytes) -> None:
         # Second gate: SerialPort is public, so it refuses anything that is not
-        # exactly one canonical allowlisted command plus a single CR.
+        # exactly one canonical allowlisted command (or the monitor's ATCAF0) plus a single CR.
         if not data.endswith(b"\r") or not data[:-1].isascii():
             raise ForbiddenCommand(f"not one CR-terminated ASCII command: {data!r}")
         body = data[:-1].decode("ascii")
-        if check_command(body) != body:
+        if body != RAW_ON and check_command(body) != body:
             raise ForbiddenCommand(f"not a canonical command: {data!r}")
+        if self._raw and body[:2] not in ("AT", "ST"):
+            raise ForbiddenCommand(f"raw CAN mode (ATCAF0) is on: {body!r} is refused")
         if not self._prompt_seen:
             self._wait_for_prompt()
         self._ser.reset_input_buffer()  # drop any late reply to the previous command
         self._ser.write(data)
+        self._prompt_seen = False
+        if body == RAW_ON:
+            self._raw = True
+        elif body in ("ATCAF1", "ATZ", "ATD"):
+            self._raw = False
 
     def read_until_prompt(self, timeout: float) -> str:
         deadline = time.monotonic() + timeout
@@ -108,6 +116,26 @@ class SerialPort:
                     break
         self._prompt_seen = b">" in buf
         return buf.decode("ascii", errors="replace").split(">", 1)[0]
+
+    def read_available(self, timeout: float) -> str:
+        """What the adapter sends within `timeout` (a monitor stream); a '>' means it is back at the prompt."""
+        deadline = time.monotonic() + timeout
+        buf = bytearray()
+        while time.monotonic() < deadline:
+            chunk = self._ser.read(self._ser.in_waiting or 1)
+            if chunk:
+                buf += chunk
+                if b">" in chunk:
+                    self._prompt_seen = True
+                    break
+            elif buf:
+                break
+        return buf.decode("ascii", errors="replace")
+
+    def interrupt(self) -> None:
+        """Stop a monitor stream: one CR, and only while no prompt has come back (at a prompt a CR repeats the last command)."""
+        if not self._prompt_seen:
+            self._ser.write(b"\r")
 
     def close(self) -> None:
         self._ser.close()
