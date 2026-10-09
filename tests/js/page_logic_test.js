@@ -299,8 +299,11 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
   assert.strictEqual(panel.className, '', 'the same ? again closes it');
   hp.docHandlers.click({ target: q04 });
   assert.ok(focused === panel && /role="dialog" aria-modal="true" aria-labelledby="helpTitle" tabindex="-1"/.test(html) && panel.children[0].id === 'helpTitle', 'focus moves into the labelled dialog');
+  let tabbed = 0; const tab = () => hp.docHandlers.keydown({ key: 'Tab', preventDefault() { tabbed++; } });
+  focused = null; tab(); assert.ok(tabbed === 1 && focused === panel && panel.className === 'open', 'Tab stays in the open dialog');
   hp.docHandlers.keydown({ key: 'Escape' });
   assert.strictEqual(panel.className, '', 'Escape closes'); assert.strictEqual(focused, q04, 'focus returns to the ? that opened it');
+  focused = null; tab(); assert.ok(tabbed === 1 && focused === null, 'Tab is left alone when no dialog is open');
   hp.docHandlers.click({ target: q04 }); hp.docHandlers.click({ target: {} });
   assert.strictEqual(panel.className, '', 'a click outside closes');
   hp.docHandlers.click({ target: findQ(hp.el('x_grid'), '99') });
@@ -373,9 +376,16 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
   wEnv.docHandlers.click({ target: qTrim }); assert(/Short-term trim, bank 1/.test(flat(wEnv.el('helpPanel'))) && /now 13/.test(flat(wEnv.el('helpPanel'))), 'row help shows the catalog and the live value');
   const lvE = makeEnv(statesFor(10, base).concat(statesFor(40, () => Object.assign(base(), { '42': 12.1 }), 10, 4)), 'v0', OVF, [], NOGAUGES());
   for (let k = 0; k < 10; k++) await lvE.tick();
-  lvE.docHandlers.click({ target: findQ(lvE.el('o_tiles'), '42') }); assert(/now 14\.2 V: normal/.test(flat(lvE.el('helpPanel'))), flat(lvE.el('helpPanel')));
+  lvE.docHandlers.click({ target: findQ(lvE.el('o_tiles'), '42') }); assert(/now 14\.20 V: normal/.test(flat(lvE.el('helpPanel'))), flat(lvE.el('helpPanel')));
   for (let k = 0; k < 40; k++) await lvE.tick();
-  assert(/now 12\.1 V: watch \(10 s\)/.test(flat(lvE.el('helpPanel'))) && lvE.el('helpPanel').className === 'open', 'the open popup keeps its now line current: ' + flat(lvE.el('helpPanel')));
+  assert(/now 12\.10 V: watch \(10 s\)/.test(flat(lvE.el('helpPanel'))) && lvE.el('helpPanel').className === 'open', 'the open popup keeps its now line current: ' + flat(lvE.el('helpPanel')));
+  {   // fuel trims with the engine off (rpm under 300, as for PID 42) are not judged; the help's now line uses the channel's precision
+    const tr = async (o) => { const e = await ovEnv(() => Object.assign(base(), o)); return ['06', '07'].map(p => e.parts().assess(p).s); };
+    assert.deepStrictEqual(await tr({ '0C': 0, '06': 25, '07': -25 }), ['neutral', 'neutral'], 'engine off: trims neutral');
+    assert.deepStrictEqual(await tr({ '06': 25, '07': -25 }), ['out', 'out'], 'engine running: judged');
+    const rq = makeEnv(statesFor(5, () => Object.assign(idle(), { '0C': 2345.6 })), 'v6', HELPFIX); for (let k = 0; k < 5; k++) await rq.tick();
+    rq.docHandlers.click({ target: findQ(rq.el('x_grid'), '0C') }); assert(/now 2346 rpm/.test(flat(rq.el('helpPanel'))), flat(rq.el('helpPanel')));
+  }
 
   // 7) Overview honesty: help ranges not loaded (and a retry), last-seen age, spike vs median, odd help entries
   const noHelp = makeEnv(statesFor(30, base), 'v0', null);
@@ -1592,6 +1602,20 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
     const hh = makeEnv(live, 'v5', OVF, [], { 'shadetree.scenario': 'fuel' }); for (let k = 0; k < 4; k++) await hh.tick();
     assert.ok(/Not supported by this car: O2 B1S1 \(14\)/.test(missOf(hh, 'h_livepane').textContent), 'the Handheld names them too');
     assert.strictEqual(missOf(await dash(), 'd_panel').hidden, true, 'nothing missing: no line (no bitmap read yet says nothing about support)');
+    {   // fallback PIDs fill the slot: the same quantity (67 for coolant 05) keeps the slot's range and is judged by its watch; another unit (lambda 24 for O2 volts 14) shows as itself
+      const noEct = (v) => () => { const b = Object.assign(base(), { '67': v }); delete b['05']; return b; };
+      const fb = (v, extra = {}) => statesFor(30, noEct(v)).map(s => Object.assign(s, { supported: Object.keys(base()).filter(p => p !== '05').concat(['67', '03']), fallbacks: Object.assign({ '05': '67' }, extra) }));
+      const card = (e, pid) => dGauges(e).find(g => g.getAttribute('data-key').split(':')[0] === pid);
+      const gn = (g) => g.children.find(c => c.className === 'gnote').textContent;
+      const ok = await dash({}, {}, fb(95)), hot = await dash({}, {}, fb(115));
+      assert.ok(card(ok, '67') && !card(ok, '05') && /dial|bar/.test(card(ok, '67').getAttribute('data-key')), 'coolant sensor A fills the coolant slot on its scale');
+      assert.strictEqual(gn(card(ok, '67')), '10 s: normal'); assert.ok(/ out/.test(card(hot, '67').className) && gn(card(hot, '67')) === '10 s: out of range', 'judged with the coolant watch');
+      assert.ok(/^Not supported by this car: /.test(missOf(ok, 'd_panel').textContent) && !/\(05\)/.test(missOf(ok, 'd_panel').textContent), 'a slot a fallback fills is not named as missing: ' + missOf(ok, 'd_panel').textContent);
+      const ft = await dash({ 'shadetree.scenario': 'fuel' }, {}, statesFor(30, () => Object.assign(base(), { '03': 1, '24': 0.98 })).map(s => Object.assign(s, { fallbacks: { '14': '24' } })));
+      assert.ok(card(ft, '24') && card(ft, '24').getAttribute('data-key') === '24:seven' && !card(ft, '14'), 'lambda is not drawn on the O2 volts scale: a readout');
+      const own = ft.parts().gaugeModel({ pid: '14', form: 'bar', lo: 0, hi: 1.2 }), same = ok.parts().gaugeModel({ pid: '05', form: 'bar', lo: 40, hi: 120 });
+      assert.ok(own.pid === '24' && own.form === 'seven' && own.lo === null && same.pid === '67' && same.lo === 40 && same.hi === 120, 'a scenario file range is kept for the same quantity only');
+    }
   }
 
   {   // Retro Dashboard: the controls move into the Options drawer and Start/Stop into the bar; another view or skin puts the same nodes back in the toolbar
@@ -1700,7 +1724,7 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
       mode06: { read: false, note: null }, readiness: { read: false, note: 'the car did not answer' }, stats: { '0C': { n: 6, min: 650, max: 720 }, '05': { n: 6, min: 88, max: 90 } } });
     const lv = makeEnv(statesFor(6, base).map(real), 'v7', OVF); for (let k = 0; k < 6; k++) await lv.tick();
     let t = txt(lv);
-    assert.ok(t.split('\n')[0] === '$ shadetree-ai console --live' && !/^# (SIMULATED|REPLAY)/m.test(t), 'a live run: no banner, the --live prompt\n' + t);
+    assert.ok(t.split('\n')[0] === '$ shadetree-ai console' && !/^# (SIMULATED|REPLAY)/m.test(t), 'a live run: no banner, the plain prompt\n' + t);
     for (const re of [/^status: {5}LIVE$/m, /^source: {5}Live car · sampling$/m, /^vehicle: {4}ABCDE123-4 \(seen 2 times\)$/m, /^protocol: {3}ISO 15765-4 \(CAN 11\/500\)$/m,
                       /^adapter: {4}ELM327 v1\.4b \/ STN2120$/m, /^battery: {4}14\.20 V \(control module, PID 42\)$/m, /^ecu names: {2}not read$/m, /^cal ids: {4}not read$/m,
                       /^stored: {5}P0171$/m, /^pending: {4}none$/m, /^permanent: {2}no answer$/m, /^mil: {8}off$/m, /^readiness: {2}no answer$/m, /^mode 06: {4}reading…$/m,
@@ -1708,6 +1732,14 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
                       /^warning: {4}no answer for permanent codes$/m, /^warning: {4}no answer for the readiness monitors$/m])
       assert.ok(re.test(t), 'live line ' + re + '\n' + t);
     assert.ok(!/^stored:.*none/m.test(t) && !/^permanent:.*none/m.test(t), 'an unanswered list never reads as none');
+    assert.ok(/^quirks: {5}none$/m.test(t) && lv.el('chipConn').textContent === 'STN2120 · ISO 15765-4 (CAN 11/500)' && !lv.el('chipConn').title, 'no quirks file: none, nothing on the chip\n' + t);
+    {   // a quirks file applied: its hints in the words of `quirks show`, on the Terminal and the chip's tooltip
+      const qf = { file: 'quirks-local/ABCDE123-4.json', key: 'ABCDE123-4', example: false, protocol: '6', max_hz: 2, pids_lie: ['0B', '1F'], ecus: { '7E8': 'engine' }, notes: 1, protocol_pinned: true, hz_capped: true };
+      const qe = makeEnv(statesFor(2, base).map(real).map(st => Object.assign(st, { quirks: qf })), 'v7', OVF); await qe.tick(); await qe.tick();
+      const line = 'quirks-local/ABCDE123-4.json: protocol 6 (pinned), max_hz 2 (capped), pids_lie 0B 1F, ecus 7E8=engine, 1 note(s)';
+      assert.ok(txt(qe).split('\n').includes('quirks:     ' + line), txt(qe));
+      assert.strictEqual(qe.el('chipConn').textContent, 'STN2120 · ISO 15765-4 (CAN 11/500) · quirks'); assert.strictEqual(qe.el('chipConn').title, 'quirks: ' + line);
+    }
     const scr = lv.el('t_scr'), shown = plain(scr.innerHTML);
     assert.strictEqual(shown, t, 'the screen shows exactly these lines'); assert.strictEqual(scr._text, shown, 'the copy text is the screen text');
     assert.ok(/<span class="t-k">permanent:<\/span>  <span class="t-w">no answer<\/span>/.test(scr.innerHTML) && /<span class="t-o">none<\/span>/.test(scr.innerHTML), 'keys, warnings and ok values are coloured');
@@ -1742,9 +1774,9 @@ const rev = (s, t) => ({ '0C': 2500, '05': 41, '06': -11, '07': -21, '08': -10, 
       replay: { name: 'runs/sub/2026-09-30T21-32-56Z-drive-rebuilt.json', duration: 360, pos: 83, speed: 2, playing: false, ended: false, demo: false } }));
     const re = makeEnv(rp, 'v7', OVF); for (let k = 0; k < 3; k++) await re.tick();
     t = txt(re);
-    assert.ok(t.split('\n')[0] === '# REPLAY: recorded car, not live' && /^\$ shadetree-ai console --replay 2026-09-30T21-32-56Z-drive-rebuilt\.json$/m.test(t) && !/runs\/sub/.test(t), 'replay prompt: the file name only\n' + t);
+    assert.ok(t.split('\n')[0] === '# REPLAY: recorded car, not live' && /^\$ shadetree-ai console$/m.test(t) && !/runs\/sub/.test(t), 'replay: no made-up flag, no folder\n' + t);
     assert.ok(/^status: {5}REPLAY · PAUSED$/m.test(t) && /^adapter: {4}not in recording$/m.test(t) && /^vehicle: {4}not in recording$/m.test(t) && /^stored: {5}not stored in this run$/m.test(t), 'replay states\n' + t);
-    assert.ok(/^replay: {5}1:23 \/ 6:00 · paused · 2×$/m.test(t) && /^mode 06: {4}not in recording$/m.test(t), 'replay position, Mode 06 not in the recording\n' + t);
+    assert.ok(/^replay: {5}2026-09-30T21-32-56Z-drive-rebuilt\.json · 1:23 \/ 6:00 · paused · 2×$/m.test(t) && /^mode 06: {4}not in recording$/m.test(t), 'replay position, Mode 06 not in the recording\n' + t);
     // a VIN-shaped run from any field is never shown; untrusted text stays text
     const vin = '1ABCD23EFGH' + '456789';
     const vv = makeEnv(statesFor(3, base).map(st => Object.assign(st, { message: 'car ' + vin, adapter: { chip: null, ati: '<b>' + vin + '</b>', protocol: null } })), 'v7', OVF); for (let k = 0; k < 3; k++) await vv.tick();

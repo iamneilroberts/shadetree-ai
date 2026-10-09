@@ -13,6 +13,7 @@ from obd_reader.elm import is_legacy, parse_all
 from obd_reader.live import downsample, sample, summarize, validate_pids
 from obd_reader.mode06 import read_all, read_all_legacy
 from obd_reader.pids import PIDS, decode_pid, pid_name
+from obd_reader.scenarios import load_scenarios
 from obd_reader.session import Session
 from obd_reader.snapshot import Snapshot
 
@@ -231,10 +232,19 @@ def build_tools(session: Session) -> dict[str, Callable]:
             consoles[key] = ConsoleService(session, demo=demo)
         return consoles[key]
 
-    def open_console(demo: bool = False, start: bool = True) -> dict:
-        """Start the live console web page (local, token-protected, read-only) and return its URL. demo=True uses a simulated car."""
+    def open_console(demo: bool = False, start: bool = True, scenarios_file: str | None = None) -> dict:
+        """Start the live console web page (local, token-protected, read-only) and return its URL. demo=True uses a simulated car.
+        scenarios_file: a scenarios JSON file (as for `console --scenarios`) whose scenarios the page offers; an open page shows them after a reload."""
+        scen = None
+        if scenarios_file:
+            try:
+                scen = load_scenarios(Path(scenarios_file))
+            except (OSError, ValueError) as exc:
+                raise ValueError(f"scenarios_file {scenarios_file}: {exc}") from None
         service = _service(bool(demo))
         server = service.ensure()
+        if scen is not None:
+            server.scenarios = scen
         key = "demo" if demo else "real"
         if key in recent_first:
             recent_first.remove(key)
@@ -254,7 +264,7 @@ def build_tools(session: Session) -> dict[str, Callable]:
         rp = st.get("replay")
         return {"status": st["status"], "message": st["message"], "seq": st["seq"],
                 "source": "replay" if rp else "live", **({"replay": rp["name"]} if rp else {}),
-                "channels": service.hub.recent(seconds)}
+                "readiness": st["readiness"], "freeze_frame": st["freeze_frame"], "channels": service.hub.recent(seconds)}
 
     return {f.__name__: f for f in (
         list_snapshots, get_snapshot, import_snapshot, read_dtcs, freeze_frame,

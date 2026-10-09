@@ -59,6 +59,36 @@ def test_console_data_matches_what_the_page_sees(tmp_path):  # Review Focus 5
         ConsoleService.shutdown_all()
 
 
+def test_console_data_carries_the_readiness_and_freeze_frame_the_page_shows(tmp_path):
+    tl = build_tools(demo_session(tmp_path))
+    out = tl["open_console"](demo=True)
+    try:
+        assert wait_seq(out["url"], 3)
+        data, st = tl["console_data"](seconds=30), get_state(out["url"])
+        assert data["readiness"] == st["readiness"] and data["freeze_frame"] == st["freeze_frame"]
+    finally:
+        ConsoleService.shutdown_all()
+
+
+def test_open_console_offers_a_scenarios_file_and_refuses_a_bad_one(tmp_path):
+    tl = build_tools(demo_session(tmp_path))
+    good, bad = tmp_path / "s.json", tmp_path / "bad.json"
+    good.write_text(json.dumps({"scenarios": [{"id": "towing", "name": "Towing", "gauges": [{"pid": "05"}]}]}))
+    bad.write_text('{"scenarios": NaN}')
+    try:
+        out = tl["open_console"](demo=True, start=False)
+        assert tl["open_console"](demo=True, start=False, scenarios_file=str(good))["url"] == out["url"]  # an open console takes them too
+        host_port, token = out["url"].split("//")[1].split("/")[0], out["url"].split("t=")[1]
+        c = http.client.HTTPConnection(host_port, timeout=5)
+        c.request("GET", f"/api/scenarios?t={token}", headers={"Host": host_port})
+        assert [x["id"] for x in json.loads(c.getresponse().read())["scenarios"]] == ["towing"]
+        c.close()
+        with pytest.raises(ValueError, match="scenarios_file"):
+            tl["open_console"](demo=True, scenarios_file=str(bad))
+    finally:
+        ConsoleService.shutdown_all()
+
+
 def test_other_live_tools_are_refused_while_the_console_samples(tmp_path):  # Review Focus 5
     # a real (non-demo) session whose adapter is the console's: read_pid must not interleave bytes
     sim = SimPort("healthy")

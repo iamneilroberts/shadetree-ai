@@ -1160,13 +1160,22 @@
         t = ph === 'lost' ? 'Lost contact with the console server (is shadetree-ai still running?)' : !has ? '' : ph === 'error' ? 'Adapter error' : ph === 'stopped' ? 'Sampling stopped' : '';
     b.textContent = t && (lastSeq > 0 ? t + ' \u2014 showing the last readings, not current' : t); b.hidden = !t;
   }
+  // the quirks file applied to this run, in the words of `quirks show` (hints, never decisions); '' when none
+  function quirkText(q) {
+    if (!q) return '';
+    var e = q.ecus || {}, p = [q.protocol ? 'protocol ' + q.protocol + (q.protocol_pinned ? ' (pinned)' : '') : '', q.max_hz != null ? 'max_hz ' + q.max_hz + (q.hz_capped ? ' (capped)' : '') : '',
+      (q.pids_lie || []).length ? 'pids_lie ' + q.pids_lie.join(' ') : '', Object.keys(e).length ? 'ecus ' + Object.keys(e).map(function (h) { return h + '=' + e[h]; }).join(', ') : '',
+      q.notes ? q.notes + ' note(s)' : '', q.example ? 'example (made up)' : ''].filter(Boolean);
+    return q.file + ': ' + (p.join(', ') || 'none');
+  }
   function chips() {
     var st = state || {}, src = source(), live = $('chipLive'), ph = src.phase;
     live.className = 'chip ' + (ph === 'running' || ph === 'playing' ? 'live' : ph === 'error' || ph === 'lost' ? 'err' : ph === 'idle' ? 'idle' : 'paused');
     live.innerHTML = '<b>' + src.word + '</b>';
     var ad = st.adapter || {};
     // adapter and ECU text is untrusted: show it as text, never as markup
-    $('chipConn').textContent = (ad.chip || ad.ati || 'no adapter') + (ad.protocol ? ' · ' + ad.protocol : '');
+    var cc = $('chipConn'), qk = st.replay ? '' : quirkText(st.quirks);
+    cc.textContent = (ad.chip || ad.ati || 'no adapter') + (ad.protocol ? ' · ' + ad.protocol : '') + (qk ? ' · quirks' : ''); cc.title = qk ? 'quirks: ' + qk : '';
     var v = st.vehicle;
     $('chipCar').textContent = !v ? 'car ?' : v.key ? 'car ' + v.key + ' · ' + (st.replay ? 'replay' : v.known ? 'seen ' + v.runs + (v.runs === 1 ? ' time' : ' times') : 'new') : (v.note || 'car ?');
     var cd = st.codes || {}, miss = codeMiss(cd);
@@ -1273,9 +1282,11 @@
     var v = s.map(function (p) { return p.v; }).sort(function (a, b) { return a - b; }), m = v.length >> 1;
     return v.length % 2 ? v[m] : (v[m - 1] + v[m]) / 2;
   }
+  var FBQ = { '67': '05', '68': '0F', '66': '10', '87': '0B' };   // fallbacks that are the same quantity, in the same unit, as the reading they replace (sensor A)
   function watchFor(pid) {
-    var e = HELP.pids[pid]; if (!e || typeof e !== 'object') return null;
+    var e = HELP.pids[pid] || HELP.pids[FBQ[pid]]; if (!e || typeof e !== 'object') return null;
     var rpm = winMedian('0C');
+    if (rpm !== null && rpm < 300 && /^0[6-9]$/.test(pid)) return null;   // fuel trims with the engine off: no judgement
     return pid === '42' && rpm !== null && rpm < 300 && e.watch_engine_off ? e.watch_engine_off : (e.watch || null);
   }
   function judge(v, w) {
@@ -1311,7 +1322,7 @@
   function liveLine(key) {
     if (key.indexOf('m06:') === 0 || key === 'codes') return '';
     var a = assess(key), u = unitOf(key); if (a.v === null) return 'not reported by this car';
-    return 'now ' + fmtPid(key, a.v) + (u ? ' ' + u : '') + (a.s === 'stale' ? ': not current' : WORD[a.s] ? ': ' + WORD[a.s] + ' (10 s)' : '');
+    return 'now ' + fmtStat(key, a.v) + (u ? ' ' + u : '') + (a.s === 'stale' ? ': not current' : WORD[a.s] ? ': ' + WORD[a.s] + ' (10 s)' : '');
   }
   var helpBtn = null;
   function closeHelp(back) { $('helpPanel').className = ''; helpKey = null; if (back && helpBtn && helpBtn.focus) helpBtn.focus(); helpBtn = null; }   // back: focus returns to the ? that opened it
@@ -1340,6 +1351,7 @@
     if (helpKey !== null && !$('helpPanel').contains(e.target)) closeHelp();
   });
   document.addEventListener('keydown', function (e) {
+    if (e.key === 'Tab' && helpKey !== null) { e.preventDefault(); $('helpPanel').focus(); return; }
     if (e.key !== 'Escape') return;
     if (helpKey !== null) closeHelp(true); else if (OPT && !$('optDrawer').hidden) { setOpt(false); $('optBtn').focus(); }
   });
@@ -1457,7 +1469,8 @@
     return out;
   }
   function gaugeModel(spec) {   // spec { pid, form: 'dial'|'bar'|'seven', lo?, hi? } (metric) -> what the gauge shows now; values and bands in display units
-    var pid = spec.pid, d = GAUGE[pid] || {}, lo = typeof spec.lo === 'number' ? spec.lo : d.lo, hi = typeof spec.hi === 'number' ? spec.hi : d.hi,
+    var pid = dFb(spec.pid), keep = pid === spec.pid || FBQ[pid] === spec.pid, d = GAUGE[pid] || GAUGE[FBQ[pid]] || {},   // a fallback in another unit (lambda for O2 volts) shows as itself
+        lo = keep && typeof spec.lo === 'number' ? spec.lo : d.lo, hi = keep && typeof spec.hi === 'number' ? spec.hi : d.hi,
         ranged = typeof lo === 'number' && typeof hi === 'number' && hi > lo, form = !ranged ? 'seven' : FORMS.indexOf(spec.form) >= 0 ? spec.form : 'dial',
         chs = (state && state.channels) || {}, present = !!chs[pid], a = assess(pid), v = a.v, has = v !== null, c = chFor(pid),
         s = a.s === 'na' ? 'none' : RANK[a.now] > RANK[a.s] ? a.now : a.s,   // worse of now and 10 s
@@ -1498,7 +1511,7 @@
   function missLine(specs) {   // the scenario's PIDs the car's bitmap lacks (live) or the recording does not hold, by name: never silently blank
     var st = state || {}, chs = st.channels || {}, sup = st.supported || [], seen = {}, out = [];
     specs.forEach(function (g) {
-      var p = g.pid; if (seen[p] || chs[p]) return; seen[p] = 1;
+      var p = g.pid; if (seen[p] || chs[p] || chs[dFb(p)]) return; seen[p] = 1;
       if (st.replay || (sup.length && sup.indexOf(p) < 0)) out.push(pidTitle(p, p) + ' (' + p + ')');
     });
     return out.length ? (st.replay ? 'Not in this recording: ' : 'Not supported by this car: ') + out.join(', ') : '';
@@ -2178,11 +2191,12 @@
     function names(a) { return a.length + ': ' + a.slice(0, 6).join(', ') + (a.length > 6 ? ' and ' + (a.length - 6) + ' more' : ''); }
     if (rp) out([['t-w', '# REPLAY: ' + (rp.demo ? 'recorded simulation, not a car' : 'recorded car, not live')]]);
     else if (st.demo) out([['t-w', '# SIMULATED: no car connected']]);
-    out([['t-p', '$ '], ['t-c', 'shadetree-ai console ' + (rp ? '--replay ' + String(rp.name || '').split(/[\\/]/).pop() : st.demo ? '--demo' : '--live')]]);
+    out([['t-p', '$ '], ['t-c', 'shadetree-ai console' + (st.demo && !rp ? ' --demo' : '')]]);
     kv('status', src.word, src.sampling || src.phase === 'playing' ? 't-o' : 't-w'); kv('source', summary().parts[0], '');
     var v = st.vehicle;
     kv('vehicle', !v ? nr : v.key ? v.key + (rp ? ' (replay)' : v.known ? ' (seen ' + v.runs + (v.runs === 1 ? ' time)' : ' times)') : ' (new)') : v.note || nr, v && v.key ? '' : 't-w');
     kv('protocol', ad.protocol || nr, ad.protocol ? '' : 't-w');
+    kv('quirks', rp ? nr : quirkText(st.quirks) || 'none', '');
     kv('adapter', rp ? nr : ad.ati ? ad.ati + ' / ' + (ad.chip || 'not STN') : nr, rp || !ad.ati ? 't-w' : '');
     var bv = latest('42'), rv = ad.voltage;   // no PID 42: the adapter's supply voltage (ATRV, pin 16)
     kv('battery', bv != null ? fmtStat('42', bv) + ' V (control module, PID 42)' : typeof rv === 'number' ? rv.toFixed(1) + ' V (adapter supply, ATRV)' : nr, bv != null || typeof rv === 'number' ? 't-n' : 't-w');
@@ -2196,7 +2210,7 @@
     var rs = readySum(); kv('readiness', rs.t, rs.warn ? 't-w' : 't-o');
     var res = m6.results || [], bad = res.filter(function (x) { return x.within_limits === false; }).length;
     kv('mode 06', m6.read ? (m6.mids || []).length + ' MIDs, ' + res.length + ' tests, ' + bad + ' outside limits' : why(m6), m6.read && !bad && res.length ? 't-n' : 't-w');
-    if (rp) kv('replay', mmss(rp.pos) + ' / ' + mmss(rp.duration) + ' · ' + (rp.playing ? 'playing' : rp.ended ? 'ended' : 'paused') + ' · ' + rp.speed + '×', '');
+    if (rp) kv('replay', String(rp.name || '').split(/[\\/]/).pop() + ' · ' + mmss(rp.pos) + ' / ' + mmss(rp.duration) + ' · ' + (rp.playing ? 'playing' : rp.ended ? 'ended' : 'paused') + ' · ' + rp.speed + '×', '');
     else kv('rate', st.hz_measured ? st.hz_measured.toFixed(1) + ' Hz' : src.sampling ? 'starting' : 'not sampling', st.hz_measured ? 't-n' : 't-w');
     kv('units', US ? 'US' : 'metric', '');
     var chs = st.channels || {}, stats = st.stats || {}, ids = Object.keys(chs).sort(), stale = [], none = [];
