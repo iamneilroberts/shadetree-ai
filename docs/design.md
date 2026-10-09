@@ -1,6 +1,6 @@
 # OBD Diagnostic Assistant — Design (draft 1)
 
-_Status: design of record, updated 2026-10-02. Project name `shadetree-ai` (provisional; import package `obd_reader`, repo dir `obd-reader`). Built so far: Phases 1 and 2, the tool layer and MCP server (Phase 3a), the live console with its Dashboard, scenarios, Retro and Handheld views, replay, help popups, per-car profiles, readiness and freeze-frame panels and scenario PID requests (§7b), and the `probe` command with its VIN-free report (§6). Also built: the 1970s cabinet skin, the Options drawer, Capture level, the Terminal view (§7b) and legacy-bus decoding (J1850, ISO 9141, KWP; first hardware check on a J1850 VPW truck, 2026-10-04), the quirks file (probe step 4, §6), and the listen-only bus capture (`listen`). **NOT BUILT:** the reference store and grounding checker (Phase 3b), legacy CAL ID/CVN/ECU name reads, playbooks and evals (Phase 5), UDS 0x19, Mode 22, and a Mode 05 tool (the allowlist permits Mode 05; no tool or scan step uses it). See the README "What works today" table for hardware-verification status._
+_Status: design of record, updated 2026-10-08. Project name `shadetree-ai` (provisional; import package `obd_reader`, repo dir `obd-reader`). Built so far: Phases 1 and 2, the tool layer and MCP server (Phase 3a), the live console with its Dashboard, scenarios, Retro and Handheld views, replay, help popups, per-car profiles, readiness and freeze-frame panels and scenario PID requests (§7b), and the `probe` command with its VIN-free report (§6). Also built: the 1970s cabinet skin, the Options drawer, Capture level, the Terminal view (§7b) and legacy-bus decoding (J1850, ISO 9141, KWP; first hardware check on a J1850 VPW truck, 2026-10-04), the quirks file (probe step 4, §6), and the listen-only bus capture (`listen`). **NOT BUILT:** the reference store and grounding checker (Phase 3b), legacy CAL ID/CVN/ECU name reads, playbooks and evals (Phase 5), UDS 0x19, Mode 22, and a Mode 05 tool (the allowlist permits Mode 05; no tool or scan step uses it). See the README "What works today" table for hardware-verification status._
 
 ## 1. Purpose
 
@@ -65,14 +65,14 @@ replay/     fake ELM over pty/in-process, driven by transcripts ──> same tra
 | Layer | Allowed | Grammar |
 |---|---|---|
 | OBD services | Modes 01, 02, 03, 05, 06, 07, 09, 0A | `01 PP`, `02 PP FF`, `03`, `05 TID SENSOR`, `06 MID`, `07`, `09 PP`, `0A` — hex, exact arg lengths per mode |
-| ELM AT | `ATZ ATD ATE0 ATL0 ATS0 ATH0/1 ATSP<0-9> ATTP<0-9> (A-C = J1939 or user CAN: refused) ATDP ATDPN ATRV ATI AT@1 ATCAF1 ATST<hh> ATAT0/1/2 ATSH<hex> ATCRA<hex> ATWS` | explicit list |
-| STN read-only | `STI STDI STIX`-style identify commands only | explicit list |
+| ELM AT | `ATZ ATD ATE0 ATL0 ATS0 ATH0/1 ATSP<0-9> ATTP<0-9> (A-C = J1939 or user CAN: refused) ATDP ATDPN ATRV ATI AT@1 ATCAF1 ATCSM1 ATAL ATMA ATST<hh> ATAT0/1/2 ATSH<hex> ATCRA<hex> ATWS` | explicit list |
+| STN read-only | `STI STDI STIX`-style identify commands, and `STMA` (listen-only monitor) | explicit list |
 | Later, gated | UDS `19 xx` read-DTC over ISO-TP (own phase, after a real-car test); UDS `22` waits for OBDb | not enabled |
 
 ### 5.2 Explicitly refused (non-exhaustive)
-Mode 04 (clear DTCs), 08 (control), 0B+, any UDS service other than 19, `ATPP` (programmable-parameter writes), `STPX`/raw-send/other STN write or config-persisting commands, `ATMA` (bus monitor flood), anything not matching the table.
+Mode 04 (clear DTCs), 08 (control), 0B+, any UDS service other than 19, `ATPP` (programmable-parameter writes), `STPX`/raw-send/other STN write or config-persisting commands, anything not matching the table.
 
-**Stateful-adapter rule (found in Phase 1 review):** `ATCAF0` (CAN auto-formatting off) makes the first hex byte the ISO-TP PCI byte, so an allowed-looking `0104` would go out as a Mode 04 frame. `ATCAF0` is refused; only `ATCAF1` is allowed. Any future AT command that changes how later bytes are framed needs the same scrutiny (the gate is stateless).
+**Stateful-adapter rule (found in Phase 1 review):** `ATCAF0` (CAN auto-formatting off) makes the first hex byte the ISO-TP PCI byte, so an allowed-looking `0104` would go out as a Mode 04 frame. `ATCAF0` is never on the allowlist; only `Transport.monitor()` sends it. While raw mode is on, `Transport.send` and `SerialPort.write` refuse every non-AT/ST command. While a monitor stream is open, `Transport.send` refuses every command. `ATCAF1` is restored in a `finally`, retried once, and raw mode is cleared only on OK. Any future AT command that changes how later bytes are framed needs the same scrutiny.
 
 ### 5.3 Enforcement (defense in depth)
 1. **Typed requests.** Scanner code builds `Request(mode, pid)` objects from an enum table; there is no string-building API for callers.
