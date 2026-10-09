@@ -14,7 +14,7 @@ class AdapterNotReady(RuntimeError):
 
 
 class SilentModeUnsupported(RuntimeError):
-    """The adapter did not accept ATCSM1, so it might ACK frames on a CAN bus; nothing was monitored."""
+    """The adapter did not accept ATCSM1 (or STCMM0 before STMA), so it might ACK frames on a CAN bus; nothing was monitored."""
 
 
 MAX_MONITOR_S = 900.0
@@ -104,6 +104,10 @@ class Transport:
             reply = self.send("ATCSM1")
             if "OK" not in reply:
                 raise SilentModeUnsupported(f"the adapter answered {reply!r} to ATCSM1 (silent CAN monitoring); nothing was monitored")
+            if canon == "STMA":  # an STN's silence is set by STCMM (mode 0 = receive only, no ACKs)
+                reply = self.send("STCMM0")
+                if "OK" not in reply:
+                    raise SilentModeUnsupported(f"the adapter answered {reply!r} to STCMM0 (receive-only CAN monitoring); nothing was monitored")
         return self._stream(canon, seconds, can)
 
     def _stream(self, canon: str, seconds: float, can: bool) -> Iterator[MonitorEvent]:

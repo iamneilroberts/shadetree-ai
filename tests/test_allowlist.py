@@ -13,7 +13,7 @@ ALLOWED = [
     "ATAT1", "ATSH7DF", "ATSH7E0", "ATCRA7E8", "ATCRA", "STI", "STDI",
     "0600", "0601", "06 20", "050101", "05 02 01",
     "  at i ",
-    "ATMA", "STMA", "AT CSM 1", "ATAL",
+    "ATMA", "STMA", "AT CSM 1", "ATAL", "STCMM0", "STCMM 0",
 ]
 
 FORBIDDEN = [
@@ -25,7 +25,7 @@ FORBIDDEN = [
     # CAN auto-formatting off makes the first hex byte the ISO-TP PCI byte, so
     # "0104" would go out as a Mode 04 (clear DTCs) frame. Never allow it.
     "ATCAF0", "ATCAF 0",
-    "ATCSM0", "ATCSM", "ATMA1", "STMAX",
+    "ATCSM0", "ATCSM", "ATMA1", "STMAX", "STCMM1", "STCMM2", "STCMM",
     # wrong argument length
     "010", "01000", "0200", "020C", "0300", "0A00",
     "05", "0500", "05000000", "06", "060000",
@@ -101,6 +101,8 @@ def test_fuzz_near_miss_strings(s):
         assert not canon.startswith(("ATPP", "STPX", "ATCAF0", "ATCSM0"))
         if canon.startswith(("ATMA", "STMA")):
             assert canon in ("ATMA", "STMA")
+        if canon.startswith("STCMM"):
+            assert canon == "STCMM0"
     else:
         assert int(canon[:2], 16) in ALLOWED_MODES
 

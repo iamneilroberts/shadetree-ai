@@ -48,6 +48,7 @@ _PATTERNS = tuple(
         # STN identify (read-only)
         r"STI", r"STDI",
         r"STMA",  # STN monitor all (listen only)
+        r"STCMM0",  # CAN receive only, no ACKs; STCMM1/2 are refused (1 ACKs frames)
     )
 )
 

@@ -179,3 +179,29 @@ def test_j1850_stream_refuses_every_command_and_sends_nothing():
     assert port.writes == n
     it.close()
     assert t.send("0100") == ["OK"]
+
+
+def _stma(can, **kw):
+    clk = FakeClock()
+    port = StreamPort(["0C9 01 02\r"], clock=clk, **kw)
+    return port, Transport(port, clock=clk.now), clk
+
+
+def test_stma_on_can_sets_receive_only_first():
+    port, t, _ = _stma(True)
+    list(t.monitor("STMA", 0.35, can=True))
+    assert port.writes == ["ATCSM1", "STCMM0", "ATCAF0", "STMA", "ATCAF1"]
+    assert port.interrupts == 1
+
+
+def test_stma_refused_stcmm0_stops_before_raw_mode_and_monitor():
+    port, t, _ = _stma(True, replies={"STCMM0": "?"})
+    with pytest.raises(SilentModeUnsupported, match="STCMM0"):
+        t.monitor("STMA", 1, can=True)
+    assert port.writes == ["ATCSM1", "STCMM0"]
+
+
+def test_stma_without_can_sends_no_stcmm0():
+    port, t, _ = _stma(False)
+    list(t.monitor("STMA", 0.35, can=False))
+    assert port.writes == ["STMA"]
