@@ -18,6 +18,7 @@ from urllib.parse import parse_qs, urlparse
 from obd_reader.export import ExportError, build_zip
 from obd_reader.hub import DEFAULT_PIDS, HubBusy, LiveHub
 from obd_reader.live import LiveLimitError
+from obd_reader.plugins import collect_routes, extend_page, load_plugins
 from obd_reader.replay_run import MAX_FILE_BYTES, list_runs, load_run, read_run_file
 from obd_reader.session import AdapterBusy, Config, NoAdapterError, Session
 from obd_reader.simulator import SimPort
@@ -63,7 +64,7 @@ def guess_lan_ip() -> str | None:
 class ConsoleServer:
     def __init__(self, hub: LiveHub, *, host: str = "127.0.0.1", port: int = 0,
                  token: str | None = None, allow_lan: bool = False, allow_hosts=(), examples_dir=None,
-                 scenarios=None):
+                 scenarios=None, plugins=None):
         self.examples_dir = None if examples_dir is None else Path(examples_dir)
         self.scenarios: list[dict] = list(scenarios or [])
         self.public_hosts: set[str] = set()   # names a tunnel serves us under (https): the page is still bound to loopback
@@ -74,6 +75,8 @@ class ConsoleServer:
         if host not in _LOOPBACK and not allow_lan:
             raise ValueError("binding to a non-loopback address needs allow_lan=True (--allow-lan)")
         self.hub, self.token = hub, token or secrets.token_urlsafe(16)
+        self.plugins = load_plugins() if plugins is None else list(plugins)
+        self.extra_get, self.extra_post = collect_routes(self.plugins, hub, set(_GET_ROUTES) | set(_POST_ROUTES))
         self.httpd = ThreadingHTTPServer((host, port), self._handler())
         self.host, self.port = self.httpd.server_address[0], self.httpd.server_address[1]
         self.allowed_hosts = {f"127.0.0.1:{self.port}", f"localhost:{self.port}", f"[::1]:{self.port}"}
@@ -110,7 +113,9 @@ class ConsoleServer:
 
     def _page(self) -> tuple[bytes, str]:
         if self._page_bytes is None:
-            self._page_bytes = resources.files("obd_reader.web").joinpath("console.html").read_bytes()
+            page = resources.files("obd_reader.web").joinpath("console.html").read_bytes()
+            exts = [p.page_extension() for p in self.plugins if hasattr(p, "page_extension")]
+            self._page_bytes = extend_page(page, exts)
             self._page_csp = _page_csp(self._page_bytes)
         return self._page_bytes, self._page_csp
 
@@ -196,13 +201,20 @@ class ConsoleServer:
             # ---- routes ----
             def do_GET(self):
                 path = urlparse(self.path).path
-                if path not in _GET_ROUTES:
-                    if path in _POST_ROUTES:
+                if path not in _GET_ROUTES and path not in outer.extra_get:
+                    if path in _POST_ROUTES or path in outer.extra_post:
                         return self._json(405, {"error": "use POST"})
                     return self._json(404, {"error": "not found"})
                 ok, q = self._guard(post=path == "/api/export.zip")  # the download also refuses a foreign Origin
                 if not ok:
                     return
+                if path in outer.extra_get:
+                    try:
+                        return self._json(200, outer.extra_get[path](q))
+                    except (HubBusy, AdapterBusy) as e:
+                        return self._json(409, {"error": str(e)})
+                    except (LiveLimitError, ValueError, TypeError, LookupError, NoAdapterError) as e:
+                        return self._json(400, {"error": str(e)})
                 if path == "/":
                     html, csp = outer._page()
                     return self._send(200, html, "text/html; charset=utf-8", csp)
@@ -234,8 +246,8 @@ class ConsoleServer:
 
             def do_POST(self):
                 path = urlparse(self.path).path
-                if path not in _POST_ROUTES:
-                    if path in _GET_ROUTES:
+                if path not in _POST_ROUTES and path not in outer.extra_post:
+                    if path in _GET_ROUTES or path in outer.extra_get:
                         return self._json(405, {"error": "use GET"})
                     return self._json(404, {"error": "not found"})
                 ok, _ = self._guard(post=True)
@@ -245,6 +257,8 @@ class ConsoleServer:
                 if body is None:
                     return
                 try:
+                    if path in outer.extra_post:
+                        return self._json(200, outer.extra_post[path](body))
                     if path == "/api/start":
                         outer.hub.start(body.get("pids"), hz=body.get("hz", 2.5), seconds=body.get("seconds", 600.0),
                                         capture=body.get("capture", "std"))
@@ -292,7 +306,7 @@ class ConsoleServer:
                     return self._json(404, {"error": "no such saved run"})
                 except (HubBusy, AdapterBusy) as e:
                     return self._json(409, {"error": str(e)})
-                except (LiveLimitError, ValueError, TypeError, NoAdapterError) as e:
+                except (LiveLimitError, ValueError, TypeError, LookupError, NoAdapterError) as e:
                     return self._json(400, {"error": str(e)})
 
             def _not_allowed(self):

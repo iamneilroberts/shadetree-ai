@@ -85,6 +85,15 @@ class Session:
             self._lock.release()
 
     @contextmanager
+    def exclusive(self) -> Iterator[None]:
+        """The adapter lock alone, for an add-on that opens its own port (plugins.py)."""
+        self._acquire()
+        try:
+            yield
+        finally:
+            self._lock.release()
+
+    @contextmanager
     def connection(self, label: str, protocol: str | None = _CONFIG_PROTOCOL, quirks=None) -> Iterator[Transport]:
         """`quirks` (a quirks.Quirks) is a hint: its protocol replaces automatic search ("0"), never an explicit pin."""
         protocol = self.config.protocol if protocol is _CONFIG_PROTOCOL else protocol

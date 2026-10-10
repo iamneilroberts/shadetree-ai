@@ -6,6 +6,7 @@ from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import ToolAnnotations
 
+from obd_reader.plugins import collect_tools, load_plugins
 from obd_reader.session import Config, Session
 from obd_reader.tools import TOOL_NAMES, build_tools
 
@@ -33,8 +34,13 @@ def _surface_errors(fn):
     return wrapper
 
 
-def build_server(session: Session) -> MCPServer:
-    server = MCPServer("shadetree-ai", instructions=INSTRUCTIONS)
+def server_instructions(plugins: list) -> str:
+    return INSTRUCTIONS + "".join("\n\n" + p.mcp_instructions() for p in plugins if hasattr(p, "mcp_instructions"))
+
+
+def build_server(session: Session, plugins: list | None = None) -> MCPServer:
+    plugins = load_plugins() if plugins is None else plugins
+    server = MCPServer("shadetree-ai", instructions=server_instructions(plugins))
     tools = build_tools(session)
     assert set(tools) == set(TOOL_NAMES), "tool registry drifted from the reviewed set"
     for name, fn in tools.items():
@@ -42,6 +48,12 @@ def build_server(session: Session) -> MCPServer:
             name=name,
             annotations=ToolAnnotations(read_only_hint=True, destructive_hint=False, open_world_hint=False),
         )(_surface_errors(fn))
+    for name, tool in collect_tools(plugins, session, set(tools)).items():
+        server.tool(
+            name=name,
+            annotations=ToolAnnotations(read_only_hint=tool.read_only, destructive_hint=tool.destructive,
+                                        open_world_hint=False),
+        )(_surface_errors(tool.fn))
     return server
 
 

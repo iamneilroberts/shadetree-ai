@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from obd_reader.capture import capture
+from obd_reader.plugins import load_plugins
 from obd_reader.replay import ReplayPort
 from obd_reader.scanner import scan
 from obd_reader.transport import SerialPort, Transport
@@ -362,6 +363,9 @@ def build_parser() -> argparse.ArgumentParser:
                     help="ask NHTSA vPIC (one HTTPS call, sends only the key characters, no serial; cached)")
     vi.add_argument("--out-dir", type=Path, default=Path("."), help="the data home that holds the lookup cache")
     vi.set_defaults(func=_vin_info)
+    for plugin in load_plugins():
+        if hasattr(plugin, "cli"):
+            plugin.cli(sub)
     return ap
 
 

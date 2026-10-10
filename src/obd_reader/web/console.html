@@ -692,6 +692,7 @@
     <button class="vbtn" data-view="v5" role="tab">Handheld</button>
     <button class="vbtn" data-view="v6" role="tab">All readings</button>
     <button class="vbtn" data-view="v7" role="tab">Terminal</button>
+    <!--plugin-tabs-->
   </nav>
   <button type="button" class="b optbtn" id="optBtn" aria-expanded="false" aria-controls="optDrawer">Options</button>
   <div class="optd" id="optDrawer" role="group" aria-label="Options" hidden>
@@ -880,6 +881,7 @@
     <div class="tbar"><span>The current run as command-line text: read-only, updated with every reading.</span><span id="t_note" role="status"></span><button type="button" class="b" id="t_copy">Copy text</button></div>
     <div class="tcrt"><pre class="tscr" id="t_scr" role="log" aria-live="off" aria-label="Terminal: the current run as command-line text" tabindex="0"></pre></div>
   </section>
+  <!--plugin-panels-->
 </main>
 <p class="foot">Values come from one shared sampler, so Claude and this page see the same numbers. Normal, watch and out of range are general rules of thumb, not limits for your car [general knowledge, unverified]. The guided test is a draft, unreviewed playbook.</p>
 
@@ -2499,6 +2501,7 @@
       render();
     })
     .catch(function () {});
+  /*plugin-js*/
   // the page test reaches the shared parts through this hook; a browser never defines it, so nothing is exposed
   if (typeof window.__shadetreeParts === 'function') window.__shadetreeParts({ lampModel: lampModel, assess: assess, pickView: pickView, panel: panel, gaugeZones: gaugeZones, gauges: gauges, pidRows: pidRows, pidTableEl: pidTableEl,
     gaugeModel: gaugeModel, niceTicks: niceTicks, dialSvg: dialSvg, segDigits: segDigits, BUILTIN: BUILTIN, stripTiles: stripTiles, cleanSpecs: cleanSpecs, scenarioList: scenarioList, loadSaved: loadSaved, saveSaved: saveSaved, specsFor: specsFor, editAdd: editAdd, editRemove: editRemove, editMove: editMove, editForm: editForm, termLines: termLines, termText: termText });

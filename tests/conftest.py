@@ -127,3 +127,9 @@ def elm_server():
     yield start
     for s in socks:
         s.close()
+
+
+@pytest.fixture(autouse=True)
+def _no_plugins(monkeypatch):
+    """An add-on installed in the same venv (editable) must not change the public tests."""
+    monkeypatch.setenv("SHADETREE_NO_PLUGINS", "1")
