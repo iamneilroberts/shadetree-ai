@@ -181,6 +181,7 @@ def test_help_needs_the_token_and_is_get_only(srv):
     assert call(server, "GET", "/api/help", host="evil.example")[0] == 403
     status, body = call(server, "GET", "/api/help")
     assert status == 200 and "06" in body["pids"] and "evap" in body["mode06"]
+    assert body["mode06"]["gm:02:50:min"]["title"] == "Weak vacuum, pass test 1"  # GM's J1850 table (gm_mode06.py)
     assert call(server, "POST", "/api/help", {})[0] == 405
 
 

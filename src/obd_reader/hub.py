@@ -18,6 +18,7 @@ from obd_reader.elm import classify, decode_dtc_list, decode_supported, is_legac
 from obd_reader.live import (
     MAX_HZ, MAX_PIDS, MIN_HZ, EcuChoice, LiveLimitError, ecu_role, read_pid_value, summarize, validate_pids,
 )
+from obd_reader import gm_mode06
 from obd_reader.mode06 import read_all as read_mode06, read_all_legacy as read_mode06_legacy
 from obd_reader.pids import PIDS, pid_label
 from obd_reader.profiles import ProfileStore
@@ -585,9 +586,12 @@ class LiveHub:
         proto = self._adapter["protocol"] or ""
         if self._sim is None and is_legacy(proto):
             tids, lres = read_mode06_legacy(t, stop=self._stop.is_set)
+            rows = [r.model_dump() for r in lres]
+            if gm_mode06.is_gm(self._key):  # GM's published table names the tests (gm_mode06.py)
+                rows = [gm_mode06.annotate(r) for r in rows]
             with self._data_lock:
                 self._m06 = ({"read": True, "note": None, "layout": "legacy", "mids": tids,
-                              "results": [r.model_dump() for r in lres]} if tids else
+                              "results": rows} if tids else
                              {"read": False, "note": "the car did not answer Mode 06 (no supported tests reported)",
                               "mids": [], "results": []})
             return

@@ -22,6 +22,7 @@ from obd_reader.plugins import collect_routes, extend_page, load_plugins
 from obd_reader.replay_run import MAX_FILE_BYTES, list_runs, load_run, read_run_file
 from obd_reader.session import AdapterBusy, Config, NoAdapterError, Session
 from obd_reader.simulator import SimPort
+from obd_reader.gm_mode06 import HELP as GM_MODE06_HELP
 from obd_reader.stat_help import HELP, MODE06
 from obd_reader.vin_decode import LookupUnavailable
 
@@ -219,7 +220,7 @@ class ConsoleServer:
                     html, csp = outer._page()
                     return self._send(200, html, "text/html; charset=utf-8", csp)
                 if path == "/api/help":
-                    return self._json(200, {"pids": HELP, "mode06": MODE06})
+                    return self._json(200, {"pids": HELP, "mode06": {**MODE06, **GM_MODE06_HELP}})
                 if path == "/api/scenarios":
                     return self._json(200, {"scenarios": outer.scenarios})
                 if path == "/api/export.zip":  # the user's own runs only, VIN serial masked (export.build_zip)

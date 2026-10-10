@@ -1173,3 +1173,16 @@ def test_atrv_is_read_at_connect_and_every_so_often_and_kept_in_state_and_the_sa
     hub.stop()
     run = _json.loads(hub.save_run("bench").read_text())
     assert run["adapter"]["voltage"] == 12.6 and run["adapter"]["voltage_t"] > 0
+
+
+def test_gm_legacy_mode06_rows_carry_gms_test_names(tmp_path, monkeypatch):
+    from obd_reader import gm_mode06
+    monkeypatch.setattr(gm_mode06, "is_gm", lambda key: True)  # the simulator's VIN is not a GM one
+    sim = _sim_with({"ATDP": "SAE J1850 VPW\r", "0600": "46 00 FF 40 00 00 00\r", "0602": "46 02 D0 80 03 80 6E\r"})
+    hub, _, _ = make(tmp_path, sim=None, port_factory=lambda: sim)
+    hub._sim = None
+    hub.start(DEFAULT_PIDS, hz=10, seconds=30)
+    assert wait_for(lambda: hub.state()["mode06"]["read"])
+    r = hub.state()["mode06"]["results"][0]
+    hub.stop()
+    assert r["name"] == "Weak vacuum, pass test 1" and r["value_s"] == 0.3 and r["help"] == "gm:02:50:min"

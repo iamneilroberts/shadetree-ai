@@ -1424,20 +1424,36 @@
       box.appendChild(tb);
     });
   }
-  function renderM6Legacy(box, res) {   // J1850, ISO 9141, KWP: one value against one limit; TIDs are not CAN monitor ids, so no names, no help, no pass/fail
+  function renderM6Legacy(box, res) {   // J1850, ISO 9141, KWP: one value against one limit. TIDs are not CAN monitor ids: names and help only where
+    // the hub matched GM's published table (r.name, r.help); never judged pass or fail
+    var named = res.some(function (r) { return r.name; });
     $('m6_count').textContent = res.length ? res.length + ' tests \u00b7 not judged' : 'no results';
     $('m6_count').className = 'tag';
-    box.appendChild(el('p', 'note', 'Older-bus layout: each row is one raw value and one limit. Whether the limit is a minimum or a maximum comes from the component id (SAE J1979; general knowledge, unverified on this car), and what each test means is set by the manufacturer, so no row is judged OK or outside.'));
+    box.appendChild(el('p', 'note', named ?
+      'Older-bus layout: one value against one limit per test (\u2264 must stay at or below, \u2265 must reach). Names, units and limit types come from GM\u2019s published Mode $06 table for J1850 (Class 2) vehicles, restated; the scaling is ours, from GM\u2019s stated ranges. Rows are not judged OK or outside: compare each value with its own limit, and use ? for what a test checks.' :
+      'Older-bus layout: each row is one raw value and one limit. Whether the limit is a minimum or a maximum comes from the component id (SAE J1979; general knowledge, unverified on this car), and what each test means is set by the manufacturer, so no row is judged OK or outside.'));
     if (!res.length) return;
-    var tb = el('table', 'm6'), hd = el('tr');
-    ['Test (TID)', 'Component', 'Value', 'Limit', 'Limit is'].forEach(function (c) { hd.appendChild(el('th', '', c)); });
-    tb.appendChild(hd);
-    res.forEach(function (r) {
-      var tr = el('tr');
-      [r.tid, r.component, r.value, r.limit, r.limit_type].forEach(function (c) { tr.appendChild(el('td', '', String(c))); });
-      tb.appendChild(tr);
+    var num = function (v, u) { return typeof v === 'number' && isFinite(v) ? String(Number(v.toFixed(3))) + (u ? ' ' + u : '') : null; };
+    var by = {}, order = [];
+    res.forEach(function (r) { var g = r.tid; if (!by[g]) { by[g] = []; order.push(g); } by[g].push(r); });
+    order.forEach(function (tid) {
+      var first = by[tid][0], h = el('div', 'm6h', (first.monitor || 'Test') + ' ');
+      h.appendChild(el('span', '', 'TID ' + tid)); box.appendChild(h);
+      var tb = el('table', 'm6'), hd = el('tr');
+      ['Test', 'Value', 'Limit', 'Raw value / limit'].forEach(function (c) { hd.appendChild(el('th', '', c)); });
+      tb.appendChild(hd);
+      by[tid].forEach(function (r) {
+        var tr = el('tr'), name = el('td', '', String(r.name || 'Component ' + r.component));
+        if (r.help) name.appendChild(qbtn('m06:' + r.help));
+        var sign = r.limit_type === 'min' ? '\u2265 ' : '\u2264 ', v = num(r.value_s, r.unit), l = num(r.limit_s, r.unit);
+        tr.appendChild(name);
+        tr.appendChild(el('td', '', v === null ? String(r.value) : v));
+        tr.appendChild(el('td', '', sign + (l === null ? String(r.limit) : l)));
+        tr.appendChild(el('td', '', r.value + ' / ' + r.limit + ' \u00b7 comp ' + r.component));
+        tb.appendChild(tr);
+      });
+      box.appendChild(tb);
     });
-    box.appendChild(tb);
   }
   /* ---------- shared parts: Panel, Gauge, PID table ---------- */
   function panel(title) {   // a card with a title plate: { root, plate, name, body }; callers fill body and may add controls to plate

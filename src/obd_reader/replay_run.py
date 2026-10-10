@@ -125,6 +125,9 @@ def _mode06(m) -> dict | None:
     return {"read": True, "note": None, "mids": [x for x in mids if isinstance(x, str) and _HEX2.fullmatch(x)], "results": out}
 
 
+_GM_HELP_KEY = re.compile(r"gm:[0-9A-F]{2}:[0-9A-F]{2}:(?:min|max)")
+
+
 def _mode06_legacy(tids: list, res: list) -> dict | None:
     out = []
     for r in res:
@@ -134,7 +137,13 @@ def _mode06_legacy(tids: list, res: list) -> dict | None:
         if (not all(isinstance(x, str) and _HEX2.fullmatch(x) for x in ids) or not all(type(x) is int for x in nums)
                 or r.get("limit_type") not in ("min", "max")):
             return None
-        out.append({"tid": ids[0], "component": ids[1], "value": nums[0], "limit": nums[1], "limit_type": r["limit_type"]})
+        row = {"tid": ids[0], "component": ids[1], "value": nums[0], "limit": nums[1], "limit_type": r["limit_type"]}
+        hk = r.get("help")
+        if isinstance(hk, str) and _GM_HELP_KEY.fullmatch(hk):  # GM names: kept only as plain short text and numbers
+            row.update(help=hk, name=_short(r.get("name")), monitor=_short(r.get("monitor")), unit=_short(r.get("unit")),
+                       **{k: r[k] if type(r.get(k)) in (int, float) and math.isfinite(r[k]) else None
+                          for k in ("value_s", "limit_s")})
+        out.append(row)
     return {"read": True, "note": None, "layout": "legacy",
             "mids": [x for x in tids if isinstance(x, str) and _HEX2.fullmatch(x)], "results": out}
 

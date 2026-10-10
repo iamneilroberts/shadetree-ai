@@ -283,3 +283,13 @@ def test_legacy_mode06_block_is_kept_and_bad_rows_drop_it():
     bad = copy.deepcopy(good)
     bad["results"][0]["limit_type"] = "<b>"
     assert rr._mode06(bad) is None
+
+
+def test_legacy_mode06_gm_names_are_kept_as_plain_values():
+    r = {"tid": "02", "component": "50", "value": 32771, "limit": 32878, "limit_type": "min", "name": "Weak vacuum",
+         "monitor": "EVAP", "unit": "in H2O", "value_s": 0.3, "limit_s": 11.0, "help": "gm:02:50:min"}
+    got = rr._mode06({"read": True, "layout": "legacy", "mids": ["02"], "results": [r]})
+    assert got["results"][0] == r
+    bad = dict(r, help="gm:02:50:<x>", value_s=float("nan"))
+    plain = rr._mode06({"read": True, "layout": "legacy", "mids": ["02"], "results": [bad]})["results"][0]
+    assert "name" not in plain and "help" not in plain
