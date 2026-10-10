@@ -143,6 +143,11 @@ class LiveHub:
         return self._thread is not None and self._thread.is_alive()
 
     @property
+    def session(self) -> Session:
+        """The adapter session, so a console add-on can read under the shared lock (plugins.py)."""
+        return self._s
+
+    @property
     def runs_dir(self) -> Path:
         return Path(self._s.config.home) / "runs"
 

@@ -1186,3 +1186,9 @@ def test_gm_legacy_mode06_rows_carry_gms_test_names(tmp_path, monkeypatch):
     r = hub.state()["mode06"]["results"][0]
     hub.stop()
     assert r["name"] == "Weak vacuum, pass test 1" and r["value_s"] == 0.3 and r["help"] == "gm:02:50:min"
+
+
+def test_livehub_exposes_its_session(tmp_path):
+    s = Session(Config(port="sim", home=tmp_path, timeout=1.0), port_factory=lambda: object())
+    hub = LiveHub(s)
+    assert hub.session is s
